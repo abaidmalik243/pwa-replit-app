@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import AdminSidebar from "@/components/AdminSidebar";
 import AdminHeader from "@/components/AdminHeader";
 import OrderCard, { Order } from "@/components/OrderCard";
 import { useToast } from "@/hooks/use-toast";
+import { playNotificationSound } from "@/lib/notificationSound";
+import { Button } from "@/components/ui/button";
 
 //todo: remove mock functionality
 const MOCK_ORDERS: Order[] = [
@@ -51,6 +53,42 @@ export default function AdminDashboard() {
   const [orders, setOrders] = useState<Order[]>(MOCK_ORDERS);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const { toast } = useToast();
+  const previousPendingCount = useRef(0);
+
+  // Monitor for new pending orders and play sound
+  useEffect(() => {
+    const currentPendingCount = orders.filter((o) => o.status === "pending").length;
+    
+    // Play sound if there are more pending orders than before
+    if (currentPendingCount > previousPendingCount.current && soundEnabled) {
+      playNotificationSound();
+      toast({
+        title: "🔔 New Order!",
+        description: `You have ${currentPendingCount} pending order${currentPendingCount > 1 ? 's' : ''}`,
+      });
+    }
+    
+    previousPendingCount.current = currentPendingCount;
+  }, [orders, soundEnabled, toast]);
+
+  // Simulate new orders coming in (for demo purposes)
+  const simulateNewOrder = () => {
+    const newOrder: Order = {
+      id: `${Date.now()}`,
+      orderNumber: `${Math.floor(1000 + Math.random() * 9000)}`,
+      customerName: "New Customer",
+      customerPhone: "+1 (555) 999-9999",
+      items: [
+        { name: "Gourmet Burger", quantity: 1, price: 12.99 },
+        { name: "Crispy Fries", quantity: 1, price: 4.99 },
+      ],
+      total: 17.98,
+      status: "pending",
+      createdAt: new Date(),
+    };
+    
+    setOrders((prev) => [newOrder, ...prev]);
+  };
 
   const handleAccept = (id: string) => {
     setOrders((prev) =>
@@ -124,11 +162,20 @@ export default function AdminDashboard() {
         />
 
         <main className="flex-1 overflow-y-auto p-6">
-          <div className="mb-6">
-            <h1 className="text-3xl font-bold mb-2">Order Dashboard</h1>
-            <p className="text-muted-foreground">
-              Manage incoming orders and update their status
-            </p>
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold mb-2">Order Dashboard</h1>
+              <p className="text-muted-foreground">
+                Manage incoming orders and update their status
+              </p>
+            </div>
+            <Button 
+              onClick={simulateNewOrder}
+              variant="outline"
+              data-testid="button-simulate-order"
+            >
+              🧪 Simulate New Order
+            </Button>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

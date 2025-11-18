@@ -1,3 +1,4 @@
+import "dotenv/config";
 import * as schema from "@shared/schema";
 import bcrypt from "bcrypt";
 import { db, pool } from "./db";

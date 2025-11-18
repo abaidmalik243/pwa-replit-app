@@ -34,7 +34,7 @@ Preferred communication style: Simple, everyday language.
 
 **Schema Design**: The application uses a relational database with the following core entities:
 
-- **Branches**: Multi-location support with delivery area definitions, custom branding (logo, colors), and active status flags.
+- **Branches**: Multi-location support with delivery area definitions, GPS coordinates (latitude/longitude as decimal fields), custom branding (logo, colors), and active status flags. Each branch has real geographic coordinates for distance-based matching.
 - **Users**: Authentication and role-based access control (admin, staff, customer) with feature-based permissions array and branch assignment.
 - **Categories**: Menu organization with images, descriptions, and active status.
 - **Menu Items**: Product catalog with pricing, descriptions, images, category relationships, vegetarian flags, and availability status.
@@ -42,6 +42,11 @@ Preferred communication style: Simple, everyday language.
 - **Expenses**: Financial tracking by branch with categories (rent, utilities, supplies, salaries, marketing, maintenance, transportation, other) and date-based reporting.
 
 All tables use UUID primary keys generated via PostgreSQL's `gen_random_uuid()` function.
+
+**Branch GPS Coordinates** (for geolocation matching):
+- Okara: 30.8081° N, 73.4534° E
+- Sahiwal: 30.6708° N, 73.1116° E
+- Faisalabad: 31.4180° N, 73.0790° E
 
 ### Authentication System
 
@@ -90,6 +95,9 @@ All tables use UUID primary keys generated via PostgreSQL's `gen_random_uuid()` 
 **Dual Interface Design**:
 
 1. **Customer Interface**: Visual-first, appetite-driven design inspired by Uber Eats and DoorDash
+   - Order type and location selection modal (first-time and on-demand)
+   - GPS-based nearest branch detection using Haversine formula
+   - City and delivery area selection with validation
    - Hero slider with food imagery
    - Horizontal scrollable category filter
    - Grid-based menu item cards with "Add to Cart" functionality

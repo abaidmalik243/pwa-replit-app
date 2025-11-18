@@ -28,9 +28,6 @@ export default function CartDrawer({
   onCheckout 
 }: CartDrawerProps) {
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const tax = subtotal * 0.1;
-  const deliveryFee = 2.99;
-  const total = subtotal + tax + deliveryFee;
 
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
@@ -94,23 +91,13 @@ export default function CartDrawer({
 
             <div className="space-y-4 pt-4 border-t">
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Subtotal</span>
-                  <span data-testid="text-subtotal">${subtotal.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Tax</span>
-                  <span data-testid="text-tax">${tax.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Delivery Fee</span>
-                  <span data-testid="text-delivery">${deliveryFee.toFixed(2)}</span>
-                </div>
-                <Separator />
                 <div className="flex justify-between font-semibold text-base">
-                  <span>Total</span>
-                  <span data-testid="text-total">${total.toFixed(2)}</span>
+                  <span>Subtotal</span>
+                  <span data-testid="text-subtotal">Rs. {subtotal.toFixed(0)}</span>
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Delivery fee (if applicable) will be shown at checkout
+                </p>
               </div>
 
               <Button 
@@ -119,7 +106,7 @@ export default function CartDrawer({
                 onClick={onCheckout}
                 data-testid="button-checkout"
               >
-                Checkout
+                Proceed to Checkout
               </Button>
             </div>
           </>

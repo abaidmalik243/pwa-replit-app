@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import CustomerHeader from "@/components/CustomerHeader";
 import ImageSlider from "@/components/ImageSlider";
 import Footer from "@/components/Footer";
@@ -7,6 +8,7 @@ import CategoryFilter from "@/components/CategoryFilter";
 import MenuItemCard, { MenuItem } from "@/components/MenuItemCard";
 import CartDrawer, { CartItem } from "@/components/CartDrawer";
 import OrderTypeDialog from "@/components/OrderTypeDialog";
+import OrderConfirmationDialog, { OrderDetails } from "@/components/OrderConfirmationDialog";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
@@ -35,6 +37,7 @@ export default function CustomerHome() {
   const [activeCategory, setActiveCategory] = useState("All");
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isConfirmationOpen, setIsConfirmationOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
   const [orderType, setOrderType] = useState<"delivery" | "pickup">("delivery");
@@ -147,13 +150,58 @@ export default function CustomerHome() {
     }
   };
 
+  const createOrderMutation = useMutation({
+    mutationFn: async (orderData: any) => {
+      const res = await apiRequest("POST", "/api/orders", orderData);
+      return await res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      toast({
+        title: "Order placed successfully!",
+        description: `Your order #${data.orderNumber} has been received. We'll notify you when it's ready.`,
+      });
+      setCartItems([]);
+      setIsCartOpen(false);
+      setIsConfirmationOpen(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error placing order",
+        description: error.message || "Failed to place order. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleCheckout = () => {
-    toast({
-      title: "Order placed!",
-      description: "Your order has been placed successfully. We'll notify you when it's ready.",
-    });
-    setCartItems([]);
+    // Close cart and open confirmation dialog
     setIsCartOpen(false);
+    setIsConfirmationOpen(true);
+  };
+
+  const handleConfirmOrder = (orderDetails: OrderDetails) => {
+    // Generate order number
+    const orderNumber = `ORD-${Date.now().toString().slice(-8)}`;
+
+    // Prepare order data
+    const orderData = {
+      orderNumber,
+      branchId: selectedBranchId,
+      customerName: orderDetails.customerName,
+      customerPhone: orderDetails.customerPhone,
+      alternativePhone: orderDetails.alternativePhone,
+      customerAddress: orderDetails.customerAddress,
+      deliveryArea: selectedArea,
+      orderType: orderType === "pickup" ? "takeaway" : "delivery",
+      paymentMethod: orderDetails.paymentMethod,
+      items: JSON.stringify(cartItems),
+      total: cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0) + (orderType === "delivery" ? 50 : 0),
+      notes: orderDetails.notes,
+      status: "pending",
+    };
+
+    createOrderMutation.mutate(orderData);
   };
 
   const selectedBranch = branches.find(b => b.id === selectedBranchId);
@@ -228,6 +276,17 @@ export default function CustomerHome() {
           branchId: selectedBranchId,
           area: selectedArea,
         } : undefined}
+      />
+
+      <OrderConfirmationDialog
+        open={isConfirmationOpen}
+        onOpenChange={setIsConfirmationOpen}
+        cartItems={cartItems}
+        orderType={orderType}
+        branchName={selectedBranch?.name}
+        selectedArea={selectedArea}
+        onConfirmOrder={handleConfirmOrder}
+        isSubmitting={createOrderMutation.isPending}
       />
     </div>
   );

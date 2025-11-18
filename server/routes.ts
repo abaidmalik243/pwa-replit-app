@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import bcrypt from "bcrypt";
 import { z } from "zod";
-import { insertUserSchema } from "@shared/schema";
+import { insertUserSchema, insertOrderSchema, insertBranchSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication routes
@@ -81,21 +81,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/branches", async (req, res) => {
     try {
-      const branch = await storage.createBranch(req.body);
+      const validatedData = insertBranchSchema.parse(req.body);
+      const branch = await storage.createBranch(validatedData);
       res.json(branch);
     } catch (error: any) {
+      console.error("Branch creation error:", error);
       res.status(400).json({ error: error.message });
     }
   });
 
   app.put("/api/branches/:id", async (req, res) => {
     try {
-      const branch = await storage.updateBranch(req.params.id, req.body);
+      const validatedData = insertBranchSchema.partial().parse(req.body);
+      const branch = await storage.updateBranch(req.params.id, validatedData);
       if (!branch) {
         return res.status(404).json({ error: "Branch not found" });
       }
       res.json(branch);
     } catch (error: any) {
+      console.error("Branch update error:", error);
       res.status(400).json({ error: error.message });
     }
   });
@@ -211,15 +215,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/orders", async (req, res) => {
     try {
-      // Generate order number
-      const orderNumber = `KP-${Date.now().toString().slice(-6)}`;
-      const order = await storage.createOrder({
-        ...req.body,
-        orderNumber,
-      });
+      // Validate order data
+      const validatedData = insertOrderSchema.parse(req.body);
+      
+      const order = await storage.createOrder(validatedData);
       res.json(order);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      console.error("Order creation error:", error);
+      res.status(400).json({ error: error.message || "Failed to create order" });
     }
   });
 

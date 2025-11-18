@@ -85,9 +85,11 @@ export const orders = pgTable("orders", {
   branchId: varchar("branch_id").references(() => branches.id).notNull(),
   customerName: text("customer_name").notNull(),
   customerPhone: text("customer_phone").notNull(),
+  alternativePhone: text("alternative_phone"), // Alternative contact number
   customerAddress: text("customer_address"), // For delivery orders
   deliveryArea: text("delivery_area"), // Selected delivery area
   orderType: text("order_type").notNull().default("takeaway"), // takeaway or delivery
+  paymentMethod: text("payment_method").notNull().default("cash"), // cash or jazzcash
   items: text("items").notNull(), // JSON string
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
   status: text("status").notNull().default("pending"), // pending, preparing, ready, completed, cancelled
@@ -96,7 +98,9 @@ export const orders = pgTable("orders", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-export const insertOrderSchema = createInsertSchema(orders).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertOrderSchema = createInsertSchema(orders).omit({ id: true, createdAt: true, updatedAt: true }).extend({
+  total: z.string().or(z.number()).transform(val => typeof val === 'string' ? val : val.toString()),
+});
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type Order = typeof orders.$inferSelect;
 

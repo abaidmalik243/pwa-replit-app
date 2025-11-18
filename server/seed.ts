@@ -1,14 +1,318 @@
-import { drizzle } from "drizzle-orm/neon-serverless";
-import { Pool } from "@neondatabase/serverless";
 import * as schema from "@shared/schema";
 import bcrypt from "bcrypt";
-
-const pool = new Pool({ connectionString: process.env.DATABASE_URL! });
-const db = drizzle(pool, { schema });
-
+import { db, pool } from "./db";
+async function seedMenuData() {
+  console.log("🌱 Seeding menu data...");
+  try {
+    // Clear existing menu items and categories (in correct order to avoid FK conflicts)
+    console.log("Clearing existing menu data...");
+    await db.delete(schema.menuItems);
+    await db.delete(schema.categories);
+    console.log("✅ Cleared existing menu data");
+    // Create Categories
+    const categoriesData = [
+      {
+        name: "Pizzas",
+        description: "Delicious handcrafted pizzas with premium toppings",
+        imageUrl: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&h=300&fit=crop",
+        isActive: true,
+      },
+      {
+        name: "French Fries",
+        description: "Crispy golden fries",
+        imageUrl: "https://images.unsplash.com/photo-1630431341973-02e1979c5501?w=400&h=300&fit=crop",
+        isActive: true,
+      },
+      {
+        name: "Burgers",
+        description: "Juicy burgers with fresh ingredients",
+        imageUrl: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&h=300&fit=crop",
+        isActive: true,
+      },
+      {
+        name: "Wings",
+        description: "Crispy chicken wings with various flavors",
+        imageUrl: "https://images.unsplash.com/photo-1527477396000-e27163b481c2?w=400&h=300&fit=crop",
+        isActive: true,
+      },
+      {
+        name: "Pasta",
+        description: "Italian-style pasta dishes",
+        imageUrl: "https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=400&h=300&fit=crop",
+        isActive: true,
+      },
+    ];
+    const createdCategories = await db.insert(schema.categories).values(categoriesData).returning();
+    console.log(`✅ Created ${createdCategories.length} categories`);
+    const pizzaCategoryId = createdCategories.find((c: schema.Category) => c.name === "Pizzas")!.id;
+    const friesCategoryId = createdCategories.find((c: schema.Category) => c.name === "French Fries")!.id;
+    const burgersCategoryId = createdCategories.find((c: schema.Category) => c.name === "Burgers")!.id;
+    const wingsCategoryId = createdCategories.find((c: schema.Category) => c.name === "Wings")!.id;
+    const pastaCategoryId = createdCategories.find((c: schema.Category) => c.name === "Pasta")!.id;
+    // Menu Items
+    const menuItemsData: schema.InsertMenuItem[] = [];
+    // Regular Pizzas (Small, Medium, Large)
+    const regularPizzas = [
+      "Chicken Tikka",
+      "Chicken Fajita",
+      "Chicken Supreme",
+      "Veg Lover",
+      "Chicken Malai Boti",
+      "Kebabish Special",
+    ];
+    for (const pizza of regularPizzas) {
+      menuItemsData.push(
+        {
+          name: `${pizza} Pizza - Small`,
+          description: `Delicious ${pizza} pizza`,
+          price: "450",
+          categoryId: pizzaCategoryId,
+          imageUrl: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&h=300&fit=crop",
+          isAvailable: true,
+        },
+        {
+          name: `${pizza} Pizza - Medium`,
+          description: `Delicious ${pizza} pizza`,
+          price: "850",
+          categoryId: pizzaCategoryId,
+          imageUrl: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&h=300&fit=crop",
+          isAvailable: true,
+        },
+        {
+          name: `${pizza} Pizza - Large`,
+          description: `Delicious ${pizza} pizza`,
+          price: "1180",
+          categoryId: pizzaCategoryId,
+          imageUrl: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&h=300&fit=crop",
+          isAvailable: true,
+        }
+      );
+    }
+    // Special Treat Pizzas - Kabab and Cheese Stuffer
+    menuItemsData.push(
+      {
+        name: "Kabab Stuffer Pizza - Medium",
+        description: "Special treat pizza stuffed with kebab",
+        price: "1180",
+        categoryId: pizzaCategoryId,
+        imageUrl: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&h=300&fit=crop",
+        isAvailable: true,
+      },
+      {
+        name: "Kabab Stuffer Pizza - Large",
+        description: "Special treat pizza stuffed with kebab",
+        price: "1480",
+        categoryId: pizzaCategoryId,
+        imageUrl: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&h=300&fit=crop",
+        isAvailable: true,
+      },
+      {
+        name: "Cheese Stuffer Pizza - Medium",
+        description: "Special treat pizza stuffed with cheese",
+        price: "1180",
+        categoryId: pizzaCategoryId,
+        imageUrl: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&h=300&fit=crop",
+        isAvailable: true,
+      },
+      {
+        name: "Cheese Stuffer Pizza - Large",
+        description: "Special treat pizza stuffed with cheese",
+        price: "1480",
+        categoryId: pizzaCategoryId,
+        imageUrl: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&h=300&fit=crop",
+        isAvailable: true,
+      }
+    );
+    // Special Treat Pizzas - Bihari Kabab and Pepperoni
+    menuItemsData.push(
+      {
+        name: "Bihari Kabab Pizza - Medium",
+        description: "Special treat pizza with Bihari kabab",
+        price: "980",
+        categoryId: pizzaCategoryId,
+        imageUrl: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&h=300&fit=crop",
+        isAvailable: true,
+      },
+      {
+        name: "Bihari Kabab Pizza - Large",
+        description: "Special treat pizza with Bihari kabab",
+        price: "1380",
+        categoryId: pizzaCategoryId,
+        imageUrl: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&h=300&fit=crop",
+        isAvailable: true,
+      },
+      {
+        name: "Pepperoni Pizza - Medium",
+        description: "Classic pepperoni pizza",
+        price: "980",
+        categoryId: pizzaCategoryId,
+        imageUrl: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&h=300&fit=crop",
+        isAvailable: true,
+      },
+      {
+        name: "Pepperoni Pizza - Large",
+        description: "Classic pepperoni pizza",
+        price: "1380",
+        categoryId: pizzaCategoryId,
+        imageUrl: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&h=300&fit=crop",
+        isAvailable: true,
+      }
+    );
+    // Square Pizzas
+    for (const pizza of regularPizzas) {
+      menuItemsData.push(
+        {
+          name: `${pizza} Square Pizza - Medium`,
+          description: `Square ${pizza} pizza`,
+          price: "950",
+          categoryId: pizzaCategoryId,
+          imageUrl: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&h=300&fit=crop",
+          isAvailable: true,
+        },
+        {
+          name: `${pizza} Square Pizza - Large`,
+          description: `Square ${pizza} pizza`,
+          price: "1280",
+          categoryId: pizzaCategoryId,
+          imageUrl: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&h=300&fit=crop",
+          isAvailable: true,
+        }
+      );
+    }
+    // Square Stuffer Pizza
+    menuItemsData.push({
+      name: "Kabab Stuffer Square Pizza",
+      description: "Square pizza stuffed with kebab",
+      price: "1550",
+      categoryId: pizzaCategoryId,
+      imageUrl: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&h=300&fit=crop",
+      isAvailable: true,
+    });
+    // French Fries
+    menuItemsData.push(
+      {
+        name: "Regular Fries",
+        description: "Crispy golden french fries",
+        price: "180",
+        categoryId: friesCategoryId,
+        imageUrl: "https://images.unsplash.com/photo-1630431341973-02e1979c5501?w=400&h=300&fit=crop",
+        isAvailable: true,
+      },
+      {
+        name: "Family Pack Fries",
+        description: "Large family pack of crispy fries",
+        price: "350",
+        categoryId: friesCategoryId,
+        imageUrl: "https://images.unsplash.com/photo-1630431341973-02e1979c5501?w=400&h=300&fit=crop",
+        isAvailable: true,
+      }
+    );
+    // Burgers
+    menuItemsData.push({
+      name: "Zinger Burger",
+      description: "Crispy chicken zinger burger",
+      price: "330",
+      categoryId: burgersCategoryId,
+      imageUrl: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&h=300&fit=crop",
+      isAvailable: true,
+    });
+    // Wings
+    menuItemsData.push(
+      {
+        name: "Oven Baked Wings - 5 Pieces",
+        description: "Delicious oven baked chicken wings",
+        price: "250",
+        categoryId: wingsCategoryId,
+        imageUrl: "https://images.unsplash.com/photo-1527477396000-e27163b481c2?w=400&h=300&fit=crop",
+        isAvailable: true,
+      },
+      {
+        name: "Oven Baked Wings - 10 Pieces",
+        description: "Delicious oven baked chicken wings",
+        price: "450",
+        categoryId: wingsCategoryId,
+        imageUrl: "https://images.unsplash.com/photo-1527477396000-e27163b481c2?w=400&h=300&fit=crop",
+        isAvailable: true,
+      },
+      {
+        name: "Hot Wings - 5 Pieces",
+        description: "Spicy hot chicken wings",
+        price: "290",
+        categoryId: wingsCategoryId,
+        imageUrl: "https://images.unsplash.com/photo-1527477396000-e27163b481c2?w=400&h=300&fit=crop",
+        isAvailable: true,
+      },
+      {
+        name: "Hot Wings - 10 Pieces",
+        description: "Spicy hot chicken wings",
+        price: "550",
+        categoryId: wingsCategoryId,
+        imageUrl: "https://images.unsplash.com/photo-1527477396000-e27163b481c2?w=400&h=300&fit=crop",
+        isAvailable: true,
+      }
+    );
+    // Pasta
+    menuItemsData.push(
+      {
+        name: "Special Pasta - F-1",
+        description: "Special pasta",
+        price: "350",
+        categoryId: pastaCategoryId,
+        imageUrl: "https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=400&h=300&fit=crop",
+        isAvailable: true,
+      },
+      {
+        name: "Special Pasta - F-2",
+        description: "Special pasta (Large)",
+        price: "550",
+        categoryId: pastaCategoryId,
+        imageUrl: "https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=400&h=300&fit=crop",
+        isAvailable: true,
+      },
+      {
+        name: "BBQ Pasta - F-1",
+        description: "BBQ pasta",
+        price: "400",
+        categoryId: pastaCategoryId,
+        imageUrl: "https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=400&h=300&fit=crop",
+        isAvailable: true,
+      },
+      {
+        name: "BBQ Pasta - F-2",
+        description: "BBQ pasta (Large)",
+        price: "600",
+        categoryId: pastaCategoryId,
+        imageUrl: "https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=400&h=300&fit=crop",
+        isAvailable: true,
+      },
+      {
+        name: "Crunchy Pasta - F-1",
+        description: "Crunchy pasta",
+        price: "450",
+        categoryId: pastaCategoryId,
+        imageUrl: "https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=400&h=300&fit=crop",
+        isAvailable: true,
+      },
+      {
+        name: "Crunchy Pasta - F-2",
+        description: "Crunchy pasta (Large)",
+        price: "650",
+        categoryId: pastaCategoryId,
+        imageUrl: "https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=400&h=300&fit=crop",
+        isAvailable: true,
+      }
+    );
+    // Insert all menu items
+    const createdMenuItems = await db.insert(schema.menuItems).values(menuItemsData).returning();
+    console.log(`✅ Created ${createdMenuItems.length} menu items`);
+    console.log("🎉 Menu seeding completed successfully!");
+  } catch (error) {
+    console.error("❌ Error seeding menu:", error);
+    throw error;
+  }
+}
 async function seed() {
   console.log("🌱 Starting database seed...");
-
   try {
     // Create branches with delivery areas
     console.log("Creating branches...");
@@ -22,7 +326,6 @@ async function seed() {
       deliveryAreas: ["City Center", "Model Town", "Satellite Town", "Sadar Bazaar", "Civil Lines"],
       isActive: true,
     }).returning().then(rows => rows[0]);
-
     const sahiwal = await db.insert(schema.branches).values({
       name: "Kebabish Pizza Sahiwal",
       city: "Sahiwal",
@@ -33,7 +336,6 @@ async function seed() {
       deliveryAreas: ["Farid Town", "Allama Iqbal Colony", "Civil Lines", "High Street", "Jinnah Colony"],
       isActive: true,
     }).returning().then(rows => rows[0]);
-
     const faisalabad = await db.insert(schema.branches).values({
       name: "Kebabish Pizza Faisalabad",
       city: "Faisalabad",
@@ -44,7 +346,6 @@ async function seed() {
       deliveryAreas: ["D-Ground", "Peoples Colony", "Susan Road", "Madina Town", "Gulberg"],
       isActive: true,
     }).returning().then(rows => rows[0]);
-
     // Create default admin account
     console.log("Creating default admin account...");
     const hashedPassword = await bcrypt.hash("Abcd@1234", 10);
@@ -68,426 +369,8 @@ async function seed() {
       isActive: true,
     });
 
-    // Create categories
-    console.log("Creating categories...");
-    const pizzaCat = await db.insert(schema.categories).values({
-      name: "Pizzas",
-      description: "Delicious pizzas in various sizes and flavors",
-      isActive: true,
-    }).returning().then(rows => rows[0]);
-
-    const friesCat = await db.insert(schema.categories).values({
-      name: "French Fries",
-      description: "Crispy golden fries",
-      isActive: true,
-    }).returning().then(rows => rows[0]);
-
-    const burgersCat = await db.insert(schema.categories).values({
-      name: "Burgers",
-      description: "Juicy burgers",
-      isActive: true,
-    }).returning().then(rows => rows[0]);
-
-    const wingsCat = await db.insert(schema.categories).values({
-      name: "Wings",
-      description: "Oven baked and hot wings",
-      isActive: true,
-    }).returning().then(rows => rows[0]);
-
-    const pastaCat = await db.insert(schema.categories).values({
-      name: "Pasta",
-      description: "Delicious pasta in different flavors",
-      isActive: true,
-    }).returning().then(rows => rows[0]);
-
-    // Pizza menu items
-    console.log("Creating menu items - Pizzas...");
-    const pizzaTypes = [
-      "Chicken Tikka",
-      "Chicken Fajita",
-      "Chicken Supreme",
-      "Veg Lover",
-      "Chicken Malai Boti",
-      "Kebabish Special",
-    ];
-
-    // Regular Pizzas (Small, Medium, Large)
-    for (const pizzaType of pizzaTypes) {
-      await db.insert(schema.menuItems).values([
-        {
-          name: `${pizzaType} Pizza`,
-          description: `Delicious ${pizzaType} pizza`,
-          price: "450",
-          size: "Small",
-          variant: "Regular",
-          categoryId: pizzaCat.id,
-          isAvailable: true,
-          isHotSelling: ["Chicken Tikka", "Kebabish Special"].includes(pizzaType),
-          stockQuantity: 100,
-          lowStockThreshold: 10,
-        },
-        {
-          name: `${pizzaType} Pizza`,
-          description: `Delicious ${pizzaType} pizza`,
-          price: "850",
-          size: "Medium",
-          variant: "Regular",
-          categoryId: pizzaCat.id,
-          isAvailable: true,
-          isHotSelling: ["Chicken Tikka", "Kebabish Special"].includes(pizzaType),
-          stockQuantity: 100,
-          lowStockThreshold: 10,
-        },
-        {
-          name: `${pizzaType} Pizza`,
-          description: `Delicious ${pizzaType} pizza`,
-          price: "1180",
-          size: "Large",
-          variant: "Regular",
-          categoryId: pizzaCat.id,
-          isAvailable: true,
-          isHotSelling: ["Chicken Tikka", "Kebabish Special"].includes(pizzaType),
-          stockQuantity: 100,
-          lowStockThreshold: 10,
-        },
-      ]);
-    }
-
-    // Special Treat Pizzas
-    await db.insert(schema.menuItems).values([
-      {
-        name: "Kabab Stuffer Pizza",
-        description: "Delicious kabab stuffed pizza",
-        price: "1150",
-        size: "Medium",
-        variant: "Special Treat",
-        categoryId: pizzaCat.id,
-        isAvailable: true,
-        isHotSelling: true,
-        stockQuantity: 50,
-        lowStockThreshold: 5,
-      },
-      {
-        name: "Kabab Stuffer Pizza",
-        description: "Delicious kabab stuffed pizza",
-        price: "1480",
-        size: "Large",
-        variant: "Special Treat",
-        categoryId: pizzaCat.id,
-        isAvailable: true,
-        isHotSelling: true,
-        stockQuantity: 50,
-        lowStockThreshold: 5,
-      },
-      {
-        name: "Cheese Stuffer Pizza",
-        description: "Extra cheese stuffed pizza",
-        price: "1150",
-        size: "Medium",
-        variant: "Special Treat",
-        categoryId: pizzaCat.id,
-        isAvailable: true,
-        isHotSelling: false,
-        stockQuantity: 50,
-        lowStockThreshold: 5,
-      },
-      {
-        name: "Cheese Stuffer Pizza",
-        description: "Extra cheese stuffed pizza",
-        price: "1480",
-        size: "Large",
-        variant: "Special Treat",
-        categoryId: pizzaCat.id,
-        isAvailable: true,
-        isHotSelling: false,
-        stockQuantity: 50,
-        lowStockThreshold: 5,
-      },
-    ]);
-
-    // Bihari Kabab & Pepperoni
-    await db.insert(schema.menuItems).values([
-      {
-        name: "Bihari Kabab Pizza",
-        description: "Traditional Bihari kabab pizza",
-        price: "980",
-        size: "Medium",
-        variant: "Premium",
-        categoryId: pizzaCat.id,
-        isAvailable: true,
-        isHotSelling: true,
-        stockQuantity: 60,
-        lowStockThreshold: 8,
-      },
-      {
-        name: "Bihari Kabab Pizza",
-        description: "Traditional Bihari kabab pizza",
-        price: "1380",
-        size: "Large",
-        variant: "Premium",
-        categoryId: pizzaCat.id,
-        isAvailable: true,
-        isHotSelling: true,
-        stockQuantity: 60,
-        lowStockThreshold: 8,
-      },
-      {
-        name: "Pepperoni Pizza",
-        description: "Classic pepperoni pizza",
-        price: "980",
-        size: "Medium",
-        variant: "Premium",
-        categoryId: pizzaCat.id,
-        isAvailable: true,
-        isHotSelling: false,
-        stockQuantity: 60,
-        lowStockThreshold: 8,
-      },
-      {
-        name: "Pepperoni Pizza",
-        description: "Classic pepperoni pizza",
-        price: "1380",
-        size: "Large",
-        variant: "Premium",
-        categoryId: pizzaCat.id,
-        isAvailable: true,
-        isHotSelling: false,
-        stockQuantity: 60,
-        lowStockThreshold: 8,
-      },
-    ]);
-
-    // Square Pizzas
-    for (const pizzaType of pizzaTypes) {
-      await db.insert(schema.menuItems).values([
-        {
-          name: `${pizzaType} Pizza`,
-          description: `Square ${pizzaType} pizza`,
-          price: "950",
-          size: "Medium",
-          variant: "Square",
-          categoryId: pizzaCat.id,
-          isAvailable: true,
-          isHotSelling: false,
-          stockQuantity: 40,
-          lowStockThreshold: 5,
-        },
-        {
-          name: `${pizzaType} Pizza`,
-          description: `Square ${pizzaType} pizza`,
-          price: "1280",
-          size: "Large",
-          variant: "Square",
-          categoryId: pizzaCat.id,
-          isAvailable: true,
-          isHotSelling: false,
-          stockQuantity: 40,
-          lowStockThreshold: 5,
-        },
-      ]);
-    }
-
-    // Square Stuffer
-    await db.insert(schema.menuItems).values({
-      name: "Kabab Stuffer Pizza",
-      description: "Square kabab stuffer pizza",
-      price: "1550",
-      size: "Large",
-      variant: "Square Stuffer",
-      categoryId: pizzaCat.id,
-      isAvailable: true,
-      isHotSelling: true,
-      stockQuantity: 30,
-      lowStockThreshold: 5,
-    });
-
-    // French Fries
-    console.log("Creating menu items - French Fries...");
-    await db.insert(schema.menuItems).values([
-      {
-        name: "Regular Fries",
-        description: "Crispy golden french fries",
-        price: "180",
-        size: "Regular",
-        variant: null,
-        categoryId: friesCat.id,
-        isAvailable: true,
-        isHotSelling: true,
-        stockQuantity: 200,
-        lowStockThreshold: 20,
-      },
-      {
-        name: "Family Pack Fries",
-        description: "Large family pack of crispy fries",
-        price: "350",
-        size: "Family",
-        variant: null,
-        categoryId: friesCat.id,
-        isAvailable: true,
-        isHotSelling: false,
-        stockQuantity: 150,
-        lowStockThreshold: 15,
-      },
-    ]);
-
-    // Burgers
-    console.log("Creating menu items - Burgers...");
-    await db.insert(schema.menuItems).values([
-      {
-        name: "Zinger Burger",
-        description: "Crispy zinger burger",
-        price: "330",
-        size: null,
-        variant: null,
-        categoryId: burgersCat.id,
-        isAvailable: true,
-        isHotSelling: true,
-        stockQuantity: 80,
-        lowStockThreshold: 10,
-      },
-      {
-        name: "Fish Burger",
-        description: "Delicious fish burger (Coming Soon)",
-        price: "480",
-        size: null,
-        variant: null,
-        categoryId: burgersCat.id,
-        isAvailable: false,
-        isHotSelling: false,
-        stockQuantity: 0,
-        lowStockThreshold: 0,
-      },
-    ]);
-
-    // Wings
-    console.log("Creating menu items - Wings...");
-    await db.insert(schema.menuItems).values([
-      {
-        name: "Oven Baked Wings",
-        description: "Crispy oven baked wings",
-        price: "250",
-        size: "5 Pieces",
-        variant: "Oven Baked",
-        categoryId: wingsCat.id,
-        isAvailable: true,
-        isHotSelling: true,
-        stockQuantity: 120,
-        lowStockThreshold: 15,
-      },
-      {
-        name: "Oven Baked Wings",
-        description: "Crispy oven baked wings",
-        price: "450",
-        size: "10 Pieces",
-        variant: "Oven Baked",
-        categoryId: wingsCat.id,
-        isAvailable: true,
-        isHotSelling: true,
-        stockQuantity: 120,
-        lowStockThreshold: 15,
-      },
-      {
-        name: "Hot Wings",
-        description: "Spicy hot wings",
-        price: "290",
-        size: "5 Pieces",
-        variant: "Hot",
-        categoryId: wingsCat.id,
-        isAvailable: true,
-        isHotSelling: false,
-        stockQuantity: 100,
-        lowStockThreshold: 12,
-      },
-      {
-        name: "Hot Wings",
-        description: "Spicy hot wings",
-        price: "550",
-        size: "10 Pieces",
-        variant: "Hot",
-        categoryId: wingsCat.id,
-        isAvailable: true,
-        isHotSelling: false,
-        stockQuantity: 100,
-        lowStockThreshold: 12,
-      },
-    ]);
-
-    // Pasta
-    console.log("Creating menu items - Pasta...");
-    await db.insert(schema.menuItems).values([
-      {
-        name: "Special Pasta",
-        description: "Our special pasta",
-        price: "350",
-        size: "F-1",
-        variant: "Special",
-        categoryId: pastaCat.id,
-        isAvailable: true,
-        isHotSelling: false,
-        stockQuantity: 70,
-        lowStockThreshold: 10,
-      },
-      {
-        name: "Special Pasta",
-        description: "Our special pasta",
-        price: "550",
-        size: "F-2",
-        variant: "Special",
-        categoryId: pastaCat.id,
-        isAvailable: true,
-        isHotSelling: false,
-        stockQuantity: 70,
-        lowStockThreshold: 10,
-      },
-      {
-        name: "BBQ Pasta",
-        description: "BBQ flavored pasta",
-        price: "400",
-        size: "F-1",
-        variant: "BBQ",
-        categoryId: pastaCat.id,
-        isAvailable: true,
-        isHotSelling: true,
-        stockQuantity: 60,
-        lowStockThreshold: 8,
-      },
-      {
-        name: "BBQ Pasta",
-        description: "BBQ flavored pasta",
-        price: "600",
-        size: "F-2",
-        variant: "BBQ",
-        categoryId: pastaCat.id,
-        isAvailable: true,
-        isHotSelling: true,
-        stockQuantity: 60,
-        lowStockThreshold: 8,
-      },
-      {
-        name: "Crunchy Pasta",
-        description: "Crunchy crispy pasta",
-        price: "450",
-        size: "F-1",
-        variant: "Crunchy",
-        categoryId: pastaCat.id,
-        isAvailable: true,
-        isHotSelling: false,
-        stockQuantity: 55,
-        lowStockThreshold: 8,
-      },
-      {
-        name: "Crunchy Pasta",
-        description: "Crunchy crispy pasta",
-        price: "650",
-        size: "F-2",
-        variant: "Crunchy",
-        categoryId: pastaCat.id,
-        isAvailable: true,
-        isHotSelling: false,
-        stockQuantity: 55,
-        lowStockThreshold: 8,
-      },
-    ]);
+    // Create categories and menu items
+    await seedMenuData();
 
     console.log("✅ Database seeded successfully!");
     console.log(`
@@ -495,7 +378,7 @@ async function seed() {
     - Branches: 3 (Okara, Sahiwal, Faisalabad)
     - Admin Account: abaidmalik243@gmail.com / Abcd@1234
     - Categories: 5 (Pizzas, Fries, Burgers, Wings, Pasta)
-    - Menu Items: 70+ items with variants and sizes
+    - Menu Items: 65 items with variants and sizes
     `);
 
   } catch (error) {

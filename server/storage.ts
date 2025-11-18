@@ -1,7 +1,11 @@
 import { drizzle } from "drizzle-orm/neon-serverless";
-import { Pool } from "@neondatabase/serverless";
+import { Pool, neonConfig } from "@neondatabase/serverless";
 import * as schema from "@shared/schema";
 import { eq, like, and, desc } from "drizzle-orm";
+import ws from "ws";
+
+// Configure WebSocket for Neon serverless (required for Node.js v18-21)
+neonConfig.webSocketConstructor = ws;
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL! });
 const db = drizzle(pool, { schema });

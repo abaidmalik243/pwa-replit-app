@@ -216,7 +216,6 @@ export default function CustomerHome() {
       <CustomerHeader
         cartItemCount={cartItems.reduce((sum, item) => sum + item.quantity, 0)}
         onCartClick={() => setIsCartOpen(true)}
-        onMenuClick={() => console.log("Menu clicked")}
         locationInfo={locationInfo}
         onChangeLocation={() => setIsOrderDialogOpen(true)}
       />

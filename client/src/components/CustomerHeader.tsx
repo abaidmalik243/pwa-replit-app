@@ -1,4 +1,4 @@
-import { ShoppingCart, Phone, Menu, Settings, MapPin } from "lucide-react";
+import { ShoppingCart, Phone, Settings, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useLocation } from "wouter";
@@ -6,7 +6,6 @@ import { useLocation } from "wouter";
 interface CustomerHeaderProps {
   cartItemCount?: number;
   onCartClick?: () => void;
-  onMenuClick?: () => void;
   locationInfo?: {
     city?: string;
     area?: string;
@@ -18,7 +17,6 @@ interface CustomerHeaderProps {
 export default function CustomerHeader({ 
   cartItemCount = 0, 
   onCartClick,
-  onMenuClick,
   locationInfo,
   onChangeLocation
 }: CustomerHeaderProps) {
@@ -28,19 +26,8 @@ export default function CustomerHeader({
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between gap-4 px-4">
         <div className="flex items-center gap-2">
-          <Button 
-            size="icon" 
-            variant="ghost" 
-            className="md:hidden"
-            onClick={onMenuClick}
-            data-testid="button-menu-toggle"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">🍕</span>
-            <h1 className="text-xl md:text-2xl font-bold text-primary" data-testid="text-logo">Kebabish Pizza</h1>
-          </div>
+          <span className="text-2xl">🍕</span>
+          <h1 className="text-xl md:text-2xl font-bold text-primary" data-testid="text-logo">Kebabish Pizza</h1>
         </div>
 
         <div className="hidden md:flex items-center gap-4">

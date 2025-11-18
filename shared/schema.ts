@@ -91,7 +91,10 @@ export const orders = pgTable("orders", {
   orderType: text("order_type").notNull().default("takeaway"), // takeaway or delivery
   paymentMethod: text("payment_method").notNull().default("cash"), // cash or jazzcash
   items: text("items").notNull(), // JSON string
-  total: decimal("total", { precision: 10, scale: 2 }).notNull(),
+  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(), // Order subtotal before delivery
+  deliveryCharges: decimal("delivery_charges", { precision: 10, scale: 2 }).default("0"), // Delivery charges
+  deliveryDistance: decimal("delivery_distance", { precision: 5, scale: 2 }), // Distance in KM
+  total: decimal("total", { precision: 10, scale: 2 }).notNull(), // subtotal + deliveryCharges
   status: text("status").notNull().default("pending"), // pending, preparing, ready, completed, cancelled
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -99,10 +102,21 @@ export const orders = pgTable("orders", {
 });
 
 export const insertOrderSchema = createInsertSchema(orders).omit({ id: true, createdAt: true, updatedAt: true }).extend({
+  subtotal: z.string().or(z.number()).transform(val => typeof val === 'string' ? val : val.toString()),
+  deliveryCharges: z.string().or(z.number()).transform(val => typeof val === 'string' ? val : val.toString()).optional(),
+  deliveryDistance: z.string().or(z.number()).transform(val => typeof val === 'string' ? val : val.toString()).optional(),
   total: z.string().or(z.number()).transform(val => typeof val === 'string' ? val : val.toString()),
 });
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type Order = typeof orders.$inferSelect;
+
+// Delivery charges configuration
+export const DELIVERY_CONFIG = {
+  BASE_CHARGE: 50, // Fixed delivery charge in PKR
+  PER_KM_CHARGE: 20, // Per kilometer charge in PKR
+  FREE_DELIVERY_THRESHOLD: 1500, // Free delivery above this order amount in PKR
+  MAX_DELIVERY_DISTANCE: 15, // Maximum delivery distance in KM
+};
 
 // Daily Expenses
 export const expenses = pgTable("expenses", {

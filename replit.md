@@ -10,6 +10,34 @@ The system enables customers to browse menus, place orders, and track deliveries
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes
+
+### November 18, 2025
+
+**Database Architecture Improvements**:
+- Created shared `server/db.ts` module for centralized database connection management, eliminating duplicate database instantiation code across storage and seed modules
+- Refactored `server/storage.ts` and `server/seed.ts` to import from shared database module
+
+**Order System Enhancements**:
+- Implemented comprehensive order validation using `insertOrderSchema` in API routes with proper JSON serialization for cart items and decimal handling for prices
+- Enhanced `OrderConfirmationDialog` with Pakistani phone number validation (03XXXXXXXXX pattern)
+- Added real-time validation feedback with clear error messaging for users
+- Integrated payment method selection (Cash on Delivery, JazzCash) and alternative phone number collection
+
+**Branch Management**:
+- Added `insertBranchSchema` validation to branch create/update API endpoints
+- Improved delivery area array validation and serialization
+
+**Menu Population**:
+- Successfully populated database with 5 categories: Pizzas, French Fries, Burgers, Wings, Pasta
+- Created 56 menu items from user-provided data:
+  * 39 Pizza variants (Regular in 3 sizes, Special Treat with Kabab/Cheese Stuffer, Square pizzas, Special toppings like Bihari Kabab and Pepperoni)
+  * 2 French Fries options (Regular, Family Pack)
+  * 5 Burger options
+  * 4 Wings options (Oven Baked and Hot Wings in 5/10 piece portions)
+  * 6 Pasta variants (Special, BBQ, Crunchy in F-1/F-2 sizes)
+- Menu seeding refactored into reusable `seedMenuData()` function with automatic clearing and recreation of categories/menu items
+
 ## System Architecture
 
 ### Technology Stack

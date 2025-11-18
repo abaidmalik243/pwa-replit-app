@@ -78,9 +78,11 @@ export default function CustomerHome() {
   }, []);
 
   const handleOrderSelection = (type: "delivery" | "pickup", branchId: string, area?: string) => {
+    console.log("[handleOrderSelection] Called with:", { type, branchId, area });
     setOrderType(type);
     setSelectedBranchId(branchId);
     setSelectedArea(area || "");
+    console.log("[handleOrderSelection] State updated, branchId:", branchId);
     
     const orderInfo = {
       orderType: type,
@@ -88,6 +90,7 @@ export default function CustomerHome() {
       area: area || "",
     };
     localStorage.setItem("kebabish-order-info", JSON.stringify(orderInfo));
+    console.log("[handleOrderSelection] Saved to localStorage:", orderInfo);
 
     const selectedBranch = branches.find(b => b.id === branchId);
     toast({
@@ -175,6 +178,7 @@ export default function CustomerHome() {
   });
 
   const handleCheckout = () => {
+    console.log("[handleCheckout] Opening confirmation dialog, selectedBranchId:", selectedBranchId);
     // Close cart and open confirmation dialog
     setIsCartOpen(false);
     setIsConfirmationOpen(true);
@@ -189,26 +193,47 @@ export default function CustomerHome() {
     const deliveryCharges = orderType === "delivery" ? 50 : 0; // TODO: Calculate based on distance
     const total = subtotal + deliveryCharges;
 
-    // Prepare order data
-    const orderData = {
+    // Validate required data
+    if (!selectedBranchId) {
+      console.error("Missing branchId - cannot create order");
+      toast({
+        title: "Error",
+        description: "Please select a branch before placing order",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Prepare order data - required fields only, add optional fields conditionally
+    const orderData: Record<string, any> = {
       orderNumber,
       branchId: selectedBranchId,
       customerName: orderDetails.customerName,
       customerPhone: orderDetails.customerPhone,
-      alternativePhone: orderDetails.alternativePhone,
-      customerAddress: orderDetails.customerAddress,
-      deliveryArea: selectedArea,
       orderType: orderType === "pickup" ? "takeaway" : "delivery",
       paymentMethod: orderDetails.paymentMethod,
       items: JSON.stringify(cartItems),
       subtotal,
       deliveryCharges,
-      deliveryDistance: null, // TODO: Calculate distance
       total,
-      notes: orderDetails.notes,
       status: "pending",
     };
 
+    // Add optional fields only if they have non-empty values
+    if (orderDetails.alternativePhone) {
+      orderData.alternativePhone = orderDetails.alternativePhone;
+    }
+    if (orderDetails.customerAddress) {
+      orderData.customerAddress = orderDetails.customerAddress;
+    }
+    if (selectedArea) {
+      orderData.deliveryArea = selectedArea;
+    }
+    if (orderDetails.notes) {
+      orderData.notes = orderDetails.notes;
+    }
+
+    console.log("Creating order with data:", orderData);
     createOrderMutation.mutate(orderData);
   };
 

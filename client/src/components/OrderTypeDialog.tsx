@@ -118,7 +118,7 @@ export default function OrderTypeDialog({ isOpen, onClose, branches, onSelect, c
           }
         });
 
-        if (nearestBranch && nearestBranch.city) {
+        if (nearestBranch) {
           setSelectedCity(nearestBranch.city);
           setSelectedBranch(nearestBranch);
           setSelectedArea(""); // Clear area to force user confirmation

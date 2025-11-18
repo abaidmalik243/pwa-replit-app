@@ -19,19 +19,9 @@ import AdminSettings from "@/pages/admin-settings";
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Landing} />
+      <Route path="/" component={CustomerHome} />
       <Route path="/login" component={Login} />
       <Route path="/signup" component={Signup} />
-      <Route path="/order">
-        <ProtectedRoute requireAuth>
-          <CustomerHome />
-        </ProtectedRoute>
-      </Route>
-      <Route path="/customer">
-        <ProtectedRoute requireAuth>
-          <CustomerHome />
-        </ProtectedRoute>
-      </Route>
       <Route path="/admin">
         <ProtectedRoute requireRole={["admin", "staff"]}>
           <AdminDashboard />

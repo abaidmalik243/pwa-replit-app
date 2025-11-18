@@ -1,6 +1,7 @@
-import { ShoppingCart, Phone, Menu } from "lucide-react";
+import { ShoppingCart, Phone, Menu, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useLocation } from "wouter";
 
 interface CustomerHeaderProps {
   cartItemCount?: number;
@@ -13,6 +14,8 @@ export default function CustomerHeader({
   onCartClick,
   onMenuClick 
 }: CustomerHeaderProps) {
+  const [, setLocation] = useLocation();
+  
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between gap-4 px-4">
@@ -39,23 +42,34 @@ export default function CustomerHeader({
           </a>
         </div>
 
-        <Button 
-          size="icon" 
-          variant="ghost" 
-          className="relative"
-          onClick={onCartClick}
-          data-testid="button-cart"
-        >
-          <ShoppingCart className="h-5 w-5" />
-          {cartItemCount > 0 && (
-            <Badge 
-              className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
-              data-testid="badge-cart-count"
-            >
-              {cartItemCount}
-            </Badge>
-          )}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            size="icon" 
+            variant="ghost"
+            onClick={() => setLocation("/admin")}
+            title="Admin Panel"
+            data-testid="button-admin"
+          >
+            <Settings className="h-5 w-5" />
+          </Button>
+          <Button 
+            size="icon" 
+            variant="ghost" 
+            className="relative"
+            onClick={onCartClick}
+            data-testid="button-cart"
+          >
+            <ShoppingCart className="h-5 w-5" />
+            {cartItemCount > 0 && (
+              <Badge 
+                className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
+                data-testid="badge-cart-count"
+              >
+                {cartItemCount}
+              </Badge>
+            )}
+          </Button>
+        </div>
       </div>
     </header>
   );

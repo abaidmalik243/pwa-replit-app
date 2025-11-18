@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, decimal, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, decimal, timestamp, boolean, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -10,6 +10,9 @@ export const branches = pgTable("branches", {
   city: text("city").notNull(),
   address: text("address"),
   phone: text("phone"),
+  deliveryAreas: text("delivery_areas").array(), // Areas where delivery is available
+  logoUrl: text("logo_url"), // Custom branch logo
+  primaryColor: text("primary_color"), // Custom branch color
   isActive: boolean("is_active").notNull().default(true),
 });
 
@@ -26,6 +29,7 @@ export const users = pgTable("users", {
   fullName: text("full_name").notNull(),
   phone: text("phone"),
   role: text("role").notNull().default("customer"), // admin, staff, customer
+  permissions: text("permissions").array(), // Feature-based permissions (e.g., "manage_menu", "view_reports")
   branchId: varchar("branch_id").references(() => branches.id),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -55,9 +59,14 @@ export const menuItems = pgTable("menu_items", {
   name: text("name").notNull(),
   description: text("description"),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  size: text("size"), // Small, Medium, Large, F-1, F-2, etc.
+  variant: text("variant"), // Regular, Special Treat, Square, Stuffer, etc.
   categoryId: varchar("category_id").references(() => categories.id),
   imageUrl: text("image_url"),
   isAvailable: boolean("is_available").notNull().default(true),
+  isHotSelling: boolean("is_hot_selling").notNull().default(false), // Display in hot-selling section
+  stockQuantity: integer("stock_quantity").default(0), // For inventory management
+  lowStockThreshold: integer("low_stock_threshold").default(10), // Alert threshold
   branchId: varchar("branch_id").references(() => branches.id), // null means available at all branches
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -74,6 +83,9 @@ export const orders = pgTable("orders", {
   branchId: varchar("branch_id").references(() => branches.id).notNull(),
   customerName: text("customer_name").notNull(),
   customerPhone: text("customer_phone").notNull(),
+  customerAddress: text("customer_address"), // For delivery orders
+  deliveryArea: text("delivery_area"), // Selected delivery area
+  orderType: text("order_type").notNull().default("takeaway"), // takeaway or delivery
   items: text("items").notNull(), // JSON string
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
   status: text("status").notNull().default("pending"), // pending, preparing, ready, completed, cancelled

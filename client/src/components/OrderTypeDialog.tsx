@@ -23,6 +23,7 @@ export default function OrderTypeDialog({ isOpen, onClose, branches, onSelect, c
   const [selectedCity, setSelectedCity] = useState<string>("");
   const [selectedArea, setSelectedArea] = useState<string>(currentSelection?.area || "");
   const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
+  const [locationMessage, setLocationMessage] = useState<string>("");
 
   const cities = Array.from(new Set(branches.filter(b => b.isActive).map(b => b.city)));
 
@@ -42,6 +43,9 @@ export default function OrderTypeDialog({ isOpen, onClose, branches, onSelect, c
         setSelectedArea(currentSelection.area || "");
         setOrderType(currentSelection.orderType);
       }
+    } else if (isOpen) {
+      // Clear message when dialog opens fresh
+      setLocationMessage("");
     }
   }, [isOpen, currentSelection, branches]);
 
@@ -74,12 +78,62 @@ export default function OrderTypeDialog({ isOpen, onClose, branches, onSelect, c
     onClose();
   };
 
+  // Calculate distance between two coordinates using Haversine formula
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371; // Earth's radius in km
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
   const handleUseCurrentLocation = () => {
-    // Quick selection: Auto-select first available city
-    // Note: Full geolocation requires branch coordinates in database
-    if (cities.length > 0) {
-      setSelectedCity(cities[0]);
+    if (!navigator.geolocation) {
+      return;
     }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const userLat = position.coords.latitude;
+        const userLon = position.coords.longitude;
+
+        // Find nearest branch
+        let nearestBranch: Branch | null = null;
+        let minDistance = Infinity;
+
+        branches.forEach((branch: Branch) => {
+          if (!branch.isActive || !branch.latitude || !branch.longitude) return;
+
+          const branchLat = parseFloat(branch.latitude);
+          const branchLon = parseFloat(branch.longitude);
+          const distance = calculateDistance(userLat, userLon, branchLat, branchLon);
+
+          if (distance < minDistance) {
+            minDistance = distance;
+            nearestBranch = branch;
+          }
+        });
+
+        if (nearestBranch && nearestBranch.city) {
+          setSelectedCity(nearestBranch.city);
+          setSelectedBranch(nearestBranch);
+          setSelectedArea(""); // Clear area to force user confirmation
+          setLocationMessage(`Found nearest branch: ${nearestBranch.name}`);
+        }
+      },
+      (error) => {
+        console.error("Geolocation error:", error);
+        setLocationMessage("Location access denied. Please select manually.");
+        // Fallback to first city if location access denied
+        if (cities.length > 0) {
+          setSelectedCity(cities[0]);
+        }
+      }
+    );
   };
 
   const canProceed = selectedBranch && 
@@ -132,15 +186,22 @@ export default function OrderTypeDialog({ isOpen, onClose, branches, onSelect, c
                 Please select your location
               </h3>
 
-              <Button
-                variant="secondary"
-                className="w-full h-12 gap-2"
-                onClick={handleUseCurrentLocation}
-                data-testid="button-use-location"
-              >
-                <MapPin className="h-4 w-4" />
-                Use Current Location
-              </Button>
+              <div className="space-y-2 w-full">
+                <Button
+                  variant="secondary"
+                  className="w-full h-12 gap-2"
+                  onClick={handleUseCurrentLocation}
+                  data-testid="button-use-location"
+                >
+                  <MapPin className="h-4 w-4" />
+                  Use Current Location
+                </Button>
+                {locationMessage && (
+                  <p className="text-sm text-center text-muted-foreground" data-testid="text-location-message">
+                    {locationMessage}
+                  </p>
+                )}
+              </div>
 
               <Select value={selectedCity} onValueChange={(value) => {
                 setSelectedCity(value);

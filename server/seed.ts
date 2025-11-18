@@ -17,6 +17,8 @@ async function seed() {
       city: "Okara",
       address: "Main Bazaar, Okara",
       phone: "+92-300-1234567",
+      latitude: "30.8081",  // Okara city center coordinates
+      longitude: "73.4534",
       deliveryAreas: ["City Center", "Model Town", "Satellite Town", "Sadar Bazaar", "Civil Lines"],
       isActive: true,
     }).returning().then(rows => rows[0]);
@@ -26,6 +28,8 @@ async function seed() {
       city: "Sahiwal",
       address: "Main Boulevard, Sahiwal",
       phone: "+92-300-1234568",
+      latitude: "30.6708",  // Sahiwal city center coordinates
+      longitude: "73.1116",
       deliveryAreas: ["Farid Town", "Allama Iqbal Colony", "Civil Lines", "High Street", "Jinnah Colony"],
       isActive: true,
     }).returning().then(rows => rows[0]);
@@ -35,6 +39,8 @@ async function seed() {
       city: "Faisalabad",
       address: "D-Ground, Faisalabad",
       phone: "+92-300-1234569",
+      latitude: "31.4180",  // Faisalabad D-Ground coordinates
+      longitude: "73.0790",
       deliveryAreas: ["D-Ground", "Peoples Colony", "Susan Road", "Madina Town", "Gulberg"],
       isActive: true,
     }).returning().then(rows => rows[0]);

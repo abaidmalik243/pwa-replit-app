@@ -10,6 +10,8 @@ export const branches = pgTable("branches", {
   city: text("city").notNull(),
   address: text("address"),
   phone: text("phone"),
+  latitude: decimal("latitude", { precision: 10, scale: 7 }), // GPS latitude
+  longitude: decimal("longitude", { precision: 10, scale: 7 }), // GPS longitude
   deliveryAreas: text("delivery_areas").array(), // Areas where delivery is available
   logoUrl: text("logo_url"), // Custom branch logo
   primaryColor: text("primary_color"), // Custom branch color

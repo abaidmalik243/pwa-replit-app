@@ -11,8 +11,10 @@ import type { Order as DBOrder } from "@shared/schema";
 
 export default function AdminDashboard() {
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const { toast } = useToast();
   const previousPendingCount = useRef(0);
+  const hasInitialized = useRef(false);
 
   // Fetch orders from API
   const { data: dbOrders = [], isLoading } = useQuery<DBOrder[]>({
@@ -48,9 +50,19 @@ export default function AdminDashboard() {
 
   // Monitor for new pending orders and play sound
   useEffect(() => {
+    // Skip if data is still loading
+    if (isLoading) return;
+    
     const currentPendingCount = orders.filter((o) => o.status === "pending").length;
     
-    // Play sound if there are more pending orders than before (removed previousPendingCount > 0 check to allow first order notification)
+    // Initialize previousPendingCount on first data load to prevent false alerts
+    if (!hasInitialized.current) {
+      previousPendingCount.current = currentPendingCount;
+      hasInitialized.current = true;
+      return;
+    }
+    
+    // Play sound only when pending count increases (indicating a truly new order)
     if (currentPendingCount > previousPendingCount.current && soundEnabled) {
       playNotificationSound();
       toast({
@@ -60,7 +72,7 @@ export default function AdminDashboard() {
     }
     
     previousPendingCount.current = currentPendingCount;
-  }, [orders, soundEnabled, toast]);
+  }, [orders, soundEnabled, toast, isLoading]);
 
   const handleAccept = (id: string) => {
     updateOrderMutation.mutate(
@@ -126,7 +138,13 @@ export default function AdminDashboard() {
 
   return (
     <div className="flex h-screen bg-background">
-      <div className="w-64">
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden" 
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      <div className={`fixed md:static inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <AdminSidebar
           soundEnabled={soundEnabled}
           onToggleSound={() => setSoundEnabled(!soundEnabled)}
@@ -139,13 +157,14 @@ export default function AdminDashboard() {
           breadcrumbs={["Admin", "Dashboard"]}
           notificationCount={pendingOrders.length}
           userName="Admin User"
+          onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
         />
 
-        <main className="flex-1 overflow-y-auto p-6">
-          <div className="mb-6 flex items-center justify-between">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+          <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold mb-2">Order Dashboard</h1>
-              <p className="text-muted-foreground">
+              <h1 className="text-2xl md:text-3xl font-bold mb-2">Order Dashboard</h1>
+              <p className="text-muted-foreground text-sm md:text-base">
                 Manage incoming orders and update their status
               </p>
             </div>
@@ -156,9 +175,9 @@ export default function AdminDashboard() {
               Loading orders...
             </div>
           ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
             <div>
-              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+              <h2 className="text-lg md:text-xl font-semibold mb-3 md:mb-4 flex items-center gap-2">
                 New Orders
                 {pendingOrders.length > 0 && (
                   <span className="bg-yellow-600 text-white text-xs px-2 py-1 rounded-full">
@@ -182,7 +201,7 @@ export default function AdminDashboard() {
             </div>
 
             <div>
-              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+              <h2 className="text-lg md:text-xl font-semibold mb-3 md:mb-4 flex items-center gap-2">
                 In Progress
                 {preparingOrders.length > 0 && (
                   <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded-full">
@@ -206,7 +225,7 @@ export default function AdminDashboard() {
             </div>
 
             <div>
-              <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+              <h2 className="text-lg md:text-xl font-semibold mb-3 md:mb-4 flex items-center gap-2">
                 Ready for Pickup
                 {readyOrders.length > 0 && (
                   <span className="bg-green-600 text-white text-xs px-2 py-1 rounded-full">

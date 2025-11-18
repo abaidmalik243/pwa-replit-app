@@ -16,6 +16,7 @@ export default function AdminMenu() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<DBMenuItem | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const { toast } = useToast();
 
   // Fetch menu items and categories
@@ -103,7 +104,13 @@ export default function AdminMenu() {
 
   return (
     <div className="flex h-screen bg-background">
-      <div className="w-64">
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden" 
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      <div className={`fixed md:static inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <AdminSidebar
           soundEnabled={soundEnabled}
           onToggleSound={() => setSoundEnabled(!soundEnabled)}
@@ -112,7 +119,11 @@ export default function AdminMenu() {
       </div>
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <AdminHeader breadcrumbs={["Admin", "Menu Items"]} userName="Admin User" />
+        <AdminHeader 
+          breadcrumbs={["Admin", "Menu Items"]} 
+          userName="Admin User"
+          onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
+        />
 
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">

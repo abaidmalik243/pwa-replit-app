@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import bcrypt from "bcrypt";
 import { z } from "zod";
+import crypto from "crypto";
 import { insertUserSchema, insertOrderSchema, insertBranchSchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -66,6 +67,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Login error:", error);
       res.status(400).json({ error: error.message || "Login failed" });
+    }
+  });
+
+  // Forgot password - generate reset token and send email
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ error: "Email is required" });
+      }
+
+      // Find user by email
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        // Don't reveal if email exists for security
+        return res.json({ message: "If the email exists, a reset link has been sent" });
+      }
+
+      // Generate secure random token
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const tokenHash = await bcrypt.hash(resetToken, 10);
+
+      // Token expires in 60 minutes
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+      // Save token to database
+      await storage.createPasswordResetToken({
+        userId: user.id,
+        tokenHash,
+        expiresAt,
+        usedAt: null,
+      });
+
+      // In production, send email with reset link
+      // For development only: log the token if explicitly in dev mode
+      if (process.env.NODE_ENV === 'development') {
+        const resetLink = `http://localhost:5000/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`;
+        console.log('[DEV ONLY] Password Reset Link:', resetLink);
+        console.log('[DEV ONLY] Token expires at:', expiresAt);
+      }
+      
+      // TODO: Send email with reset link using email service
+      // Example: await emailService.sendPasswordReset(user.email, resetToken);
+
+      res.json({ message: "If the email exists, a reset link has been sent" });
+    } catch (error: any) {
+      console.error("Forgot password error:", error);
+      res.status(500).json({ error: "Failed to process password reset request" });
+    }
+  });
+
+  // Reset password - verify token and update password
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const { email, token, newPassword } = req.body;
+
+      if (!email || !token || !newPassword) {
+        return res.status(400).json({ error: "Email, token, and new password are required" });
+      }
+
+      // Validate password strength
+      if (newPassword.length < 8) {
+        return res.status(400).json({ error: "Password must be at least 8 characters long" });
+      }
+
+      // Find user
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(400).json({ error: "Invalid reset token" });
+      }
+
+      // Find all valid tokens for this user (not yet used, not expired)
+      const allTokens = await storage.getAllPasswordResetTokensForUser(user.id);
+      
+      // Filter out expired and used tokens
+      const now = new Date();
+      const validTokens = allTokens.filter(t => 
+        !t.usedAt && new Date(t.expiresAt) > now
+      );
+
+      if (validTokens.length === 0) {
+        return res.status(400).json({ error: "Invalid or expired reset token" });
+      }
+      
+      // Find matching token using bcrypt
+      let matchingToken = null;
+      for (const dbToken of validTokens) {
+        const isMatch = await bcrypt.compare(token, dbToken.tokenHash);
+        if (isMatch) {
+          matchingToken = dbToken;
+          break;
+        }
+      }
+
+      if (!matchingToken) {
+        return res.status(400).json({ error: "Invalid reset token" });
+      }
+
+      // Hash new password
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+      // Update user password
+      await storage.updateUser(user.id, { password: hashedPassword });
+
+      // Invalidate ALL password reset tokens for this user (security)
+      await storage.invalidateUserPasswordResetTokens(user.id);
+
+      res.json({ message: "Password has been reset successfully" });
+    } catch (error: any) {
+      console.error("Reset password error:", error);
+      res.status(500).json({ error: "Failed to reset password" });
     }
   });
 

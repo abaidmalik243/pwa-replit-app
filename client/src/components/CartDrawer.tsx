@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { formatCurrency } from "@/lib/utils";
 
 export interface CartItem {
   id: string;
@@ -58,7 +59,7 @@ export default function CartDrawer({
                     <div className="flex-1">
                       <h4 className="font-medium mb-1" data-testid={`text-cart-item-name-${item.id}`}>{item.name}</h4>
                       <p className="text-sm font-semibold mb-2" data-testid={`text-cart-item-price-${item.id}`}>
-                        ${item.price.toFixed(2)}
+                        {formatCurrency(item.price)}
                       </p>
                       <div className="flex items-center gap-2">
                         <Button 
@@ -93,7 +94,7 @@ export default function CartDrawer({
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between font-semibold text-base">
                   <span>Subtotal</span>
-                  <span data-testid="text-subtotal">Rs. {subtotal.toFixed(0)}</span>
+                  <span data-testid="text-subtotal">{formatCurrency(subtotal)}</span>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Delivery fee (if applicable) will be shown at checkout

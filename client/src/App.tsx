@@ -8,6 +8,8 @@ import NotFound from "@/pages/not-found";
 import CustomerHome from "@/pages/customer-home";
 import Login from "@/pages/login";
 import Signup from "@/pages/signup";
+import ForgotPassword from "@/pages/forgot-password";
+import ResetPassword from "@/pages/reset-password";
 import AdminDashboard from "@/pages/admin-dashboard";
 import AdminMenu from "@/pages/admin-menu";
 import AdminUsers from "@/pages/admin-users";
@@ -24,6 +26,8 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/admin/login" component={Login} />
       <Route path="/signup" component={Signup} />
+      <Route path="/forgot-password" component={ForgotPassword} />
+      <Route path="/reset-password" component={ResetPassword} />
       <Route path="/admin">
         <ProtectedRoute requireRole={["admin", "staff"]}>
           <AdminDashboard />

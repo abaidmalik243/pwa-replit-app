@@ -8,6 +8,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
 import { ShoppingBag, MapPin, Phone, CreditCard, User, MessageSquare } from "lucide-react";
 import type { CartItem } from "./CartDrawer";
+import { formatCurrency } from "@/lib/utils";
 
 interface OrderConfirmationDialogProps {
   open: boolean;
@@ -126,24 +127,24 @@ export default function OrderConfirmationDialog({
                   <span className="text-muted-foreground">
                     {item.name} × {item.quantity}
                   </span>
-                  <span className="font-medium">Rs. {(item.price * item.quantity).toFixed(0)}</span>
+                  <span className="font-medium">{formatCurrency(item.price * item.quantity)}</span>
                 </div>
               ))}
               <Separator className="my-2" />
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Subtotal</span>
-                <span className="font-medium">Rs. {subtotal.toFixed(0)}</span>
+                <span className="font-medium">{formatCurrency(subtotal)}</span>
               </div>
               {orderType === "delivery" && (
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Delivery Fee</span>
-                  <span className="font-medium">Rs. {deliveryFee}</span>
+                  <span className="font-medium">{formatCurrency(deliveryFee)}</span>
                 </div>
               )}
               <Separator className="my-2" />
               <div className="flex justify-between font-bold">
                 <span>Total</span>
-                <span className="text-lg">Rs. {total.toFixed(0)}</span>
+                <span className="text-lg">{formatCurrency(total)}</span>
               </div>
             </div>
           </div>

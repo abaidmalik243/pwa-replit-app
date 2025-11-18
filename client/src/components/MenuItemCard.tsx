@@ -2,6 +2,7 @@ import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { formatCurrency } from "@/lib/utils";
 
 export interface MenuItem {
   id: string;
@@ -60,7 +61,7 @@ export default function MenuItemCard({ item, onAddToCart }: MenuItemCardProps) {
         
         <div className="flex items-center justify-between">
           <span className="text-xl font-bold" data-testid={`text-item-price-${item.id}`}>
-            ${item.price.toFixed(2)}
+            {formatCurrency(item.price)}
           </span>
           <span className="text-xs text-muted-foreground">{item.category}</span>
         </div>

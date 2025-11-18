@@ -1,5 +1,5 @@
 import * as schema from "@shared/schema";
-import { eq, like, and, desc } from "drizzle-orm";
+import { eq, like, and, desc, lt } from "drizzle-orm";
 import { db } from "./db";
 
 // Storage interface with all CRUD operations
@@ -52,6 +52,14 @@ export interface IStorage {
   createExpense(expense: schema.InsertExpense): Promise<schema.Expense>;
   updateExpense(id: string, expense: Partial<schema.InsertExpense>): Promise<schema.Expense | undefined>;
   deleteExpense(id: string): Promise<boolean>;
+
+  // Password Reset Tokens
+  createPasswordResetToken(token: schema.InsertPasswordResetToken): Promise<schema.PasswordResetToken>;
+  getPasswordResetTokenByHash(tokenHash: string): Promise<schema.PasswordResetToken | undefined>;
+  getAllPasswordResetTokensForUser(userId: string): Promise<schema.PasswordResetToken[]>;
+  markPasswordResetTokenAsUsed(id: string): Promise<void>;
+  invalidateUserPasswordResetTokens(userId: string): Promise<void>;
+  deleteExpiredPasswordResetTokens(): Promise<void>;
 }
 
 export class DbStorage implements IStorage {
@@ -233,6 +241,44 @@ export class DbStorage implements IStorage {
   async deleteExpense(id: string) {
     await db.delete(schema.expenses).where(eq(schema.expenses.id, id));
     return true;
+  }
+
+  // Password Reset Tokens
+  async createPasswordResetToken(token: schema.InsertPasswordResetToken) {
+    const result = await db.insert(schema.passwordResetTokens).values(token).returning();
+    return result[0];
+  }
+
+  async getPasswordResetTokenByHash(tokenHash: string) {
+    const result = await db.select()
+      .from(schema.passwordResetTokens)
+      .where(eq(schema.passwordResetTokens.tokenHash, tokenHash));
+    return result[0];
+  }
+
+  async getAllPasswordResetTokensForUser(userId: string) {
+    return await db.select()
+      .from(schema.passwordResetTokens)
+      .where(eq(schema.passwordResetTokens.userId, userId))
+      .orderBy(desc(schema.passwordResetTokens.createdAt));
+  }
+
+  async markPasswordResetTokenAsUsed(id: string) {
+    await db.update(schema.passwordResetTokens)
+      .set({ usedAt: new Date() })
+      .where(eq(schema.passwordResetTokens.id, id));
+  }
+
+  async deleteExpiredPasswordResetTokens() {
+    const now = new Date();
+    await db.delete(schema.passwordResetTokens)
+      .where(lt(schema.passwordResetTokens.expiresAt, now));
+  }
+
+  async invalidateUserPasswordResetTokens(userId: string) {
+    await db.update(schema.passwordResetTokens)
+      .set({ usedAt: new Date() })
+      .where(eq(schema.passwordResetTokens.userId, userId));
   }
 }
 

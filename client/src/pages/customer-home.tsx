@@ -184,6 +184,11 @@ export default function CustomerHome() {
     // Generate order number
     const orderNumber = `ORD-${Date.now().toString().slice(-8)}`;
 
+    // Calculate amounts
+    const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const deliveryCharges = orderType === "delivery" ? 50 : 0; // TODO: Calculate based on distance
+    const total = subtotal + deliveryCharges;
+
     // Prepare order data
     const orderData = {
       orderNumber,
@@ -196,7 +201,10 @@ export default function CustomerHome() {
       orderType: orderType === "pickup" ? "takeaway" : "delivery",
       paymentMethod: orderDetails.paymentMethod,
       items: JSON.stringify(cartItems),
-      total: cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0) + (orderType === "delivery" ? 50 : 0),
+      subtotal,
+      deliveryCharges,
+      deliveryDistance: null, // TODO: Calculate distance
+      total,
       notes: orderDetails.notes,
       status: "pending",
     };

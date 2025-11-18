@@ -38,10 +38,10 @@ export default function OrderTypeDialog({ isOpen, onClose, branches, onSelect, c
     if (isOpen && currentSelection && branches.length > 0) {
       const branch = branches.find(b => b.id === currentSelection.branchId);
       if (branch) {
+        setOrderType(currentSelection.orderType); // Set this first
         setSelectedCity(branch.city);
         setSelectedBranch(branch);
         setSelectedArea(currentSelection.area || "");
-        setOrderType(currentSelection.orderType);
       }
     } else if (isOpen) {
       // Clear message when dialog opens fresh
@@ -167,6 +167,7 @@ export default function OrderTypeDialog({ isOpen, onClose, branches, onSelect, c
                   className="flex-1 h-12"
                   onClick={() => setOrderType("delivery")}
                   data-testid="button-delivery"
+                  aria-pressed={orderType === "delivery"}
                 >
                   DELIVERY
                 </Button>
@@ -175,6 +176,7 @@ export default function OrderTypeDialog({ isOpen, onClose, branches, onSelect, c
                   className="flex-1 h-12"
                   onClick={() => setOrderType("pickup")}
                   data-testid="button-pickup"
+                  aria-pressed={orderType === "pickup"}
                 >
                   PICK-UP
                 </Button>

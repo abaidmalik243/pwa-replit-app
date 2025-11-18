@@ -47,8 +47,9 @@ export default function ImageSlider() {
         <div
           key={index}
           className={`absolute inset-0 transition-opacity duration-1000 ${
-            index === currentSlide ? "opacity-100" : "opacity-0"
+            index === currentSlide ? "opacity-100" : "opacity-0 pointer-events-none"
           }`}
+          data-testid={`slide-${index}`}
         >
           <div 
             className="absolute inset-0 bg-cover bg-center"
@@ -58,10 +59,16 @@ export default function ImageSlider() {
           </div>
           
           <div className="relative h-full flex flex-col items-center justify-center px-4 text-center">
-            <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4" data-testid="text-hero-title">
+            <h2 
+              className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4" 
+              data-testid={`text-hero-title-${index}`}
+            >
               {slide.title}
             </h2>
-            <p className="text-lg md:text-xl text-white/90 mb-8 max-w-2xl" data-testid="text-hero-subtitle">
+            <p 
+              className="text-lg md:text-xl text-white/90 mb-8 max-w-2xl" 
+              data-testid={`text-hero-subtitle-${index}`}
+            >
               {slide.subtitle}
             </p>
           </div>
@@ -88,7 +95,7 @@ export default function ImageSlider() {
         <ChevronRight className="h-6 w-6" />
       </Button>
 
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2" data-testid="slider-dots">
         {slides.map((_, index) => (
           <button
             key={index}
@@ -97,6 +104,7 @@ export default function ImageSlider() {
             }`}
             onClick={() => setCurrentSlide(index)}
             aria-label={`Go to slide ${index + 1}`}
+            aria-current={index === currentSlide ? "true" : "false"}
             data-testid={`button-slide-${index}`}
           />
         ))}

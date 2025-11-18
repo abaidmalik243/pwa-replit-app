@@ -11,6 +11,7 @@ import AdminUsers from "@/pages/admin-users";
 import AdminCategories from "@/pages/admin-categories";
 import AdminExpenses from "@/pages/admin-expenses";
 import AdminSettings from "@/pages/admin-settings";
+import AdminDemand from "@/pages/admin-demand";
 
 function Router() {
   return (
@@ -19,6 +20,7 @@ function Router() {
       <Route path="/admin" component={AdminDashboard} />
       <Route path="/admin/orders" component={AdminDashboard} />
       <Route path="/admin/menu" component={AdminMenu} />
+      <Route path="/admin/demand" component={AdminDemand} />
       <Route path="/admin/users" component={AdminUsers} />
       <Route path="/admin/categories" component={AdminCategories} />
       <Route path="/admin/expenses" component={AdminExpenses} />

@@ -5,9 +5,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import NotFound from "@/pages/not-found";
-import Landing from "@/pages/landing";
-import Login from "@/pages/login";
-import Signup from "@/pages/signup";
 import CustomerHome from "@/pages/customer-home";
 import AdminDashboard from "@/pages/admin-dashboard";
 import AdminMenu from "@/pages/admin-menu";
@@ -20,8 +17,6 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={CustomerHome} />
-      <Route path="/login" component={Login} />
-      <Route path="/signup" component={Signup} />
       <Route path="/admin">
         <ProtectedRoute requireRole={["admin", "staff"]}>
           <AdminDashboard />

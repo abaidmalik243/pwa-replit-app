@@ -1,10 +1,13 @@
 import { useState } from "react";
 import CustomerHeader from "@/components/CustomerHeader";
-import HeroSection from "@/components/HeroSection";
+import ImageSlider from "@/components/ImageSlider";
+import Footer from "@/components/Footer";
 import CategoryFilter from "@/components/CategoryFilter";
 import MenuItemCard, { MenuItem } from "@/components/MenuItemCard";
 import CartDrawer, { CartItem } from "@/components/CartDrawer";
 import { useToast } from "@/hooks/use-toast";
+import { Input } from "@/components/ui/input";
+import { Search } from "lucide-react";
 
 import burgerImage from "@assets/generated_images/Gourmet_burger_hero_image_fed670c3.png";
 import friesImage from "@assets/generated_images/French_fries_menu_item_798d4b73.png";
@@ -141,14 +144,27 @@ export default function CustomerHome() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <CustomerHeader
         cartItemCount={cartItems.reduce((sum, item) => sum + item.quantity, 0)}
         onCartClick={() => setIsCartOpen(true)}
         onMenuClick={() => console.log("Menu clicked")}
       />
 
-      <HeroSection onSearch={setSearchQuery} />
+      <ImageSlider />
+
+      <div className="container px-4 py-6">
+        <div className="relative max-w-2xl mx-auto mb-6">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+          <Input
+            type="search"
+            placeholder="Search dishes, cuisines..."
+            className="pl-10"
+            onChange={(e) => setSearchQuery(e.target.value)}
+            data-testid="input-search"
+          />
+        </div>
+      </div>
 
       <CategoryFilter
         categories={categories}
@@ -156,7 +172,7 @@ export default function CustomerHome() {
         onCategoryChange={setActiveCategory}
       />
 
-      <main className="container px-4 py-8">
+      <main className="container px-4 py-8 flex-1">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredItems.map((item) => (
             <MenuItemCard key={item.id} item={item} onAddToCart={handleAddToCart} />
@@ -169,6 +185,8 @@ export default function CustomerHome() {
           </div>
         )}
       </main>
+
+      <Footer />
 
       <CartDrawer
         isOpen={isCartOpen}

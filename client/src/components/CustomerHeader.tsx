@@ -44,13 +44,13 @@ export default function CustomerHeader({
 
         <div className="flex items-center gap-2">
           <Button 
-            size="icon" 
-            variant="ghost"
+            variant="default"
             onClick={() => setLocation("/admin")}
-            title="Admin Panel"
             data-testid="button-admin"
+            className="gap-2"
           >
-            <Settings className="h-5 w-5" />
+            <Settings className="h-4 w-4" />
+            <span className="hidden sm:inline">Admin</span>
           </Button>
           <Button 
             size="icon" 

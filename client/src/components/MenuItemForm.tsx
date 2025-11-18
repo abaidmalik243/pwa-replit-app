@@ -8,36 +8,36 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Upload } from "lucide-react";
+import type { Category } from "@shared/schema";
 
 const menuItemSchema = z.object({
   name: z.string().min(1, "Name is required"),
   description: z.string().min(1, "Description is required"),
   price: z.number().min(0, "Price must be positive"),
-  category: z.string().min(1, "Category is required"),
-  isVegetarian: z.boolean().default(false),
+  categoryId: z.string().min(1, "Category is required"),
   isAvailable: z.boolean().default(true),
-  image: z.string().optional(),
+  imageUrl: z.string().optional(),
 });
 
 type MenuItemFormData = z.infer<typeof menuItemSchema>;
 
 interface MenuItemFormProps {
   initialData?: Partial<MenuItemFormData>;
+  categories: Category[];
   onSubmit: (data: MenuItemFormData) => void;
   onCancel?: () => void;
 }
 
-export default function MenuItemForm({ initialData, onSubmit, onCancel }: MenuItemFormProps) {
+export default function MenuItemForm({ initialData, categories, onSubmit, onCancel }: MenuItemFormProps) {
   const form = useForm<MenuItemFormData>({
     resolver: zodResolver(menuItemSchema),
     defaultValues: {
       name: initialData?.name || "",
       description: initialData?.description || "",
       price: initialData?.price || 0,
-      category: initialData?.category || "",
-      isVegetarian: initialData?.isVegetarian || false,
+      categoryId: initialData?.categoryId || "",
       isAvailable: initialData?.isAvailable ?? true,
-      image: initialData?.image || "",
+      imageUrl: initialData?.imageUrl || "",
     },
   });
 
@@ -46,22 +46,18 @@ export default function MenuItemForm({ initialData, onSubmit, onCancel }: MenuIt
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <FormField
           control={form.control}
-          name="image"
+          name="imageUrl"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Image</FormLabel>
+              <FormLabel>Image URL (Optional)</FormLabel>
               <FormControl>
-                <div className="border-2 border-dashed rounded-lg p-8 text-center hover-elevate cursor-pointer">
-                  <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">Click to upload or drag and drop</p>
-                  <Input 
-                    type="file" 
-                    className="hidden" 
-                    accept="image/*"
-                    data-testid="input-image"
-                  />
-                </div>
+                <Input 
+                  {...field}
+                  placeholder="https://example.com/image.jpg"
+                  data-testid="input-image-url"
+                />
               </FormControl>
+              <p className="text-xs text-muted-foreground">Enter a direct URL to an image, or leave blank</p>
               <FormMessage />
             </FormItem>
           )}
@@ -123,21 +119,22 @@ export default function MenuItemForm({ initialData, onSubmit, onCancel }: MenuIt
 
           <FormField
             control={form.control}
-            name="category"
+            name="categoryId"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Category</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger data-testid="select-category">
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="Appetizers">Appetizers</SelectItem>
-                    <SelectItem value="Main Course">Main Course</SelectItem>
-                    <SelectItem value="Desserts">Desserts</SelectItem>
-                    <SelectItem value="Beverages">Beverages</SelectItem>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <FormMessage />
@@ -146,41 +143,22 @@ export default function MenuItemForm({ initialData, onSubmit, onCancel }: MenuIt
           />
         </div>
 
-        <div className="flex gap-6">
-          <FormField
-            control={form.control}
-            name="isVegetarian"
-            render={({ field }) => (
-              <FormItem className="flex items-center gap-2 space-y-0">
-                <FormControl>
-                  <Switch 
-                    checked={field.value} 
-                    onCheckedChange={field.onChange}
-                    data-testid="switch-vegetarian"
-                  />
-                </FormControl>
-                <FormLabel className="!mt-0">Vegetarian</FormLabel>
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="isAvailable"
-            render={({ field }) => (
-              <FormItem className="flex items-center gap-2 space-y-0">
-                <FormControl>
-                  <Switch 
-                    checked={field.value} 
-                    onCheckedChange={field.onChange}
-                    data-testid="switch-available"
-                  />
-                </FormControl>
-                <FormLabel className="!mt-0">Available</FormLabel>
-              </FormItem>
-            )}
-          />
-        </div>
+        <FormField
+          control={form.control}
+          name="isAvailable"
+          render={({ field }) => (
+            <FormItem className="flex items-center gap-2 space-y-0">
+              <FormControl>
+                <Switch 
+                  checked={field.value} 
+                  onCheckedChange={field.onChange}
+                  data-testid="switch-available"
+                />
+              </FormControl>
+              <FormLabel className="!mt-0">Available for customers</FormLabel>
+            </FormItem>
+          )}
+        />
 
         <div className="flex gap-3 pt-4">
           <Button type="submit" className="flex-1" data-testid="button-submit">

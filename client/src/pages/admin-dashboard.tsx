@@ -50,8 +50,8 @@ export default function AdminDashboard() {
   useEffect(() => {
     const currentPendingCount = orders.filter((o) => o.status === "pending").length;
     
-    // Play sound if there are more pending orders than before
-    if (currentPendingCount > previousPendingCount.current && soundEnabled && previousPendingCount.current > 0) {
+    // Play sound if there are more pending orders than before (removed previousPendingCount > 0 check to allow first order notification)
+    if (currentPendingCount > previousPendingCount.current && soundEnabled) {
       playNotificationSound();
       toast({
         title: "🔔 New Order!",

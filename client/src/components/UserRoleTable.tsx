@@ -28,8 +28,8 @@ const roleColors: Record<UserRole, string> = {
 
 export default function UserRoleTable({ users, onEdit, onDelete }: UserRoleTableProps) {
   return (
-    <div className="border rounded-lg">
-      <Table>
+    <div className="border rounded-lg overflow-hidden overflow-x-auto">
+      <Table className="min-w-[640px]">
         <TableHeader>
           <TableRow>
             <TableHead>User</TableHead>

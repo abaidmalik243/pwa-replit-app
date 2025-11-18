@@ -42,6 +42,7 @@ export default function AdminUsers() {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const { toast } = useToast();
 
   const { data: dbUsers = [], isLoading } = useQuery<User[]>({
@@ -165,7 +166,13 @@ export default function AdminUsers() {
 
   return (
     <div className="flex h-screen bg-background">
-      <div className="w-64">
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden" 
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      <div className={`fixed md:static inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <AdminSidebar
           soundEnabled={soundEnabled}
           onToggleSound={() => setSoundEnabled(!soundEnabled)}
@@ -174,13 +181,17 @@ export default function AdminUsers() {
       </div>
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <AdminHeader breadcrumbs={["Admin", "Users & Roles"]} userName="Admin User" />
+        <AdminHeader 
+          breadcrumbs={["Admin", "Users & Roles"]} 
+          userName="Admin User"
+          onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
+        />
 
-        <main className="flex-1 overflow-y-auto p-6">
-          <div className="flex items-center justify-between mb-6">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
             <div>
-              <h1 className="text-3xl font-bold mb-2">Users & Roles</h1>
-              <p className="text-muted-foreground">
+              <h1 className="text-2xl md:text-3xl font-bold mb-2">Users & Roles</h1>
+              <p className="text-muted-foreground text-sm md:text-base">
                 Manage user accounts and role assignments
               </p>
             </div>

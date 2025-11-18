@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import CustomerHeader from "@/components/CustomerHeader";
 import ImageSlider from "@/components/ImageSlider";
@@ -6,10 +6,11 @@ import Footer from "@/components/Footer";
 import CategoryFilter from "@/components/CategoryFilter";
 import MenuItemCard, { MenuItem } from "@/components/MenuItemCard";
 import CartDrawer, { CartItem } from "@/components/CartDrawer";
+import OrderTypeDialog from "@/components/OrderTypeDialog";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
-import type { MenuItem as DBMenuItem, Category } from "@shared/schema";
+import type { MenuItem as DBMenuItem, Category, Branch } from "@shared/schema";
 
 import burgerImage from "@assets/generated_images/Gourmet_burger_hero_image_fed670c3.png";
 import friesImage from "@assets/generated_images/French_fries_menu_item_798d4b73.png";
@@ -35,7 +36,16 @@ export default function CustomerHome() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
+  const [orderType, setOrderType] = useState<"delivery" | "pickup">("delivery");
+  const [selectedBranchId, setSelectedBranchId] = useState<string>("");
+  const [selectedArea, setSelectedArea] = useState<string>("");
   const { toast } = useToast();
+
+  // Fetch branches from API
+  const { data: branches = [] } = useQuery<Branch[]>({
+    queryKey: ["/api/branches"],
+  });
 
   // Fetch menu items from API
   const { data: dbMenuItems = [], isLoading: itemsLoading } = useQuery<DBMenuItem[]>({
@@ -46,6 +56,42 @@ export default function CustomerHome() {
   const { data: dbCategories = [] } = useQuery<Category[]>({
     queryKey: ["/api/categories"],
   });
+
+  // Check if user has already selected location
+  useEffect(() => {
+    const savedOrderInfo = localStorage.getItem("kebabish-order-info");
+    if (savedOrderInfo) {
+      try {
+        const parsed = JSON.parse(savedOrderInfo);
+        setOrderType(parsed.orderType);
+        setSelectedBranchId(parsed.branchId);
+        setSelectedArea(parsed.area || "");
+      } catch (e) {
+        setIsOrderDialogOpen(true);
+      }
+    } else {
+      setIsOrderDialogOpen(true);
+    }
+  }, []);
+
+  const handleOrderSelection = (type: "delivery" | "pickup", branchId: string, area?: string) => {
+    setOrderType(type);
+    setSelectedBranchId(branchId);
+    setSelectedArea(area || "");
+    
+    const orderInfo = {
+      orderType: type,
+      branchId,
+      area: area || "",
+    };
+    localStorage.setItem("kebabish-order-info", JSON.stringify(orderInfo));
+
+    const selectedBranch = branches.find(b => b.id === branchId);
+    toast({
+      title: "Location selected",
+      description: `${type === "delivery" ? "Delivering to" : "Pickup from"} ${selectedBranch?.name || "selected branch"}${area ? ` - ${area}` : ""}`,
+    });
+  };
 
   // Transform database menu items to component format
   const menuItems: MenuItem[] = dbMenuItems
@@ -110,12 +156,21 @@ export default function CustomerHome() {
     setIsCartOpen(false);
   };
 
+  const selectedBranch = branches.find(b => b.id === selectedBranchId);
+  const locationInfo = selectedBranch ? {
+    city: selectedBranch.city,
+    area: selectedArea,
+    orderType,
+  } : undefined;
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <CustomerHeader
         cartItemCount={cartItems.reduce((sum, item) => sum + item.quantity, 0)}
         onCartClick={() => setIsCartOpen(true)}
         onMenuClick={() => console.log("Menu clicked")}
+        locationInfo={locationInfo}
+        onChangeLocation={() => setIsOrderDialogOpen(true)}
       />
 
       <ImageSlider />
@@ -161,6 +216,18 @@ export default function CustomerHome() {
         items={cartItems}
         onUpdateQuantity={handleUpdateQuantity}
         onCheckout={handleCheckout}
+      />
+
+      <OrderTypeDialog
+        isOpen={isOrderDialogOpen}
+        onClose={() => setIsOrderDialogOpen(false)}
+        branches={branches}
+        onSelect={handleOrderSelection}
+        currentSelection={selectedBranchId ? {
+          orderType,
+          branchId: selectedBranchId,
+          area: selectedArea,
+        } : undefined}
       />
     </div>
   );

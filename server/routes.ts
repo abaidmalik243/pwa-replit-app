@@ -88,6 +88,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put("/api/branches/:id", async (req, res) => {
+    try {
+      const branch = await storage.updateBranch(req.params.id, req.body);
+      if (!branch) {
+        return res.status(404).json({ error: "Branch not found" });
+      }
+      res.json(branch);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/branches/:id", async (req, res) => {
+    try {
+      await storage.deleteBranch(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
   // Category routes
   app.get("/api/categories", async (req, res) => {
     try {

@@ -9,6 +9,7 @@ import AdminDashboard from "@/pages/admin-dashboard";
 import AdminMenu from "@/pages/admin-menu";
 import AdminUsers from "@/pages/admin-users";
 import AdminCategories from "@/pages/admin-categories";
+import AdminBranches from "@/pages/admin-branches";
 import AdminExpenses from "@/pages/admin-expenses";
 import AdminSettings from "@/pages/admin-settings";
 import AdminDemand from "@/pages/admin-demand";
@@ -23,6 +24,7 @@ function Router() {
       <Route path="/admin/demand" component={AdminDemand} />
       <Route path="/admin/users" component={AdminUsers} />
       <Route path="/admin/categories" component={AdminCategories} />
+      <Route path="/admin/branches" component={AdminBranches} />
       <Route path="/admin/expenses" component={AdminExpenses} />
       <Route path="/admin/settings" component={AdminSettings} />
       <Route component={NotFound} />

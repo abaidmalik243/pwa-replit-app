@@ -7,6 +7,9 @@ import OrderCard, { Order } from "@/components/OrderCard";
 import { useToast } from "@/hooks/use-toast";
 import { playNotificationSound } from "@/lib/notificationSound";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
+import { DollarSign, ShoppingCart, TrendingUp, Clock } from "lucide-react";
 import type { Order as DBOrder } from "@shared/schema";
 
 export default function AdminDashboard() {
@@ -30,7 +33,7 @@ export default function AdminDashboard() {
     customerPhone: order.customerPhone,
     items: JSON.parse(order.items),
     total: parseFloat(order.total),
-    status: order.status as "pending" | "preparing" | "ready" | "completed" | "cancelled",
+    status: (order.status === "completed" ? "delivered" : order.status) as Order["status"],
     createdAt: new Date(order.createdAt),
   }));
 
@@ -135,6 +138,81 @@ export default function AdminDashboard() {
   const pendingOrders = orders.filter((o) => o.status === "pending");
   const preparingOrders = orders.filter((o) => o.status === "preparing");
   const readyOrders = orders.filter((o) => o.status === "ready");
+  const completedOrders = orders.filter((o) => o.status === "delivered");
+
+  // Calculate statistics
+  const totalRevenue = orders
+    .filter((o) => o.status === "delivered")
+    .reduce((sum, order) => sum + order.total, 0);
+
+  const todayRevenue = orders
+    .filter((o) => {
+      const orderDate = new Date(o.createdAt);
+      const today = new Date();
+      return (
+        orderDate.getDate() === today.getDate() &&
+        orderDate.getMonth() === today.getMonth() &&
+        orderDate.getFullYear() === today.getFullYear() &&
+        o.status === "delivered"
+      );
+    })
+    .reduce((sum, order) => sum + order.total, 0);
+
+  const todayOrders = orders.filter((o) => {
+    const orderDate = new Date(o.createdAt);
+    const today = new Date();
+    return (
+      orderDate.getDate() === today.getDate() &&
+      orderDate.getMonth() === today.getMonth() &&
+      orderDate.getFullYear() === today.getFullYear()
+    );
+  }).length;
+
+  const avgOrderValue = completedOrders.length > 0 
+    ? totalRevenue / completedOrders.length 
+    : 0;
+
+  // Prepare chart data - last 7 days
+  const last7DaysData = Array.from({ length: 7 }, (_, i) => {
+    const date = new Date();
+    date.setDate(date.getDate() - (6 - i));
+    const dayOrders = orders.filter((o) => {
+      const orderDate = new Date(o.createdAt);
+      return (
+        orderDate.getDate() === date.getDate() &&
+        orderDate.getMonth() === date.getMonth() &&
+        orderDate.getFullYear() === date.getFullYear()
+      );
+    });
+    
+    const dayRevenue = dayOrders
+      .filter((o) => o.status === "delivered")
+      .reduce((sum, order) => sum + order.total, 0);
+
+    return {
+      date: date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      orders: dayOrders.length,
+      revenue: parseFloat(dayRevenue.toFixed(2)),
+    };
+  });
+
+  // Popular items analysis - aggregate by item name
+  const itemFrequency: { [key: string]: { name: string; count: number } } = {};
+  completedOrders.forEach((order) => {
+    order.items.forEach((item: any) => {
+      const itemName = item.name;
+      if (itemFrequency[itemName]) {
+        itemFrequency[itemName].count += item.quantity;
+      } else {
+        itemFrequency[itemName] = { name: itemName, count: item.quantity };
+      }
+    });
+  });
+
+  const popularItems = Object.values(itemFrequency)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5)
+    .map((item) => ({ ...item, name: item.name.length > 20 ? item.name.substring(0, 20) + '...' : item.name }));
 
   return (
     <div className="flex h-screen bg-background">
@@ -161,88 +239,194 @@ export default function AdminDashboard() {
         />
 
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
-          <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold mb-2">Order Dashboard</h1>
-              <p className="text-muted-foreground text-sm md:text-base">
-                Manage incoming orders and update their status
-              </p>
-            </div>
+          <div className="mb-6">
+            <h1 className="text-2xl md:text-3xl font-bold mb-2">Order Dashboard</h1>
+            <p className="text-muted-foreground text-sm md:text-base">
+              Manage incoming orders and monitor performance
+            </p>
           </div>
 
           {isLoading ? (
             <div className="text-center py-12 text-muted-foreground">
-              Loading orders...
+              Loading dashboard...
             </div>
           ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-            <div>
-              <h2 className="text-lg md:text-xl font-semibold mb-3 md:mb-4 flex items-center gap-2">
-                New Orders
-                {pendingOrders.length > 0 && (
-                  <span className="bg-yellow-600 text-white text-xs px-2 py-1 rounded-full">
-                    {pendingOrders.length}
-                  </span>
-                )}
-              </h2>
-              <div className="space-y-4">
-                {pendingOrders.map((order) => (
-                  <OrderCard
-                    key={order.id}
-                    order={order}
-                    onAccept={handleAccept}
-                    onReject={handleReject}
-                  />
-                ))}
-                {pendingOrders.length === 0 && (
-                  <p className="text-muted-foreground text-center py-8">No pending orders</p>
-                )}
-              </div>
-            </div>
+            <>
+              {/* Statistics Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <Card data-testid="card-today-revenue">
+                  <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Today's Revenue</CardTitle>
+                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold" data-testid="text-today-revenue">
+                      Rs {todayRevenue.toFixed(2)}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {todayOrders} order{todayOrders !== 1 ? "s" : ""} today
+                    </p>
+                  </CardContent>
+                </Card>
 
-            <div>
-              <h2 className="text-lg md:text-xl font-semibold mb-3 md:mb-4 flex items-center gap-2">
-                In Progress
-                {preparingOrders.length > 0 && (
-                  <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded-full">
-                    {preparingOrders.length}
-                  </span>
-                )}
-              </h2>
-              <div className="space-y-4">
-                {preparingOrders.map((order) => (
-                  <OrderCard
-                    key={order.id}
-                    order={order}
-                    onMarkReady={handleMarkReady}
-                    onCancel={handleCancel}
-                  />
-                ))}
-                {preparingOrders.length === 0 && (
-                  <p className="text-muted-foreground text-center py-8">No orders in progress</p>
-                )}
-              </div>
-            </div>
+                <Card data-testid="card-total-revenue">
+                  <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold" data-testid="text-total-revenue">
+                      Rs {totalRevenue.toFixed(2)}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {completedOrders.length} completed orders
+                    </p>
+                  </CardContent>
+                </Card>
 
-            <div>
-              <h2 className="text-lg md:text-xl font-semibold mb-3 md:mb-4 flex items-center gap-2">
-                Ready for Pickup
-                {readyOrders.length > 0 && (
-                  <span className="bg-green-600 text-white text-xs px-2 py-1 rounded-full">
-                    {readyOrders.length}
-                  </span>
-                )}
-              </h2>
-              <div className="space-y-4">
-                {readyOrders.map((order) => (
-                  <OrderCard key={order.id} order={order} />
-                ))}
-                {readyOrders.length === 0 && (
-                  <p className="text-muted-foreground text-center py-8">No orders ready</p>
-                )}
+                <Card data-testid="card-avg-order">
+                  <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Avg Order Value</CardTitle>
+                    <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold" data-testid="text-avg-order">
+                      Rs {avgOrderValue.toFixed(2)}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Per completed order
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card data-testid="card-pending-orders">
+                  <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Pending Orders</CardTitle>
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold" data-testid="text-pending-count">
+                      {pendingOrders.length}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Awaiting action
+                    </p>
+                  </CardContent>
+                </Card>
               </div>
-            </div>
-          </div>
+
+              {/* Charts */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <Card data-testid="card-chart-revenue">
+                  <CardHeader>
+                    <CardTitle>Revenue Trend (Last 7 Days)</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={250}>
+                      <LineChart data={last7DaysData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="date" />
+                        <YAxis />
+                        <Tooltip />
+                        <Line 
+                          type="monotone" 
+                          dataKey="revenue" 
+                          stroke="hsl(var(--primary))" 
+                          strokeWidth={2}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+
+                <Card data-testid="card-chart-popular-items">
+                  <CardHeader>
+                    <CardTitle>Top 5 Popular Items</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={250}>
+                      <BarChart data={popularItems}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" />
+                        <YAxis />
+                        <Tooltip />
+                        <Bar dataKey="count" fill="hsl(var(--primary))" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Order Columns */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                <div>
+                  <h2 className="text-lg md:text-xl font-semibold mb-3 md:mb-4 flex items-center gap-2">
+                    New Orders
+                    {pendingOrders.length > 0 && (
+                      <span className="bg-yellow-600 text-white text-xs px-2 py-1 rounded-full">
+                        {pendingOrders.length}
+                      </span>
+                    )}
+                  </h2>
+                  <div className="space-y-4">
+                    {pendingOrders.map((order) => (
+                      <OrderCard
+                        key={order.id}
+                        order={order}
+                        onAccept={handleAccept}
+                        onReject={handleReject}
+                      />
+                    ))}
+                    {pendingOrders.length === 0 && (
+                      <p className="text-muted-foreground text-center py-8">No pending orders</p>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <h2 className="text-lg md:text-xl font-semibold mb-3 md:mb-4 flex items-center gap-2">
+                    In Progress
+                    {preparingOrders.length > 0 && (
+                      <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded-full">
+                        {preparingOrders.length}
+                      </span>
+                    )}
+                  </h2>
+                  <div className="space-y-4">
+                    {preparingOrders.map((order) => (
+                      <OrderCard
+                        key={order.id}
+                        order={order}
+                        onMarkReady={handleMarkReady}
+                        onCancel={handleCancel}
+                      />
+                    ))}
+                    {preparingOrders.length === 0 && (
+                      <p className="text-muted-foreground text-center py-8">No orders in progress</p>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <h2 className="text-lg md:text-xl font-semibold mb-3 md:mb-4 flex items-center gap-2">
+                    Ready for Pickup
+                    {readyOrders.length > 0 && (
+                      <span className="bg-green-600 text-white text-xs px-2 py-1 rounded-full">
+                        {readyOrders.length}
+                      </span>
+                    )}
+                  </h2>
+                  <div className="space-y-4">
+                    {readyOrders.map((order) => (
+                      <OrderCard key={order.id} order={order} />
+                    ))}
+                    {readyOrders.length === 0 && (
+                      <p className="text-muted-foreground text-center py-8">No orders ready</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </>
           )}
         </main>
       </div>

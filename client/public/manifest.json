@@ -1,12 +1,14 @@
 {
-  "name": "FoodHub - Order Food Online",
-  "short_name": "FoodHub",
-  "description": "Order delicious food online with ease",
+  "name": "Kebabish Pizza - Food Ordering",
+  "short_name": "Kebabish Pizza",
+  "description": "Order delicious pizzas, burgers, wings and more from Kebabish Pizza with delivery to Okara, Sahiwal, and Faisalabad",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#ea580c",
   "orientation": "portrait-primary",
+  "scope": "/",
+  "categories": ["food", "shopping"],
   "icons": [
     {
       "src": "/favicon.png",

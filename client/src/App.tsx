@@ -3,8 +3,11 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import NotFound from "@/pages/not-found";
 import CustomerHome from "@/pages/customer-home";
+import Login from "@/pages/login";
+import Signup from "@/pages/signup";
 import AdminDashboard from "@/pages/admin-dashboard";
 import AdminMenu from "@/pages/admin-menu";
 import AdminUsers from "@/pages/admin-users";
@@ -18,15 +21,54 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={CustomerHome} />
-      <Route path="/admin" component={AdminDashboard} />
-      <Route path="/admin/orders" component={AdminDashboard} />
-      <Route path="/admin/menu" component={AdminMenu} />
-      <Route path="/admin/demand" component={AdminDemand} />
-      <Route path="/admin/users" component={AdminUsers} />
-      <Route path="/admin/categories" component={AdminCategories} />
-      <Route path="/admin/branches" component={AdminBranches} />
-      <Route path="/admin/expenses" component={AdminExpenses} />
-      <Route path="/admin/settings" component={AdminSettings} />
+      <Route path="/login" component={Login} />
+      <Route path="/admin/login" component={Login} />
+      <Route path="/signup" component={Signup} />
+      <Route path="/admin">
+        <ProtectedRoute requireRole={["admin", "staff"]}>
+          <AdminDashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/orders">
+        <ProtectedRoute requireRole={["admin", "staff"]}>
+          <AdminDashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/menu">
+        <ProtectedRoute requireRole={["admin", "staff"]}>
+          <AdminMenu />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/demand">
+        <ProtectedRoute requireRole={["admin", "staff"]}>
+          <AdminDemand />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/users">
+        <ProtectedRoute requireRole={["admin"]}>
+          <AdminUsers />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/categories">
+        <ProtectedRoute requireRole={["admin", "staff"]}>
+          <AdminCategories />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/branches">
+        <ProtectedRoute requireRole={["admin"]}>
+          <AdminBranches />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/expenses">
+        <ProtectedRoute requireRole={["admin", "staff"]}>
+          <AdminExpenses />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/settings">
+        <ProtectedRoute requireRole={["admin"]}>
+          <AdminSettings />
+        </ProtectedRoute>
+      </Route>
       <Route component={NotFound} />
     </Switch>
   );

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#ea580c">
+  <title>Offline - Kebabish Pizza</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #fff5f0 0%, #ffe8d6 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    
+    .container {
+      background: white;
+      border-radius: 16px;
+      padding: 48px 32px;
+      max-width: 480px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+    
+    .icon {
+      font-size: 64px;
+      margin-bottom: 24px;
+    }
+    
+    h1 {
+      color: #ea580c;
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+    
+    p {
+      color: #6b7280;
+      font-size: 16px;
+      line-height: 1.6;
+      margin-bottom: 32px;
+    }
+    
+    .button {
+      background: #ea580c;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      text-decoration: none;
+      display: inline-block;
+    }
+    
+    .button:hover {
+      background: #dc2626;
+    }
+    
+    .status {
+      margin-top: 24px;
+      padding: 12px;
+      background: #fef3c7;
+      border-radius: 8px;
+      font-size: 14px;
+      color: #92400e;
+    }
+    
+    .reconnecting {
+      display: none;
+      margin-top: 16px;
+      color: #ea580c;
+      font-weight: 600;
+    }
+    
+    @media (max-width: 480px) {
+      .container {
+        padding: 32px 24px;
+      }
+      
+      h1 {
+        font-size: 24px;
+      }
+      
+      .icon {
+        font-size: 48px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon">📡</div>
+    <h1>You're Offline</h1>
+    <p>
+      It looks like you've lost your internet connection. 
+      Please check your network and try again.
+    </p>
+    
+    <button class="button" onclick="location.reload()">
+      Try Again
+    </button>
+    
+    <div class="status">
+      <strong>Tip:</strong> Some pages you've visited before may still be available while offline.
+    </div>
+    
+    <div class="reconnecting" id="reconnecting">
+      🔄 Attempting to reconnect...
+    </div>
+  </div>
+  
+  <script>
+    // Check connection status
+    function checkConnection() {
+      if (navigator.onLine) {
+        document.getElementById('reconnecting').style.display = 'block';
+        setTimeout(() => {
+          location.reload();
+        }, 1000);
+      }
+    }
+    
+    // Listen for online event
+    window.addEventListener('online', checkConnection);
+    
+    // Check every 5 seconds
+    setInterval(checkConnection, 5000);
+  </script>
+</body>
+</html>

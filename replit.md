@@ -99,8 +99,9 @@ All tables use UUID primary keys generated via PostgreSQL's `gen_random_uuid()` 
 2. **Admin Panel**: Clean, productivity-focused design inspired by Linear and Notion
    - Fixed sidebar navigation with route highlighting
    - Breadcrumb navigation in header
-   - Dashboard with real-time order cards
+   - Dashboard with real-time order cards and analytics (revenue trends, popular items)
    - CRUD interfaces for menu items, categories, users, and expenses
+   - Inventory demand tracking with stock level monitoring and alerts
    - Sound notification system for new orders
 
 **State Management Patterns**:

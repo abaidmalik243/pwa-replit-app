@@ -1,66 +1,57 @@
 import { useState, useEffect, useRef } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import AdminSidebar from "@/components/AdminSidebar";
 import AdminHeader from "@/components/AdminHeader";
 import OrderCard, { Order } from "@/components/OrderCard";
 import { useToast } from "@/hooks/use-toast";
 import { playNotificationSound } from "@/lib/notificationSound";
 import { Button } from "@/components/ui/button";
-
-//todo: remove mock functionality
-const MOCK_ORDERS: Order[] = [
-  {
-    id: "1",
-    orderNumber: "1234",
-    customerName: "John Doe",
-    customerPhone: "+1 (555) 123-4567",
-    items: [
-      { name: "Gourmet Burger", quantity: 2, price: 12.99 },
-      { name: "Crispy Fries", quantity: 1, price: 4.99 },
-    ],
-    total: 30.97,
-    status: "pending",
-    createdAt: new Date(Date.now() - 5 * 60 * 1000),
-  },
-  {
-    id: "2",
-    orderNumber: "1235",
-    customerName: "Jane Smith",
-    customerPhone: "+1 (555) 234-5678",
-    items: [
-      { name: "Pepperoni Pizza", quantity: 1, price: 14.99 },
-      { name: "Iced Lemonade", quantity: 2, price: 3.99 },
-    ],
-    total: 22.97,
-    status: "preparing",
-    createdAt: new Date(Date.now() - 15 * 60 * 1000),
-  },
-  {
-    id: "3",
-    orderNumber: "1236",
-    customerName: "Bob Wilson",
-    customerPhone: "+1 (555) 345-6789",
-    items: [
-      { name: "Caesar Salad", quantity: 1, price: 10.99 },
-      { name: "Chocolate Lava Cake", quantity: 1, price: 7.99 },
-    ],
-    total: 18.98,
-    status: "ready",
-    createdAt: new Date(Date.now() - 25 * 60 * 1000),
-  },
-];
+import type { Order as DBOrder } from "@shared/schema";
 
 export default function AdminDashboard() {
-  const [orders, setOrders] = useState<Order[]>(MOCK_ORDERS);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const { toast } = useToast();
   const previousPendingCount = useRef(0);
+
+  // Fetch orders from API
+  const { data: dbOrders = [], isLoading } = useQuery<DBOrder[]>({
+    queryKey: ["/api/orders"],
+    refetchInterval: 30000, // Refetch every 30 seconds for new orders
+  });
+
+  // Transform DB orders to match OrderCard format
+  const orders: Order[] = dbOrders.map((order) => ({
+    id: order.id,
+    orderNumber: order.orderNumber,
+    customerName: order.customerName,
+    customerPhone: order.customerPhone,
+    items: JSON.parse(order.items),
+    total: parseFloat(order.total),
+    status: order.status as "pending" | "preparing" | "ready" | "completed" | "cancelled",
+    createdAt: new Date(order.createdAt),
+  }));
+
+  // Update order status mutation
+  const updateOrderMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const res = await apiRequest("PUT", `/api/orders/${id}`, { status });
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
 
   // Monitor for new pending orders and play sound
   useEffect(() => {
     const currentPendingCount = orders.filter((o) => o.status === "pending").length;
     
     // Play sound if there are more pending orders than before
-    if (currentPendingCount > previousPendingCount.current && soundEnabled) {
+    if (currentPendingCount > previousPendingCount.current && soundEnabled && previousPendingCount.current > 0) {
       playNotificationSound();
       toast({
         title: "🔔 New Order!",
@@ -71,73 +62,62 @@ export default function AdminDashboard() {
     previousPendingCount.current = currentPendingCount;
   }, [orders, soundEnabled, toast]);
 
-  // Simulate new orders coming in (for demo purposes)
-  const simulateNewOrder = () => {
-    const newOrder: Order = {
-      id: `${Date.now()}`,
-      orderNumber: `${Math.floor(1000 + Math.random() * 9000)}`,
-      customerName: "New Customer",
-      customerPhone: "+1 (555) 999-9999",
-      items: [
-        { name: "Gourmet Burger", quantity: 1, price: 12.99 },
-        { name: "Crispy Fries", quantity: 1, price: 4.99 },
-      ],
-      total: 17.98,
-      status: "pending",
-      createdAt: new Date(),
-    };
-    
-    setOrders((prev) => [newOrder, ...prev]);
-  };
-
   const handleAccept = (id: string) => {
-    setOrders((prev) =>
-      prev.map((order) =>
-        order.id === id ? { ...order, status: "preparing" as const } : order
-      )
+    updateOrderMutation.mutate(
+      { id, status: "preparing" },
+      {
+        onSuccess: () => {
+          toast({
+            title: "Order accepted",
+            description: "Order has been moved to preparing status",
+          });
+        },
+      }
     );
-    toast({
-      title: "Order accepted",
-      description: "Order has been moved to preparing status",
-    });
   };
 
   const handleReject = (id: string) => {
-    setOrders((prev) =>
-      prev.map((order) =>
-        order.id === id ? { ...order, status: "cancelled" as const } : order
-      )
+    updateOrderMutation.mutate(
+      { id, status: "cancelled" },
+      {
+        onSuccess: () => {
+          toast({
+            title: "Order rejected",
+            description: "Order has been cancelled",
+            variant: "destructive",
+          });
+        },
+      }
     );
-    toast({
-      title: "Order rejected",
-      description: "Order has been cancelled",
-      variant: "destructive",
-    });
   };
 
   const handleMarkReady = (id: string) => {
-    setOrders((prev) =>
-      prev.map((order) =>
-        order.id === id ? { ...order, status: "ready" as const } : order
-      )
+    updateOrderMutation.mutate(
+      { id, status: "ready" },
+      {
+        onSuccess: () => {
+          toast({
+            title: "Order ready",
+            description: "Order is ready for pickup",
+          });
+        },
+      }
     );
-    toast({
-      title: "Order ready",
-      description: "Order is ready for pickup",
-    });
   };
 
   const handleCancel = (id: string) => {
-    setOrders((prev) =>
-      prev.map((order) =>
-        order.id === id ? { ...order, status: "cancelled" as const } : order
-      )
+    updateOrderMutation.mutate(
+      { id, status: "cancelled" },
+      {
+        onSuccess: () => {
+          toast({
+            title: "Order cancelled",
+            description: "Order has been cancelled",
+            variant: "destructive",
+          });
+        },
+      }
     );
-    toast({
-      title: "Order cancelled",
-      description: "Order has been cancelled",
-      variant: "destructive",
-    });
   };
 
   const pendingOrders = orders.filter((o) => o.status === "pending");
@@ -169,15 +149,13 @@ export default function AdminDashboard() {
                 Manage incoming orders and update their status
               </p>
             </div>
-            <Button 
-              onClick={simulateNewOrder}
-              variant="outline"
-              data-testid="button-simulate-order"
-            >
-              🧪 Simulate New Order
-            </Button>
           </div>
 
+          {isLoading ? (
+            <div className="text-center py-12 text-muted-foreground">
+              Loading orders...
+            </div>
+          ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div>
               <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
@@ -246,6 +224,7 @@ export default function AdminDashboard() {
               </div>
             </div>
           </div>
+          )}
         </main>
       </div>
     </div>

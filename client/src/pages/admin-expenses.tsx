@@ -21,7 +21,9 @@ const expenseSchema = z.object({
   branchId: z.string().min(1, "Branch is required"),
   category: z.string().min(2, "Category is required"),
   description: z.string().min(2, "Description is required"),
-  amount: z.string().min(1, "Amount is required"),
+  amount: z.string().min(1, "Amount is required").refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
+    message: "Amount must be a positive number",
+  }),
   date: z.string().min(1, "Date is required"),
 });
 
@@ -71,17 +73,15 @@ export default function AdminExpenses() {
 
   const createMutation = useMutation({
     mutationFn: async (data: ExpenseForm) => {
-      return await apiRequest("/api/expenses", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...data,
-          amount: data.amount,
-          date: new Date(data.date),
-        }),
+      const res = await apiRequest("POST", "/api/expenses", {
+        ...data,
+        amount: data.amount,
+        date: new Date(data.date).toISOString(),
       });
+      return await res.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/expenses", selectedBranch] });
       queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
       setIsAddDialogOpen(false);
       form.reset();

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import CustomerHeader from "@/components/CustomerHeader";
 import ImageSlider from "@/components/ImageSlider";
 import Footer from "@/components/Footer";
@@ -8,6 +9,7 @@ import CartDrawer, { CartItem } from "@/components/CartDrawer";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
+import type { MenuItem as DBMenuItem, Category } from "@shared/schema";
 
 import burgerImage from "@assets/generated_images/Gourmet_burger_hero_image_fed670c3.png";
 import friesImage from "@assets/generated_images/French_fries_menu_item_798d4b73.png";
@@ -17,79 +19,16 @@ import smoothieImage from "@assets/generated_images/Smoothie_bowl_menu_item_c11d
 import saladImage from "@assets/generated_images/Salad_menu_item_382600b1.png";
 import beverageImage from "@assets/generated_images/Beverage_menu_item_083197e0.png";
 
-//todo: remove mock functionality
-const MOCK_MENU_ITEMS: MenuItem[] = [
-  {
-    id: "1",
-    name: "Gourmet Burger",
-    description: "Juicy beef patty with melted cheese, fresh lettuce, tomatoes, and our signature sauce",
-    price: 12.99,
-    image: burgerImage,
-    category: "Main Course",
-    isVegetarian: false,
-    isAvailable: true,
-  },
-  {
-    id: "2",
-    name: "Crispy Fries",
-    description: "Golden french fries seasoned with sea salt and herbs",
-    price: 4.99,
-    image: friesImage,
-    category: "Appetizers",
-    isVegetarian: true,
-    isAvailable: true,
-  },
-  {
-    id: "3",
-    name: "Pepperoni Pizza",
-    description: "Classic pizza with mozzarella cheese, pepperoni, and fresh basil",
-    price: 14.99,
-    image: pizzaImage,
-    category: "Main Course",
-    isVegetarian: false,
-    isAvailable: true,
-  },
-  {
-    id: "4",
-    name: "Chocolate Lava Cake",
-    description: "Warm chocolate cake with molten center, served with vanilla ice cream",
-    price: 7.99,
-    image: dessertImage,
-    category: "Desserts",
-    isVegetarian: true,
-    isAvailable: true,
-  },
-  {
-    id: "5",
-    name: "Smoothie Bowl",
-    description: "Fresh fruit smoothie topped with granola, berries, and chia seeds",
-    price: 9.99,
-    image: smoothieImage,
-    category: "Beverages",
-    isVegetarian: true,
-    isAvailable: true,
-  },
-  {
-    id: "6",
-    name: "Caesar Salad",
-    description: "Grilled chicken, romaine lettuce, parmesan cheese, and croutons",
-    price: 10.99,
-    image: saladImage,
-    category: "Appetizers",
-    isVegetarian: false,
-    isAvailable: true,
-  },
-  {
-    id: "7",
-    name: "Iced Lemonade",
-    description: "Refreshing homemade lemonade with fresh mint and lemon slices",
-    price: 3.99,
-    image: beverageImage,
-    category: "Beverages",
-    isVegetarian: true,
-    isAvailable: true,
-  },
-];
+// Fallback image mapping
+const defaultImages: Record<string, string> = {
+  Burger: burgerImage,
+  Fries: friesImage,
+  Pizza: pizzaImage,
+  Dessert: dessertImage,
+  Beverage: beverageImage,
+  Salad: saladImage,
+  Smoothie: smoothieImage,
+};
 
 export default function CustomerHome() {
   const [activeCategory, setActiveCategory] = useState("All");
@@ -98,10 +37,38 @@ export default function CustomerHome() {
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
 
-  const categories = ["All", "Bestsellers", "Appetizers", "Main Course", "Desserts", "Beverages"];
+  // Fetch menu items from API
+  const { data: dbMenuItems = [], isLoading: itemsLoading } = useQuery<DBMenuItem[]>({
+    queryKey: ["/api/menu-items"],
+  });
 
-  const filteredItems = MOCK_MENU_ITEMS.filter((item) => {
-    const matchesCategory = activeCategory === "All" || item.category === activeCategory;
+  // Fetch categories from API
+  const { data: dbCategories = [] } = useQuery<Category[]>({
+    queryKey: ["/api/categories"],
+  });
+
+  // Transform database menu items to component format
+  const menuItems: MenuItem[] = dbMenuItems
+    .filter((item) => item.isAvailable)
+    .map((item) => ({
+      id: item.id,
+      name: item.name,
+      description: item.description || "",
+      price: parseFloat(item.price),
+      image: item.imageUrl || Object.values(defaultImages)[0],
+      category: dbCategories.find((c) => c.id === item.categoryId)?.name || "Other",
+      isVegetarian: false,
+      isAvailable: item.isAvailable,
+    }));
+
+  // Get unique categories from menu items + "All" and "Bestsellers"
+  const uniqueCategories = Array.from(
+    new Set(menuItems.map((item) => item.category))
+  );
+  const categories = ["All", "Bestsellers", ...uniqueCategories];
+
+  const filteredItems = menuItems.filter((item) => {
+    const matchesCategory = activeCategory === "All" || activeCategory === "Bestsellers" || item.category === activeCategory;
     const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          item.description.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;

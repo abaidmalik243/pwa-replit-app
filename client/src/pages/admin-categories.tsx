@@ -46,11 +46,8 @@ export default function AdminCategories() {
 
   const createMutation = useMutation({
     mutationFn: async (data: CategoryForm) => {
-      return await apiRequest("/api/categories", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
+      const res = await apiRequest("POST", "/api/categories", data);
+      return await res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
@@ -65,11 +62,8 @@ export default function AdminCategories() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: CategoryForm }) => {
-      return await apiRequest(`/api/categories/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
+      const res = await apiRequest("PUT", `/api/categories/${id}`, data);
+      return await res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
@@ -84,9 +78,8 @@ export default function AdminCategories() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return await apiRequest(`/api/categories/${id}`, {
-        method: "DELETE",
-      });
+      const res = await apiRequest("DELETE", `/api/categories/${id}`);
+      return await res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/categories"] });

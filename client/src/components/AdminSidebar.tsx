@@ -1,4 +1,4 @@
-import { LayoutDashboard, ShoppingBag, UtensilsCrossed, Users, Settings, LogOut, Volume2, VolumeX } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, UtensilsCrossed, Users, Settings, LogOut, Volume2, VolumeX, FolderOpen, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Link, useLocation } from "wouter";
@@ -16,14 +16,17 @@ export default function AdminSidebar({ soundEnabled = true, onToggleSound, onLog
     { icon: LayoutDashboard, label: "Dashboard", path: "/admin" },
     { icon: ShoppingBag, label: "Orders", path: "/admin/orders" },
     { icon: UtensilsCrossed, label: "Menu Items", path: "/admin/menu" },
+    { icon: FolderOpen, label: "Categories", path: "/admin/categories" },
+    { icon: Receipt, label: "Expenses", path: "/admin/expenses" },
     { icon: Users, label: "Users & Roles", path: "/admin/users" },
     { icon: Settings, label: "Settings", path: "/admin/settings" },
   ];
 
   return (
     <div className="flex flex-col h-full bg-sidebar border-r border-sidebar-border">
-      <div className="p-6">
-        <h2 className="text-2xl font-bold text-sidebar-primary" data-testid="text-admin-logo">FoodHub Admin</h2>
+      <div className="p-6 flex items-center gap-2">
+        <span className="text-2xl">🍕</span>
+        <h2 className="text-xl font-bold text-sidebar-primary" data-testid="text-admin-logo">Kebabish Pizza</h2>
       </div>
 
       <nav className="flex-1 px-3 space-y-1">

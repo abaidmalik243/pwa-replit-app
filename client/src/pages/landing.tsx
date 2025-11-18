@@ -1,34 +1,44 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Link } from "wouter";
-import { ShoppingCart, UserCog, Utensils, Clock, Star } from "lucide-react";
+import { ShoppingCart, UserCog, Utensils, Clock, Star, Phone } from "lucide-react";
+import { HeroSlider } from "@/components/HeroSlider";
 
 export default function Landing() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b">
         <div className="container flex h-16 items-center justify-between px-4">
-          <h1 className="text-2xl font-bold text-primary">FoodHub</h1>
-          <div className="flex gap-3">
-            <Link href="/customer">
+          <div className="flex items-center gap-2">
+            <span className="text-3xl">🍕</span>
+            <h1 className="text-2xl font-bold text-primary">Kebabish Pizza</h1>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="hidden md:flex items-center gap-2 text-sm">
+              <Phone className="h-4 w-4 text-primary" />
+              <span className="font-medium">+92-300-1234567</span>
+            </div>
+            <Link href="/login">
               <Button variant="outline" data-testid="button-customer-login">
-                Customer Login
+                Sign In
               </Button>
             </Link>
-            <Link href="/admin">
-              <Button data-testid="button-admin-login">Admin Login</Button>
+            <Link href="/signup">
+              <Button data-testid="button-signup">Sign Up</Button>
             </Link>
           </div>
         </div>
       </header>
 
+      <HeroSlider />
+
       <main className="container px-4 py-12">
-        <div className="text-center mb-16">
-          <h2 className="text-5xl font-bold mb-4">
-            Welcome to FoodHub
+        <div className="text-center mb-12">
+          <h2 className="text-4xl font-bold mb-4">
+            Three Locations to Serve You
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Order delicious food online or manage your restaurant with our powerful admin panel
+            Find us in Okara, Sahiwal, and Faisalabad
           </p>
         </div>
 
@@ -37,9 +47,9 @@ export default function Landing() {
             <ShoppingCart className="h-12 w-12 text-primary mb-4" />
             <h3 className="text-2xl font-bold mb-3">For Customers</h3>
             <p className="text-muted-foreground mb-6">
-              Browse our menu, place orders, and enjoy fast delivery. Simple, quick, and delicious!
+              Browse our menu, place orders, and enjoy authentic pizzas & kebabs with fast delivery!
             </p>
-            <Link href="/customer">
+            <Link href="/login">
               <Button className="w-full" data-testid="button-start-ordering">
                 Start Ordering
               </Button>
@@ -50,9 +60,9 @@ export default function Landing() {
             <UserCog className="h-12 w-12 text-primary mb-4" />
             <h3 className="text-2xl font-bold mb-3">For Administrators</h3>
             <p className="text-muted-foreground mb-6">
-              Manage orders, menu items, users, and more with our comprehensive admin dashboard.
+              Manage orders, menu items, users, expenses, and more across all three branches.
             </p>
-            <Link href="/admin">
+            <Link href="/login">
               <Button className="w-full" data-testid="button-admin-dashboard">
                 Admin Dashboard
               </Button>
@@ -61,7 +71,7 @@ export default function Landing() {
         </div>
 
         <div className="max-w-4xl mx-auto">
-          <h3 className="text-3xl font-bold text-center mb-8">Why Choose FoodHub?</h3>
+          <h3 className="text-3xl font-bold text-center mb-8">Why Choose Kebabish Pizza?</h3>
           <div className="grid md:grid-cols-3 gap-6">
             <Card className="p-6 text-center">
               <Utensils className="h-10 w-10 text-primary mx-auto mb-3" />
@@ -90,7 +100,8 @@ export default function Landing() {
 
       <footer className="border-t mt-16 py-8">
         <div className="container px-4 text-center text-muted-foreground">
-          <p>&copy; 2024 FoodHub. All rights reserved.</p>
+          <p>&copy; 2024 Kebabish Pizza. All rights reserved.</p>
+          <p className="mt-2">Okara | Sahiwal | Faisalabad</p>
         </div>
       </footer>
     </div>

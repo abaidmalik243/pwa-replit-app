@@ -11,45 +11,59 @@ export function initAudioContext() {
 export function playNotificationSound() {
   try {
     const context = initAudioContext();
-    
-    // Create a pleasant notification sound (two-tone beep)
     const now = context.currentTime;
     
-    // First tone
-    const oscillator1 = context.createOscillator();
-    const gainNode1 = context.createGain();
+    // Create a louder, longer notification sound (5+ seconds)
+    // This creates a pleasant multi-tone notification that's attention-grabbing
     
-    oscillator1.connect(gainNode1);
-    gainNode1.connect(context.destination);
+    const playTone = (frequency: number, startTime: number, duration: number, volume: number) => {
+      const oscillator = context.createOscillator();
+      const gainNode = context.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(context.destination);
+      
+      oscillator.frequency.value = frequency;
+      oscillator.type = 'sine';
+      
+      // Envelope: fade in quickly, sustain, fade out
+      gainNode.gain.setValueAtTime(0, startTime);
+      gainNode.gain.linearRampToValueAtTime(volume, startTime + 0.05);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+      
+      oscillator.start(startTime);
+      oscillator.stop(startTime + duration);
+    };
     
-    oscillator1.frequency.value = 800; // Higher frequency
-    oscillator1.type = 'sine';
+    // Create a sequence of tones for a 5-second notification
+    // Pattern: High-Low-High-Low-High (attention-grabbing pattern)
+    const basVolume = 0.5; // Louder volume (0.5 = 50% max volume)
     
-    gainNode1.gain.setValueAtTime(0, now);
-    gainNode1.gain.linearRampToValueAtTime(0.3, now + 0.01);
-    gainNode1.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+    // First tone (high)
+    playTone(880, now, 0.4, basVolume);
     
-    oscillator1.start(now);
-    oscillator1.stop(now + 0.15);
+    // Second tone (low)
+    playTone(660, now + 0.5, 0.4, basVolume);
     
-    // Second tone (slightly lower)
-    const oscillator2 = context.createOscillator();
-    const gainNode2 = context.createGain();
+    // Third tone (high)
+    playTone(880, now + 1.0, 0.4, basVolume);
     
-    oscillator2.connect(gainNode2);
-    gainNode2.connect(context.destination);
+    // Fourth tone (low)
+    playTone(660, now + 1.5, 0.4, basVolume);
     
-    oscillator2.frequency.value = 600; // Lower frequency
-    oscillator2.type = 'sine';
+    // Fifth tone (high - longer)
+    playTone(880, now + 2.0, 0.6, basVolume);
     
-    gainNode2.gain.setValueAtTime(0, now + 0.15);
-    gainNode2.gain.linearRampToValueAtTime(0.3, now + 0.16);
-    gainNode2.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+    // Sixth tone (medium)
+    playTone(770, now + 2.7, 0.6, basVolume);
     
-    oscillator2.start(now + 0.15);
-    oscillator2.stop(now + 0.35);
+    // Seventh tone (high - sustained)
+    playTone(880, now + 3.4, 0.8, basVolume);
     
-    console.log('🔔 Notification sound played');
+    // Final tone (very high - attention!)
+    playTone(1046, now + 4.3, 1.0, basVolume * 1.2);
+    
+    console.log('🔔 Loud notification sound played (5+ seconds)');
   } catch (error) {
     console.error('Error playing notification sound:', error);
   }

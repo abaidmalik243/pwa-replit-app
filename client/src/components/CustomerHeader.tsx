@@ -1,4 +1,4 @@
-import { ShoppingCart, MapPin, Menu } from "lucide-react";
+import { ShoppingCart, Phone, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -26,12 +26,17 @@ export default function CustomerHeader({
           >
             <Menu className="h-5 w-5" />
           </Button>
-          <h1 className="text-2xl font-bold text-primary" data-testid="text-logo">FoodHub</h1>
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">🍕</span>
+            <h1 className="text-xl md:text-2xl font-bold text-primary" data-testid="text-logo">Kebabish Pizza</h1>
+          </div>
         </div>
 
-        <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground">
-          <MapPin className="h-4 w-4" />
-          <span data-testid="text-location">Deliver to: <span className="font-medium text-foreground">123 Main St</span></span>
+        <div className="hidden md:flex items-center gap-2 text-sm">
+          <Phone className="h-4 w-4 text-primary" />
+          <a href="tel:+923001234567" className="font-medium hover:text-primary" data-testid="text-phone">
+            +92-300-1234567
+          </a>
         </div>
 
         <Button 

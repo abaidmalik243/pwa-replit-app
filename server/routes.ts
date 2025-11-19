@@ -469,6 +469,270 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POS Tables routes
+  app.get("/api/pos/tables", async (req, res) => {
+    try {
+      const { branchId } = req.query;
+      const tables = branchId
+        ? await storage.getPosTablesByBranch(branchId as string)
+        : await storage.getAllPosTables();
+      res.json(tables);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/pos/tables/:id", async (req, res) => {
+    try {
+      const table = await storage.getPosTable(req.params.id);
+      if (!table) {
+        return res.status(404).json({ error: "Table not found" });
+      }
+      res.json(table);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/pos/tables", async (req, res) => {
+    try {
+      const table = await storage.createPosTable(req.body);
+      res.json(table);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.put("/api/pos/tables/:id", async (req, res) => {
+    try {
+      const table = await storage.updatePosTable(req.params.id, req.body);
+      if (!table) {
+        return res.status(404).json({ error: "Table not found" });
+      }
+      res.json(table);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/pos/tables/:id", async (req, res) => {
+    try {
+      await storage.deletePosTable(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // POS Sessions routes
+  app.get("/api/pos/sessions", async (req, res) => {
+    try {
+      const { branchId } = req.query;
+      const sessions = branchId
+        ? await storage.getPosSessionsByBranch(branchId as string)
+        : await storage.getAllPosSessions();
+      res.json(sessions);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/pos/sessions/active/:branchId", async (req, res) => {
+    try {
+      const session = await storage.getActivePosSession(req.params.branchId);
+      res.json(session || null);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/pos/sessions/:id", async (req, res) => {
+    try {
+      const session = await storage.getPosSession(req.params.id);
+      if (!session) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+      res.json(session);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/pos/sessions", async (req, res) => {
+    try {
+      // Generate session number
+      const sessionNumber = `S${Date.now()}`;
+      const session = await storage.createPosSession({
+        ...req.body,
+        sessionNumber,
+      });
+      res.json(session);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.put("/api/pos/sessions/:id", async (req, res) => {
+    try {
+      const session = await storage.updatePosSession(req.params.id, req.body);
+      if (!session) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+      res.json(session);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Kitchen Tickets routes
+  app.get("/api/pos/kitchen-tickets", async (req, res) => {
+    try {
+      const { status } = req.query;
+      const tickets = status
+        ? await storage.getKitchenTicketsByStatus(status as string)
+        : await storage.getAllKitchenTickets();
+      res.json(tickets);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/pos/kitchen-tickets/order/:orderId", async (req, res) => {
+    try {
+      const tickets = await storage.getKitchenTicketsByOrder(req.params.orderId);
+      res.json(tickets);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/pos/kitchen-tickets", async (req, res) => {
+    try {
+      // Generate ticket number
+      const ticketNumber = `KOT${Date.now()}`;
+      const ticket = await storage.createKitchenTicket({
+        ...req.body,
+        ticketNumber,
+      });
+      res.json(ticket);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.put("/api/pos/kitchen-tickets/:id", async (req, res) => {
+    try {
+      const ticket = await storage.updateKitchenTicket(req.params.id, req.body);
+      if (!ticket) {
+        return res.status(404).json({ error: "Ticket not found" });
+      }
+      res.json(ticket);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Payments routes
+  app.get("/api/pos/payments", async (req, res) => {
+    try {
+      const { orderId, sessionId } = req.query;
+      let payments;
+      if (orderId) {
+        payments = await storage.getPaymentsByOrder(orderId as string);
+      } else if (sessionId) {
+        payments = await storage.getPaymentsBySession(sessionId as string);
+      } else {
+        payments = await storage.getAllPayments();
+      }
+      res.json(payments);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/pos/payments", async (req, res) => {
+    try {
+      const payment = await storage.createPayment(req.body);
+      res.json(payment);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Order Modifications routes
+  app.get("/api/pos/order-modifications/:orderId", async (req, res) => {
+    try {
+      const modifications = await storage.getOrderModifications(req.params.orderId);
+      res.json(modifications);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/pos/order-modifications", async (req, res) => {
+    try {
+      const modification = await storage.createOrderModification(req.body);
+      res.json(modification);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Table Reservations routes
+  app.get("/api/pos/reservations", async (req, res) => {
+    try {
+      const { tableId } = req.query;
+      const reservations = tableId
+        ? await storage.getReservationsByTable(tableId as string)
+        : await storage.getAllTableReservations();
+      res.json(reservations);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/pos/reservations/:id", async (req, res) => {
+    try {
+      const reservation = await storage.getTableReservation(req.params.id);
+      if (!reservation) {
+        return res.status(404).json({ error: "Reservation not found" });
+      }
+      res.json(reservation);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/pos/reservations", async (req, res) => {
+    try {
+      const reservation = await storage.createTableReservation(req.body);
+      res.json(reservation);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.put("/api/pos/reservations/:id", async (req, res) => {
+    try {
+      const reservation = await storage.updateTableReservation(req.params.id, req.body);
+      if (!reservation) {
+        return res.status(404).json({ error: "Reservation not found" });
+      }
+      res.json(reservation);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/pos/reservations/:id", async (req, res) => {
+    try {
+      await storage.deleteTableReservation(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

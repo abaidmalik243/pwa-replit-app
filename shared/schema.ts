@@ -97,8 +97,8 @@ export const orders = pgTable("orders", {
   orderNumber: text("order_number").notNull().unique(),
   customerId: varchar("customer_id").references(() => users.id),
   branchId: varchar("branch_id").references(() => branches.id).notNull(),
-  sessionId: varchar("session_id"),// POS: Link to cash register session (forward reference added below)
-  tableId: varchar("table_id"), // POS: For dine-in orders (forward reference added below)
+  sessionId: varchar("session_id").references(() => posSessions.id), // POS: Link to cash register session
+  tableId: varchar("table_id").references(() => posTables.id), // POS: For dine-in orders
   customerName: text("customer_name").notNull(),
   customerPhone: text("customer_phone").notNull(),
   alternativePhone: text("alternative_phone"), // Alternative contact number
@@ -166,7 +166,6 @@ export const posTables = pgTable("pos_tables", {
   capacity: integer("capacity").notNull().default(4), // Number of seats
   section: text("section"), // Main Hall, Outdoor, VIP, etc.
   status: text("status").notNull().default("available"), // available, occupied, reserved, cleaning
-  currentOrderId: varchar("current_order_id").references(() => orders.id),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

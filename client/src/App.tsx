@@ -20,6 +20,7 @@ import AdminBranches from "@/pages/admin-branches";
 import AdminExpenses from "@/pages/admin-expenses";
 import AdminSettings from "@/pages/admin-settings";
 import AdminDemand from "@/pages/admin-demand";
+import PosMain from "@/pages/pos-main";
 
 function Router() {
   return (
@@ -32,6 +33,11 @@ function Router() {
       <Route path="/reset-password" component={ResetPassword} />
       <Route path="/terms-conditions" component={TermsConditions} />
       <Route path="/privacy-policy" component={PrivacyPolicy} />
+      <Route path="/pos">
+        <ProtectedRoute requireRole={["admin", "staff"]}>
+          <PosMain />
+        </ProtectedRoute>
+      </Route>
       <Route path="/admin">
         <ProtectedRoute requireRole={["admin", "staff"]}>
           <AdminDashboard />

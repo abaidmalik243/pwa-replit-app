@@ -34,7 +34,12 @@ export default function KitchenDisplay() {
   // Fetch orders for kitchen display
   const { data: orders = [] } = useQuery<Order[]>({
     queryKey: ["/api/orders", userBranchId],
-    queryFn: () => fetch(`/api/orders?branchId=${userBranchId}`).then(res => res.json()),
+    queryFn: () => {
+      const url = userBranchId === "all" 
+        ? "/api/orders" 
+        : `/api/orders?branchId=${userBranchId}`;
+      return fetch(url).then(res => res.json());
+    },
     enabled: !!userBranchId,
     refetchInterval: 5000, // Poll every 5 seconds
   });
@@ -164,7 +169,7 @@ export default function KitchenDisplay() {
     new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
   );
 
-  if (!userBranchId) {
+  if (!userBranchId || (userBranchId !== "all" && !userBranchId)) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="text-center">

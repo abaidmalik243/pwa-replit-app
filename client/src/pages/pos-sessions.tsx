@@ -48,7 +48,9 @@ export default function PosSessions() {
     );
   }
 
-  // Fetch active session
+  const viewingAllBranches = userBranchId === "all";
+
+  // Fetch active session (only for specific branch)
   const { data: activeSession } = useQuery<PosSession | null>({
     queryKey: ["/api/pos/sessions/active", userBranchId],
     queryFn: async () => {
@@ -57,13 +59,18 @@ export default function PosSessions() {
       if (!response.ok) throw new Error("Failed to fetch active session");
       return response.json();
     },
-    enabled: !!userBranchId,
+    enabled: !!userBranchId && !viewingAllBranches,
   });
 
   // Fetch session history
   const { data: sessions = [] } = useQuery<PosSession[]>({
     queryKey: ["/api/pos/sessions", userBranchId],
-    queryFn: () => fetch(`/api/pos/sessions?branchId=${userBranchId}`).then(res => res.json()),
+    queryFn: () => {
+      const url = viewingAllBranches 
+        ? "/api/pos/sessions" 
+        : `/api/pos/sessions?branchId=${userBranchId}`;
+      return fetch(url).then(res => res.json());
+    },
     enabled: !!userBranchId,
   });
 
@@ -205,11 +212,14 @@ export default function PosSessions() {
                 <h1 className="text-3xl font-bold" data-testid="heading-sessions">Cash Register Sessions</h1>
                 <p className="text-muted-foreground">Manage cash register opening and closing</p>
               </div>
-              {!activeSession && (
+              {!activeSession && !viewingAllBranches && (
                 <Button onClick={() => setShowOpenDialog(true)} data-testid="button-open-session">
                   <Plus className="w-4 h-4 mr-2" />
                   Open Session
                 </Button>
+              )}
+              {viewingAllBranches && (
+                <Badge variant="outline">Viewing All Branches</Badge>
               )}
             </div>
 

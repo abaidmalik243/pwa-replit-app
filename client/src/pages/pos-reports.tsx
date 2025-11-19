@@ -27,6 +27,7 @@ export default function PosReports() {
     }
   })();
   const userBranchId = user.branchId;
+  const viewingAllBranches = userBranchId === "all";
 
   // Calculate date range
   const getDateRange = () => {
@@ -49,14 +50,24 @@ export default function PosReports() {
   // Fetch orders
   const { data: allOrders = [] } = useQuery<Order[]>({
     queryKey: ["/api/orders", userBranchId],
-    queryFn: () => fetch(`/api/orders?branchId=${userBranchId}`).then(res => res.json()),
+    queryFn: () => {
+      const url = viewingAllBranches 
+        ? "/api/orders" 
+        : `/api/orders?branchId=${userBranchId}`;
+      return fetch(url).then(res => res.json());
+    },
     enabled: !!userBranchId,
   });
 
   // Fetch sessions
   const { data: sessions = [] } = useQuery<PosSession[]>({
     queryKey: ["/api/pos/sessions", userBranchId],
-    queryFn: () => fetch(`/api/pos/sessions?branchId=${userBranchId}`).then(res => res.json()),
+    queryFn: () => {
+      const url = viewingAllBranches 
+        ? "/api/pos/sessions" 
+        : `/api/pos/sessions?branchId=${userBranchId}`;
+      return fetch(url).then(res => res.json());
+    },
     enabled: !!userBranchId,
   });
 

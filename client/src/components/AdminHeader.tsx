@@ -107,6 +107,7 @@ export default function AdminHeader({ breadcrumbs, notificationCount = 0, userNa
                 </div>
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="all">All Branches</SelectItem>
                 {branches.filter(b => b.isActive).map((branch) => (
                   <SelectItem key={branch.id} value={branch.id}>
                     {branch.name}

@@ -56,10 +56,17 @@ export default function POSTables() {
     );
   }
 
+  const viewingAllBranches = userBranchId === "all";
+
   // Fetch tables
   const { data: tables = [] } = useQuery<PosTable[]>({
     queryKey: ["/api/pos/tables", userBranchId],
-    queryFn: () => fetch(`/api/pos/tables?branchId=${userBranchId}`).then(res => res.json()),
+    queryFn: () => {
+      const url = viewingAllBranches 
+        ? "/api/pos/tables" 
+        : `/api/pos/tables?branchId=${userBranchId}`;
+      return fetch(url).then(res => res.json());
+    },
     enabled: !!userBranchId,
   });
 
@@ -233,10 +240,14 @@ export default function POSTables() {
                 <h1 className="text-3xl font-bold" data-testid="heading-tables">Table Management</h1>
                 <p className="text-muted-foreground">Manage restaurant tables and floor plan</p>
               </div>
-              <Button onClick={() => setShowDialog(true)} data-testid="button-add-table">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Table
-              </Button>
+              {!viewingAllBranches ? (
+                <Button onClick={() => setShowDialog(true)} data-testid="button-add-table">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Table
+                </Button>
+              ) : (
+                <Badge variant="outline">Viewing All Branches</Badge>
+              )}
             </div>
 
             {/* Stats */}

@@ -97,19 +97,27 @@ export const orders = pgTable("orders", {
   orderNumber: text("order_number").notNull().unique(),
   customerId: varchar("customer_id").references(() => users.id),
   branchId: varchar("branch_id").references(() => branches.id).notNull(),
+  sessionId: varchar("session_id"),// POS: Link to cash register session (forward reference added below)
+  tableId: varchar("table_id"), // POS: For dine-in orders (forward reference added below)
   customerName: text("customer_name").notNull(),
   customerPhone: text("customer_phone").notNull(),
   alternativePhone: text("alternative_phone"), // Alternative contact number
   customerAddress: text("customer_address"), // For delivery orders
   deliveryArea: text("delivery_area"), // Selected delivery area
-  orderType: text("order_type").notNull().default("takeaway"), // takeaway or delivery
-  paymentMethod: text("payment_method").notNull().default("cash"), // cash or jazzcash
+  orderType: text("order_type").notNull().default("takeaway"), // takeaway, delivery, or dine-in
+  orderSource: text("order_source").notNull().default("online"), // online, pos, phone
+  paymentMethod: text("payment_method").notNull().default("cash"), // cash, card, or jazzcash
+  paymentStatus: text("payment_status").notNull().default("pending"), // pending, paid, partial
   items: text("items").notNull(), // JSON string
-  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(), // Order subtotal before delivery
+  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(), // Order subtotal before delivery/discount
+  discount: decimal("discount", { precision: 10, scale: 2 }).default("0"), // POS: Discount amount
+  discountReason: text("discount_reason"), // POS: Reason for discount
   deliveryCharges: decimal("delivery_charges", { precision: 10, scale: 2 }).default("0"), // Delivery charges
   deliveryDistance: decimal("delivery_distance", { precision: 5, scale: 2 }), // Distance in KM
-  total: decimal("total", { precision: 10, scale: 2 }).notNull(), // subtotal + deliveryCharges
+  total: decimal("total", { precision: 10, scale: 2 }).notNull(), // subtotal - discount + deliveryCharges
   status: text("status").notNull().default("pending"), // pending, preparing, ready, completed, cancelled
+  waiterId: varchar("waiter_id").references(() => users.id), // POS: Assigned waiter for dine-in
+  servedBy: varchar("served_by").references(() => users.id), // POS: Cashier/staff who took the order
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -117,6 +125,7 @@ export const orders = pgTable("orders", {
 
 export const insertOrderSchema = createInsertSchema(orders).omit({ id: true, createdAt: true, updatedAt: true }).extend({
   subtotal: z.string().or(z.number()).transform(val => typeof val === 'string' ? val : val.toString()),
+  discount: z.string().or(z.number()).transform(val => typeof val === 'string' ? val : val.toString()).optional(),
   deliveryCharges: z.string().or(z.number()).transform(val => typeof val === 'string' ? val : val.toString()).optional(),
   deliveryDistance: z.string().or(z.number()).transform(val => typeof val === 'string' ? val : val.toString()).optional(),
   total: z.string().or(z.number()).transform(val => typeof val === 'string' ? val : val.toString()),
@@ -147,3 +156,117 @@ export const expenses = pgTable("expenses", {
 export const insertExpenseSchema = createInsertSchema(expenses).omit({ id: true, createdAt: true });
 export type InsertExpense = z.infer<typeof insertExpenseSchema>;
 export type Expense = typeof expenses.$inferSelect;
+
+// POS Tables for Dine-in Management
+export const posTables = pgTable("pos_tables", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  branchId: varchar("branch_id").references(() => branches.id).notNull(),
+  tableName: text("table_name").notNull(), // Table 1, Table 2, VIP-1, etc.
+  tableNumber: integer("table_number").notNull(),
+  capacity: integer("capacity").notNull().default(4), // Number of seats
+  section: text("section"), // Main Hall, Outdoor, VIP, etc.
+  status: text("status").notNull().default("available"), // available, occupied, reserved, cleaning
+  currentOrderId: varchar("current_order_id").references(() => orders.id),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertPosTableSchema = createInsertSchema(posTables).omit({ id: true, createdAt: true });
+export type InsertPosTable = z.infer<typeof insertPosTableSchema>;
+export type PosTable = typeof posTables.$inferSelect;
+
+// POS Cash Register Sessions
+export const posSessions = pgTable("pos_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  branchId: varchar("branch_id").references(() => branches.id).notNull(),
+  userId: varchar("user_id").references(() => users.id).notNull(), // Cashier who opened the session
+  sessionNumber: text("session_number").notNull(), // Unique session identifier
+  openingCash: decimal("opening_cash", { precision: 10, scale: 2 }).notNull(),
+  closingCash: decimal("closing_cash", { precision: 10, scale: 2 }),
+  expectedCash: decimal("expected_cash", { precision: 10, scale: 2 }), // Based on transactions
+  cashDifference: decimal("cash_difference", { precision: 10, scale: 2 }), // Expected - Closing
+  totalSales: decimal("total_sales", { precision: 10, scale: 2 }).default("0"),
+  totalOrders: integer("total_orders").default(0),
+  cashSales: decimal("cash_sales", { precision: 10, scale: 2 }).default("0"),
+  cardSales: decimal("card_sales", { precision: 10, scale: 2 }).default("0"),
+  jazzCashSales: decimal("jazz_cash_sales", { precision: 10, scale: 2 }).default("0"),
+  status: text("status").notNull().default("open"), // open, closed
+  notes: text("notes"),
+  openedAt: timestamp("opened_at").notNull().defaultNow(),
+  closedAt: timestamp("closed_at"),
+});
+
+export const insertPosSessionSchema = createInsertSchema(posSessions).omit({ id: true, openedAt: true });
+export type InsertPosSession = z.infer<typeof insertPosSessionSchema>;
+export type PosSession = typeof posSessions.$inferSelect;
+
+// Kitchen Order Tickets (KOT)
+export const kitchenTickets = pgTable("kitchen_tickets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orderId: varchar("order_id").references(() => orders.id).notNull(),
+  ticketNumber: text("ticket_number").notNull(),
+  items: text("items").notNull(), // JSON string of items for this ticket
+  station: text("station"), // Grill, Fryer, Pizza Station, etc.
+  priority: text("priority").notNull().default("normal"), // urgent, high, normal, low
+  status: text("status").notNull().default("pending"), // pending, preparing, ready, served
+  specialInstructions: text("special_instructions"),
+  preparedBy: varchar("prepared_by").references(() => users.id), // Chef/cook who prepared
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+});
+
+export const insertKitchenTicketSchema = createInsertSchema(kitchenTickets).omit({ id: true, createdAt: true });
+export type InsertKitchenTicket = z.infer<typeof insertKitchenTicketSchema>;
+export type KitchenTicket = typeof kitchenTickets.$inferSelect;
+
+// Payment Transactions (supports split payments)
+export const payments = pgTable("payments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orderId: varchar("order_id").references(() => orders.id).notNull(),
+  sessionId: varchar("session_id").references(() => posSessions.id),
+  paymentMethod: text("payment_method").notNull(), // cash, card, jazzcash
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  reference: text("reference"), // Card authorization number, JazzCash transaction ID, etc.
+  receivedBy: varchar("received_by").references(() => users.id), // Staff who received payment
+  status: text("status").notNull().default("completed"), // pending, completed, refunded
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertPaymentSchema = createInsertSchema(payments).omit({ id: true, createdAt: true });
+export type InsertPayment = z.infer<typeof insertPaymentSchema>;
+export type Payment = typeof payments.$inferSelect;
+
+// Order Modifications Log
+export const orderModifications = pgTable("order_modifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orderId: varchar("order_id").references(() => orders.id).notNull(),
+  modifiedBy: varchar("modified_by").references(() => users.id).notNull(),
+  modificationType: text("modification_type").notNull(), // item_added, item_removed, discount_applied, etc.
+  description: text("description").notNull(),
+  oldValue: text("old_value"), // JSON or text of old value
+  newValue: text("new_value"), // JSON or text of new value
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertOrderModificationSchema = createInsertSchema(orderModifications).omit({ id: true, createdAt: true });
+export type InsertOrderModification = z.infer<typeof insertOrderModificationSchema>;
+export type OrderModification = typeof orderModifications.$inferSelect;
+
+// Table Reservations
+export const tableReservations = pgTable("table_reservations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tableId: varchar("table_id").references(() => posTables.id).notNull(),
+  customerName: text("customer_name").notNull(),
+  customerPhone: text("customer_phone").notNull(),
+  guestCount: integer("guest_count").notNull(),
+  reservationDate: timestamp("reservation_date").notNull(),
+  duration: integer("duration").default(120), // Duration in minutes
+  status: text("status").notNull().default("confirmed"), // confirmed, seated, completed, cancelled
+  specialRequests: text("special_requests"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertTableReservationSchema = createInsertSchema(tableReservations).omit({ id: true, createdAt: true });
+export type InsertTableReservation = z.infer<typeof insertTableReservationSchema>;
+export type TableReservation = typeof tableReservations.$inferSelect;

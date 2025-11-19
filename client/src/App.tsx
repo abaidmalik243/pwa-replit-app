@@ -10,6 +10,8 @@ import Login from "@/pages/login";
 import Signup from "@/pages/signup";
 import ForgotPassword from "@/pages/forgot-password";
 import ResetPassword from "@/pages/reset-password";
+import TermsConditions from "@/pages/terms-conditions";
+import PrivacyPolicy from "@/pages/privacy-policy";
 import AdminDashboard from "@/pages/admin-dashboard";
 import AdminMenu from "@/pages/admin-menu";
 import AdminUsers from "@/pages/admin-users";
@@ -28,6 +30,8 @@ function Router() {
       <Route path="/signup" component={Signup} />
       <Route path="/forgot-password" component={ForgotPassword} />
       <Route path="/reset-password" component={ResetPassword} />
+      <Route path="/terms-conditions" component={TermsConditions} />
+      <Route path="/privacy-policy" component={PrivacyPolicy} />
       <Route path="/admin">
         <ProtectedRoute requireRole={["admin", "staff"]}>
           <AdminDashboard />

@@ -77,7 +77,7 @@ export default function AdminUsers() {
 
   const createMutation = useMutation({
     mutationFn: async (data: UserForm) => {
-      const res = await apiRequest("POST", "/api/users", data);
+      const res = await apiRequest("/api/users", "POST", data);
       return await res.json();
     },
     onSuccess: () => {
@@ -93,7 +93,7 @@ export default function AdminUsers() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<UserForm> }) => {
-      const res = await apiRequest("PUT", `/api/users/${id}`, data);
+      const res = await apiRequest(`/api/users/${id}`, "PUT", data);
       return await res.json();
     },
     onSuccess: () => {
@@ -110,7 +110,7 @@ export default function AdminUsers() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await apiRequest("DELETE", `/api/users/${id}`);
+      const res = await apiRequest(`/api/users/${id}`, "DELETE");
       return await res.json();
     },
     onSuccess: () => {

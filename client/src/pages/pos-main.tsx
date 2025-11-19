@@ -265,16 +265,11 @@ export default function PosMain() {
       specialInstructions: item.specialInstructions,
     }));
 
-    const orderData = {
+    const orderData: any = {
       orderNumber,
       branchId: userBranchId,
-      sessionId: activeSession?.id || null,
-      tableId: orderType === "dine-in" ? selectedTable : null,
       customerName,
       customerPhone,
-      alternativePhone: null,
-      customerAddress: orderType === "delivery" ? "" : null,
-      deliveryArea: orderType === "delivery" ? "" : null,
       orderType,
       orderSource: "pos",
       paymentMethod: "cash",
@@ -282,15 +277,18 @@ export default function PosMain() {
       items: JSON.stringify(orderItems),
       subtotal: subtotal.toString(),
       discount: discount.toString(),
-      discountReason: null,
       deliveryCharges: deliveryCharges.toString(),
-      deliveryDistance: null,
       total: total.toString(),
       status: "pending",
-      waiterId: null,
-      servedBy: user.id || null,
-      notes: null,
     };
+
+    // Add optional fields only if they have values
+    if (activeSession?.id) orderData.sessionId = activeSession.id;
+    if (orderType === "dine-in" && selectedTable) orderData.tableId = selectedTable;
+    if (orderType === "delivery") {
+      orderData.customerAddress = "";
+      orderData.deliveryArea = "";
+    }
 
     createOrderMutation.mutate(orderData);
   };

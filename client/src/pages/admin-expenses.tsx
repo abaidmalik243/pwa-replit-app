@@ -73,7 +73,7 @@ export default function AdminExpenses() {
 
   const createMutation = useMutation({
     mutationFn: async (data: ExpenseForm) => {
-      const res = await apiRequest("POST", "/api/expenses", {
+      const res = await apiRequest("/api/expenses", "POST", {
         ...data,
         amount: data.amount,
         date: new Date(data.date).toISOString(),

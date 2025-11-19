@@ -35,7 +35,7 @@ export default function AdminDemand() {
   // Update stock mutation
   const updateStockMutation = useMutation({
     mutationFn: async ({ id, stockQuantity }: { id: string; stockQuantity: number }) => {
-      const res = await apiRequest("PUT", `/api/menu-items/${id}`, { stockQuantity });
+      const res = await apiRequest(`/api/menu-items/${id}`, "PUT", { stockQuantity });
       return await res.json();
     },
     onSuccess: () => {

@@ -278,7 +278,7 @@ export default function CustomerHome() {
 
   const createOrderMutation = useMutation({
     mutationFn: async (orderData: any) => {
-      const res = await apiRequest("POST", "/api/orders", orderData);
+      const res = await apiRequest("/api/orders", "POST", orderData);
       return await res.json();
     },
     onSuccess: (data) => {

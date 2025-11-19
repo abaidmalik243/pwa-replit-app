@@ -46,7 +46,7 @@ export default function AdminCategories() {
 
   const createMutation = useMutation({
     mutationFn: async (data: CategoryForm) => {
-      const res = await apiRequest("POST", "/api/categories", data);
+      const res = await apiRequest("/api/categories", "POST", data);
       return await res.json();
     },
     onSuccess: () => {
@@ -62,7 +62,7 @@ export default function AdminCategories() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: CategoryForm }) => {
-      const res = await apiRequest("PUT", `/api/categories/${id}`, data);
+      const res = await apiRequest(`/api/categories/${id}`, "PUT", data);
       return await res.json();
     },
     onSuccess: () => {
@@ -78,7 +78,7 @@ export default function AdminCategories() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await apiRequest("DELETE", `/api/categories/${id}`);
+      const res = await apiRequest(`/api/categories/${id}`, "DELETE");
       return await res.json();
     },
     onSuccess: () => {

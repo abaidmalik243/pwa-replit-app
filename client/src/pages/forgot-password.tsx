@@ -17,7 +17,7 @@ export default function ForgotPassword() {
 
   const forgotPasswordMutation = useMutation({
     mutationFn: async (data: { email: string }) => {
-      const res = await apiRequest("POST", "/api/auth/forgot-password", data);
+      const res = await apiRequest("/api/auth/forgot-password", "POST", data);
       return await res.json();
     },
     onSuccess: () => {

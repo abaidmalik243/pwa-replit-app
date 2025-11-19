@@ -61,7 +61,7 @@ export default function AdminBranches() {
 
   const createMutation = useMutation({
     mutationFn: async (data: BranchForm) => {
-      const res = await apiRequest("POST", "/api/branches", data);
+      const res = await apiRequest("/api/branches", "POST", data);
       return await res.json();
     },
     onSuccess: () => {
@@ -77,7 +77,7 @@ export default function AdminBranches() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: BranchForm }) => {
-      const res = await apiRequest("PUT", `/api/branches/${id}`, data);
+      const res = await apiRequest(`/api/branches/${id}`, "PUT", data);
       return await res.json();
     },
     onSuccess: () => {
@@ -93,7 +93,7 @@ export default function AdminBranches() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await apiRequest("DELETE", `/api/branches/${id}`);
+      const res = await apiRequest(`/api/branches/${id}`, "DELETE");
       return await res.json();
     },
     onSuccess: () => {

@@ -31,7 +31,7 @@ export default function AdminMenu() {
   // Toggle availability mutation
   const toggleAvailabilityMutation = useMutation({
     mutationFn: async ({ id, isAvailable }: { id: string; isAvailable: boolean }) => {
-      const res = await apiRequest("PUT", `/api/menu-items/${id}`, { isAvailable });
+      const res = await apiRequest(`/api/menu-items/${id}`, "PUT", { isAvailable });
       return await res.json();
     },
     onSuccess: () => {
@@ -46,7 +46,7 @@ export default function AdminMenu() {
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await apiRequest("DELETE", `/api/menu-items/${id}`);
+      const res = await apiRequest(`/api/menu-items/${id}`, "DELETE");
       return await res.json();
     },
     onSuccess: () => {
@@ -62,10 +62,10 @@ export default function AdminMenu() {
   const saveMutation = useMutation({
     mutationFn: async (data: any) => {
       if (editingItem) {
-        const res = await apiRequest("PUT", `/api/menu-items/${editingItem.id}`, data);
+        const res = await apiRequest(`/api/menu-items/${editingItem.id}`, "PUT", data);
         return await res.json();
       } else {
-        const res = await apiRequest("POST", "/api/menu-items", data);
+        const res = await apiRequest("/api/menu-items", "POST", data);
         return await res.json();
       }
     },

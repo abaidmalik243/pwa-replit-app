@@ -40,7 +40,7 @@ export default function AdminDashboard() {
   // Update order status mutation
   const updateOrderMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const res = await apiRequest("PUT", `/api/orders/${id}`, { status });
+      const res = await apiRequest(`/api/orders/${id}`, "PUT", { status });
       return await res.json();
     },
     onSuccess: () => {

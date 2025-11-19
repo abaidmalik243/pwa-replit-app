@@ -1,7 +1,12 @@
-import { Bell, User, Menu } from "lucide-react";
+import { Bell, User, Menu, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useQuery } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useToast } from "@/hooks/use-toast";
+import type { Branch } from "@shared/schema";
 
 interface AdminHeaderProps {
   breadcrumbs: string[];
@@ -11,6 +16,53 @@ interface AdminHeaderProps {
 }
 
 export default function AdminHeader({ breadcrumbs, notificationCount = 0, userName = "Admin", onMenuToggle }: AdminHeaderProps) {
+  const { toast } = useToast();
+  const [selectedBranchId, setSelectedBranchId] = useState<string>("");
+
+  // Get user from localStorage
+  const user = (() => {
+    try {
+      const stored = localStorage.getItem("user");
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  })();
+
+  const isAdmin = user.role === "admin";
+
+  // Fetch all branches for admin users
+  const { data: branches = [] } = useQuery<Branch[]>({
+    queryKey: ["/api/branches"],
+    enabled: isAdmin,
+  });
+
+  // Initialize selected branch from user data
+  useEffect(() => {
+    if (user.branchId) {
+      setSelectedBranchId(user.branchId);
+    }
+  }, [user.branchId]);
+
+  // Handle branch change
+  const handleBranchChange = (branchId: string) => {
+    setSelectedBranchId(branchId);
+    
+    // Update user in localStorage
+    const updatedUser = { ...user, branchId };
+    localStorage.setItem("user", JSON.stringify(updatedUser));
+    
+    // Show toast
+    const branch = branches.find(b => b.id === branchId);
+    toast({
+      title: "Branch switched",
+      description: `Now viewing: ${branch?.name || "Unknown Branch"}`,
+    });
+
+    // Reload page to refresh all data
+    window.location.reload();
+  };
+
   return (
     <header className="border-b bg-background">
       <div className="flex h-14 md:h-16 items-center justify-between px-3 md:px-6">
@@ -42,6 +94,28 @@ export default function AdminHeader({ breadcrumbs, notificationCount = 0, userNa
         </div>
 
         <div className="flex items-center gap-2 md:gap-4">
+          {/* Branch Switcher - Only for Admins */}
+          {isAdmin && branches.length > 0 && (
+            <Select value={selectedBranchId} onValueChange={handleBranchChange}>
+              <SelectTrigger 
+                className="w-[180px] md:w-[220px] h-9"
+                data-testid="select-branch"
+              >
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-muted-foreground" />
+                  <SelectValue placeholder="Select branch" />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                {branches.filter(b => b.isActive).map((branch) => (
+                  <SelectItem key={branch.id} value={branch.id}>
+                    {branch.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
           <Button size="icon" variant="ghost" className="relative" data-testid="button-notifications">
             <Bell className="h-4 w-4 md:h-5 md:w-5" />
             {notificationCount > 0 && (

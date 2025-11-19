@@ -22,6 +22,8 @@ import AdminSettings from "@/pages/admin-settings";
 import AdminDemand from "@/pages/admin-demand";
 import PosMain from "@/pages/pos-main";
 import PosTables from "@/pages/pos-tables";
+import KitchenDisplay from "@/pages/kitchen-display";
+import PosSessions from "@/pages/pos-sessions";
 
 function Router() {
   return (
@@ -42,6 +44,16 @@ function Router() {
       <Route path="/admin/pos-tables">
         <ProtectedRoute requireRole={["admin", "staff"]}>
           <PosTables />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/kitchen">
+        <ProtectedRoute requireRole={["admin", "staff"]}>
+          <KitchenDisplay />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/pos-sessions">
+        <ProtectedRoute requireRole={["admin", "staff"]}>
+          <PosSessions />
         </ProtectedRoute>
       </Route>
       <Route path="/admin">

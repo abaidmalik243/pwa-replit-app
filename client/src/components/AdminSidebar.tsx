@@ -1,4 +1,4 @@
-import { LayoutDashboard, ShoppingBag, UtensilsCrossed, Users, Settings, LogOut, Volume2, VolumeX, FolderOpen, Receipt, TrendingUp, Building2, CreditCard, Table2 } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, UtensilsCrossed, Users, Settings, LogOut, Volume2, VolumeX, FolderOpen, Receipt, TrendingUp, Building2, CreditCard, Table2, ChefHat, Calculator } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Link, useLocation } from "wouter";
@@ -17,6 +17,8 @@ export default function AdminSidebar({ soundEnabled = true, onToggleSound, onLog
     { icon: ShoppingBag, label: "Orders", path: "/admin/orders" },
     { icon: CreditCard, label: "POS", path: "/admin/pos" },
     { icon: Table2, label: "Tables", path: "/admin/pos-tables" },
+    { icon: ChefHat, label: "Kitchen", path: "/admin/kitchen" },
+    { icon: Calculator, label: "Sessions", path: "/admin/pos-sessions" },
     { icon: UtensilsCrossed, label: "Menu Items", path: "/admin/menu" },
     { icon: FolderOpen, label: "Categories", path: "/admin/categories" },
     { icon: Building2, label: "Branches", path: "/admin/branches" },

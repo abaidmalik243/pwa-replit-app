@@ -351,6 +351,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Simplified endpoint for updating order status (used by Kitchen Display)
+  app.post("/api/orders/:id/status", async (req, res) => {
+    try {
+      const { status } = req.body;
+      if (!status) {
+        return res.status(400).json({ error: "Status is required" });
+      }
+
+      // Validate status value
+      const validStatuses = ["pending", "preparing", "ready", "completed", "cancelled"];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ error: "Invalid status value" });
+      }
+
+      // Fetch current order
+      const currentOrder = await storage.getOrder(req.params.id);
+      if (!currentOrder) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+
+      // Update only the status
+      const updatedOrder = await storage.updateOrder(req.params.id, {
+        ...currentOrder,
+        status,
+      });
+
+      if (!updatedOrder) {
+        return res.status(500).json({ error: "Failed to update order status" });
+      }
+
+      res.json(updatedOrder);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
   // User routes
   app.get("/api/users", async (req, res) => {
     try {
@@ -579,6 +615,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Session not found" });
       }
       res.json(session);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Simplified endpoint for closing a session (used by Session Management)
+  app.post("/api/pos/sessions/:id/close", async (req, res) => {
+    try {
+      const { closingCash, notes, closedBy } = req.body;
+      if (closingCash === undefined || closingCash === null) {
+        return res.status(400).json({ error: "closingCash is required" });
+      }
+
+      // Validate closingCash is a valid number
+      const cashAmount = typeof closingCash === 'string' ? parseFloat(closingCash) : closingCash;
+      if (isNaN(cashAmount) || cashAmount < 0) {
+        return res.status(400).json({ error: "Invalid closing cash amount" });
+      }
+
+      // Fetch current session
+      const currentSession = await storage.getPosSession(req.params.id);
+      if (!currentSession) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+
+      if (currentSession.status === "closed") {
+        return res.status(400).json({ error: "Session is already closed" });
+      }
+
+      // Update session to closed (ensure closingCash is stored as string)
+      const updatedSession = await storage.updatePosSession(req.params.id, {
+        ...currentSession,
+        status: "closed",
+        closingCash: cashAmount.toString(),
+        closedBy,
+        notes,
+      });
+
+      if (!updatedSession) {
+        return res.status(500).json({ error: "Failed to close session" });
+      }
+
+      res.json(updatedSession);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
     }

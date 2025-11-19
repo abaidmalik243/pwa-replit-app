@@ -51,7 +51,32 @@ An `IStorage` interface in `server/storage.ts` abstracts CRUD operations, separa
 
 ### PWA Features
 
-Includes a web app manifest (`manifest.json`) for standalone display, theme colors, and icons. A service worker (`sw.js`) provides offline-first capabilities with network-first caching, precaching, dynamic caching, and an offline fallback page (`offline.html`) with reconnection detection. Supports installation to home screen and responsive design via Tailwind breakpoints.
+Includes a web app manifest (`manifest.json`) for standalone display, theme colors, and icons. A service worker (`sw.js`) provides offline-first capabilities with network-first caching, precaching, dynamic caching, and an offline fallback page (`offline.html`) with reconnection detection. Supports installation to home screen and comprehensive responsive design.
+
+### Responsive Design
+
+All pages are fully responsive with mobile-first approach using Tailwind CSS breakpoints (sm: 640px, md: 768px, lg: 1024px, xl: 1280px, 2xl: 1536px):
+
+**POS System Responsive Features**:
+- **Mobile Sidebar**: Slide-in/out animation with backdrop overlay on all POS pages (md breakpoint: 768px)
+- **POS Main** (`/admin/pos`):
+  - Menu grid scales: 1 column (mobile) → 2 columns (sm) → 3 columns (md) → 4 columns (lg)
+  - Layout switches to side-by-side menu + cart at xl breakpoint (1280px+)
+  - Cart sidebar: full-width on mobile, 20rem at xl, 24rem at 2xl
+  - Responsive search bar and category filters with proper wrapping
+  - Touch-friendly card sizing and spacing on mobile devices
+- **Sessions** (`/admin/pos-sessions`):
+  - Session history grid: 1 column → 2 columns (sm) → 4 columns (md)
+  - Active session card with responsive stat layout
+  - Full-width buttons on mobile, auto-width on desktop
+  - Responsive padding and typography scaling
+- **Tables** (`/admin/pos-tables`):
+  - Stats grid: 2 columns (mobile) → 4 columns (md)
+  - Table grid: 2 → 3 (sm) → 4 (md) → 5 (lg) → 6 (xl) columns
+  - Responsive table cards with proper text truncation
+  - Touch-optimized interaction targets
+
+**Customer Interface**: Already features responsive hero slider, adaptive category filters, responsive menu grid, and slide-over cart optimized for all screen sizes.
 
 ### Real-Time Features
 

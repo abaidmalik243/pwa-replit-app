@@ -183,8 +183,8 @@ export default function CustomerHome() {
   };
 
   const handleUpdateQuantity = (id: string, quantity: number) => {
-    if (quantity === 0) {
-      setCartItems((prev) => prev.filter((item) => item.id !== id));
+    if (quantity <= 0) {
+      handleRemoveItem(id);
     } else {
       setCartItems((prev) =>
         prev.map((item) => (item.id === id ? { ...item, quantity } : item))

@@ -351,6 +351,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint for applying discount (used by Discount Dialog)
+  app.post("/api/orders/:id/discount", async (req, res) => {
+    try {
+      const { discount, discountReason } = req.body;
+      
+      if (discount === undefined || discount === null) {
+        return res.status(400).json({ error: "Discount amount is required" });
+      }
+
+      const discountValue = typeof discount === 'string' ? parseFloat(discount) : discount;
+      if (isNaN(discountValue) || discountValue < 0) {
+        return res.status(400).json({ error: "Invalid discount amount" });
+      }
+
+      // Fetch current order
+      const currentOrder = await storage.getOrder(req.params.id);
+      if (!currentOrder) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+
+      const subtotal = parseFloat(currentOrder.subtotal);
+      if (discountValue > subtotal) {
+        return res.status(400).json({ error: "Discount cannot exceed subtotal" });
+      }
+
+      // Calculate new total
+      const deliveryCharges = parseFloat(currentOrder.deliveryCharges || "0");
+      const newTotal = subtotal - discountValue + deliveryCharges;
+
+      // Update order with discount (only pass mutable fields)
+      const updatedOrder = await storage.updateOrder(req.params.id, {
+        branchId: currentOrder.branchId,
+        orderNumber: currentOrder.orderNumber,
+        customerId: currentOrder.customerId || undefined,
+        sessionId: currentOrder.sessionId || undefined,
+        tableId: currentOrder.tableId || undefined,
+        customerName: currentOrder.customerName,
+        customerPhone: currentOrder.customerPhone,
+        alternativePhone: currentOrder.alternativePhone || undefined,
+        customerAddress: currentOrder.customerAddress || undefined,
+        deliveryArea: currentOrder.deliveryArea || undefined,
+        orderType: currentOrder.orderType,
+        orderSource: currentOrder.orderSource,
+        paymentMethod: currentOrder.paymentMethod,
+        paymentStatus: currentOrder.paymentStatus,
+        items: currentOrder.items,
+        subtotal: currentOrder.subtotal,
+        discount: discountValue.toString(),
+        discountReason,
+        deliveryCharges: currentOrder.deliveryCharges ?? undefined,
+        deliveryDistance: currentOrder.deliveryDistance ?? undefined,
+        total: newTotal.toString(),
+        status: currentOrder.status,
+        waiterId: currentOrder.waiterId || undefined,
+        servedBy: currentOrder.servedBy || undefined,
+        notes: currentOrder.notes || undefined,
+      });
+
+      if (!updatedOrder) {
+        return res.status(500).json({ error: "Failed to apply discount" });
+      }
+
+      res.json(updatedOrder);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
   // Endpoint for processing payment (used by Payment Dialog)
   app.post("/api/orders/:id/payment", async (req, res) => {
     try {

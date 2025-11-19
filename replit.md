@@ -2,7 +2,7 @@
 
 ## Overview
 
-Kebabish Pizza is a multi-branch food ordering Progressive Web Application (PWA) designed for a restaurant chain in Pakistan. It features a customer-facing ordering system and an administrative management panel. The application enables customers to browse menus, place orders, and track deliveries, while providing restaurant staff with real-time order management, menu control, user administration, and expense tracking. Built as a full-stack TypeScript solution, it focuses on responsive design, real-time updates, and role-based access control, aiming to enhance the food ordering experience and streamline restaurant operations.
+Kebabish Pizza is a multi-branch food ordering Progressive Web Application (PWA) designed for a restaurant chain in Pakistan. It features a customer-facing ordering system and a comprehensive Point of Sale (POS) system with administrative management. The application enables customers to browse menus, place orders, and track deliveries, while providing restaurant staff with a full-featured POS system including order entry, table management, kitchen display, cash register sessions, payment processing, discount management, and detailed reporting. Built as a full-stack TypeScript solution, it focuses on responsive design, real-time updates, and role-based access control, aiming to enhance both the food ordering experience and streamline restaurant operations.
 
 ## User Preferences
 
@@ -23,8 +23,11 @@ The application uses a relational database with UUID primary keys. Core entities
 - **Users**: Authentication and role-based access control (admin, staff, customer) with feature-based permissions and branch assignment.
 - **Categories**: Menu organization with images and descriptions.
 - **Menu Items**: Product catalog with pricing, descriptions, images, and availability.
-- **Orders**: Order management with customer info, item details, status tracking, and timestamps.
+- **Orders**: Order management with customer info, item details, status tracking, timestamps, and POS-specific fields (tableId, sessionId, orderSource, paymentStatus, discount).
 - **Expenses**: Financial tracking by branch with categories and date-based reporting.
+- **POS Tables**: Dine-in table management with status, capacity, section grouping, and order assignment.
+- **POS Sessions**: Cash register session tracking with opening/closing cash, sales totals, payment method breakdowns, and variance calculation.
+- **Kitchen Tickets**: Order ticket management for kitchen display with preparation status.
 
 ### Authentication System
 
@@ -65,6 +68,90 @@ Vite builds the client to `/dist/public`, and ESBuild bundles the TypeScript ser
 ### Seeding Strategy
 
 An initial seed script creates three branches (Okara, Sahiwal, Faisalabad) with delivery areas and a default admin account.
+
+### POS Module
+
+The comprehensive Point of Sale (POS) system includes multiple integrated features:
+
+**1. Order Entry Interface** (`/admin/pos`):
+- Quick menu item selection with grid/list view toggle
+- Item customization dialog for variants and special instructions
+- Shopping cart management with quantity adjustment
+- Order type selection (dine-in, takeaway, delivery)
+- Table pre-selection via URL parameter for dine-in orders
+- Customer information capture
+- Real-time session detection and validation
+- Automatic payment dialog trigger after order creation
+
+**2. Table Management** (`/admin/pos-tables`):
+- Visual floor plan with color-coded table status (available, occupied, reserved)
+- Section-based grouping (Main Dining, Patio, VIP)
+- Table capacity and number display
+- Quick order creation with table pre-selection
+- Real-time status updates
+- "Create Order" action navigates to POS with table pre-filled
+
+**3. Kitchen Display System** (`/admin/kitchen`):
+- Real-time order monitoring for POS orders
+- Status progression workflow (pending → preparing → ready → served)
+- Order timer showing elapsed time since creation
+- Status filter (all, pending, preparing, ready)
+- Web Audio API notification sounds for new orders with toggle control
+- Sound-enabled visual indicator
+- Branch-filtered order display
+- Auto-refresh every 5 seconds
+
+**4. Cash Register / Session Management** (`/admin/pos-sessions`):
+- Session lifecycle management (open/close)
+- Opening cash declaration
+- Closing cash count with variance calculation
+- Session history with date filtering
+- Sales summary per session (total sales, order count)
+- Payment method breakdown (cash, card, JazzCash sales)
+- Status badges (open/closed)
+- Notes field for session discrepancies
+
+**5. Payment Processing**:
+- Multi-method support (Cash, Card, JazzCash)
+- Single payment mode with automatic total calculation for non-cash
+- Cash payment with change calculation
+- Split payment mode for multiple payment methods
+- Payment amount validation
+- Visual payment method selection with icons
+- Payment details stored in order notes
+- Backend endpoint: `POST /api/orders/:id/payment`
+
+**6. Discount Management**:
+- Percentage-based discounts (e.g., 10% off)
+- Fixed amount discounts (e.g., PKR 100 off)
+- Discount reason tracking (loyalty, manager approval, etc.)
+- Real-time total recalculation
+- Discount preview before application
+- Maximum discount validation (cannot exceed subtotal)
+- Backend endpoint: `POST /api/orders/:id/discount`
+- DiscountDialog component reusable across POS screens
+
+**7. Reporting Dashboard** (`/admin/pos-reports`):
+- Date range filtering (today, yesterday, last 7 days, last 30 days)
+- Key metrics: total sales, order count, average order value, session count
+- Payment method breakdown with order counts and totals
+- Order status distribution
+- Top 5 popular items by quantity sold
+- Session-based sales aggregation
+- Visual cards for key performance indicators
+
+**POS Backend Endpoints**:
+- `POST /api/orders/:id/status` - Update order status (Kitchen Display)
+- `POST /api/orders/:id/payment` - Process payment
+- `POST /api/orders/:id/discount` - Apply discount
+- `POST /api/pos/sessions/:id/close` - Close cash register session
+- All endpoints fetch authoritative data before updates to maintain consistency
+
+**Known Limitations** (documented per user request - Option A):
+- Kitchen Display and Session Management use full order/session spreading during updates, which can cause stale data in concurrent scenarios
+- Payment endpoint appends to notes field instead of dedicated payment_details column
+- No WebSocket implementation; relies on polling for real-time updates
+- These limitations are documented for future architectural refactoring
 
 ## External Dependencies
 

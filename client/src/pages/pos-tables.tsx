@@ -220,28 +220,40 @@ export default function POSTables() {
   return (
     <div className="flex h-screen bg-background">
       {sidebarOpen && (
-        <div className="lg:hidden">
-          <AdminSidebar />
-        </div>
+        <div 
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden" 
+          onClick={() => setSidebarOpen(false)}
+        />
       )}
-
-      <div className="hidden lg:block">
-        <AdminSidebar />
+      <div className={`fixed md:static inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        <AdminSidebar
+          soundEnabled={true}
+          onToggleSound={() => {}}
+          onLogout={() => {
+            localStorage.removeItem("user");
+            navigate("/login");
+          }}
+        />
       </div>
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <AdminHeader breadcrumbs={["POS", "Tables"]} onMenuToggle={() => setSidebarOpen(!sidebarOpen)} />
+        <AdminHeader 
+          breadcrumbs={["POS", "Tables"]} 
+          notificationCount={0}
+          userName={user.fullName || "User"}
+          onMenuToggle={() => setSidebarOpen(!sidebarOpen)} 
+        />
 
-        <main className="flex-1 overflow-auto p-6">
-          <div className="max-w-7xl mx-auto space-y-6">
+        <main className="flex-1 overflow-auto p-3 sm:p-4 md:p-6">
+          <div className="max-w-7xl mx-auto space-y-4 md:space-y-6">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div>
-                <h1 className="text-3xl font-bold" data-testid="heading-tables">Table Management</h1>
-                <p className="text-muted-foreground">Manage restaurant tables and floor plan</p>
+                <h1 className="text-2xl sm:text-3xl font-bold" data-testid="heading-tables">Table Management</h1>
+                <p className="text-sm text-muted-foreground">Manage restaurant tables and floor plan</p>
               </div>
               {!viewingAllBranches ? (
-                <Button onClick={() => setShowDialog(true)} data-testid="button-add-table">
+                <Button onClick={() => setShowDialog(true)} data-testid="button-add-table" className="w-full sm:w-auto">
                   <Plus className="w-4 h-4 mr-2" />
                   Add Table
                 </Button>
@@ -251,57 +263,57 @@ export default function POSTables() {
             </div>
 
             {/* Stats */}
-            <div className="grid gap-4 md:grid-cols-4">
-              <Card className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-green-500/10 rounded-lg">
-                    <Users className="w-5 h-5 text-green-600 dark:text-green-400" />
+            <div className="grid gap-3 sm:gap-4 grid-cols-2 md:grid-cols-4">
+              <Card className="p-3 sm:p-4">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="p-1.5 sm:p-2 bg-green-500/10 rounded-lg flex-shrink-0">
+                    <Users className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 dark:text-green-400" />
                   </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Available</p>
-                    <p className="text-2xl font-bold" data-testid="stat-available">
+                  <div className="min-w-0">
+                    <p className="text-xs sm:text-sm text-muted-foreground">Available</p>
+                    <p className="text-xl sm:text-2xl font-bold" data-testid="stat-available">
                       {tables.filter(t => t.status === "available").length}
                     </p>
                   </div>
                 </div>
               </Card>
 
-              <Card className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-red-500/10 rounded-lg">
-                    <DollarSign className="w-5 h-5 text-red-600 dark:text-red-400" />
+              <Card className="p-3 sm:p-4">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="p-1.5 sm:p-2 bg-red-500/10 rounded-lg flex-shrink-0">
+                    <DollarSign className="w-4 h-4 sm:w-5 sm:h-5 text-red-600 dark:text-red-400" />
                   </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Occupied</p>
-                    <p className="text-2xl font-bold" data-testid="stat-occupied">
+                  <div className="min-w-0">
+                    <p className="text-xs sm:text-sm text-muted-foreground">Occupied</p>
+                    <p className="text-xl sm:text-2xl font-bold" data-testid="stat-occupied">
                       {tables.filter(t => t.status === "occupied").length}
                     </p>
                   </div>
                 </div>
               </Card>
 
-              <Card className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-500/10 rounded-lg">
-                    <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              <Card className="p-3 sm:p-4">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="p-1.5 sm:p-2 bg-blue-500/10 rounded-lg flex-shrink-0">
+                    <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 dark:text-blue-400" />
                   </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Reserved</p>
-                    <p className="text-2xl font-bold" data-testid="stat-reserved">
+                  <div className="min-w-0">
+                    <p className="text-xs sm:text-sm text-muted-foreground">Reserved</p>
+                    <p className="text-xl sm:text-2xl font-bold" data-testid="stat-reserved">
                       {tables.filter(t => t.status === "reserved").length}
                     </p>
                   </div>
                 </div>
               </Card>
 
-              <Card className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-muted rounded-lg">
-                    <Users className="w-5 h-5 text-muted-foreground" />
+              <Card className="p-3 sm:p-4">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="p-1.5 sm:p-2 bg-muted rounded-lg flex-shrink-0">
+                    <Users className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
                   </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Total Tables</p>
-                    <p className="text-2xl font-bold" data-testid="stat-total">
+                  <div className="min-w-0">
+                    <p className="text-xs sm:text-sm text-muted-foreground">Total Tables</p>
+                    <p className="text-xl sm:text-2xl font-bold" data-testid="stat-total">
                       {tables.length}
                     </p>
                   </div>
@@ -312,18 +324,18 @@ export default function POSTables() {
             {/* Table layout grid */}
             {Object.entries(groupedTables).map(([section, sectionTables]) => (
               <div key={section}>
-                <h2 className="text-xl font-semibold mb-4">{section}</h2>
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">{section}</h2>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
                   {sectionTables.map((table) => (
                     <Card
                       key={table.id}
-                      className={`p-4 hover-elevate cursor-pointer ${getStatusColor(table.status)}`}
+                      className={`p-3 sm:p-4 hover-elevate cursor-pointer ${getStatusColor(table.status)}`}
                       data-testid={`card-table-${table.id}`}
                     >
                       <div className="flex flex-col h-full">
                         <div className="flex items-start justify-between mb-2">
-                          <div>
-                            <p className="text-lg font-bold" data-testid={`text-table-number-${table.id}`}>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-base sm:text-lg font-bold truncate" data-testid={`text-table-number-${table.id}`}>
                               {table.tableName}
                             </p>
                             <p className="text-xs text-muted-foreground">
@@ -333,7 +345,7 @@ export default function POSTables() {
                           </div>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button size="icon" variant="ghost" className="h-6 w-6" data-testid={`button-table-menu-${table.id}`}>
+                              <Button size="icon" variant="ghost" className="h-6 w-6 flex-shrink-0" data-testid={`button-table-menu-${table.id}`}>
                                 <MoreVertical className="w-4 h-4" />
                               </Button>
                             </DropdownMenuTrigger>
@@ -389,9 +401,9 @@ export default function POSTables() {
             ))}
 
             {tables.length === 0 && (
-              <Card className="p-12 text-center">
-                <p className="text-muted-foreground mb-4">No tables configured yet</p>
-                <Button onClick={() => setShowDialog(true)} data-testid="button-add-first-table">
+              <Card className="p-6 sm:p-12 text-center">
+                <p className="text-sm sm:text-base text-muted-foreground mb-4">No tables configured yet</p>
+                <Button onClick={() => setShowDialog(true)} data-testid="button-add-first-table" className="w-full sm:w-auto">
                   <Plus className="w-4 h-4 mr-2" />
                   Add Your First Table
                 </Button>

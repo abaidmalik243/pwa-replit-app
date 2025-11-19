@@ -320,17 +320,17 @@ export default function PosMain() {
           onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
         />
 
-        <main className="flex-1 overflow-hidden p-2">
-          <div className="flex flex-col lg:flex-row h-full gap-2">
+        <main className="flex-1 overflow-hidden p-2 md:p-4">
+          <div className="flex flex-col xl:flex-row h-full gap-2 md:gap-4">
         {/* Left: Menu Items */}
-        <div className="flex-1 flex flex-col gap-2 min-h-0">
+        <div className="flex-1 flex flex-col gap-2 md:gap-3 min-h-0">
           {/* Search and filters */}
-          <div className="flex gap-2">
-            <div className="relative flex-1">
+          <div className="flex gap-2 flex-wrap sm:flex-nowrap">
+            <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 data-testid="input-search-menu"
-                placeholder="Search menu items..."
+                placeholder="Search menu..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
@@ -341,6 +341,7 @@ export default function PosMain() {
               size="icon"
               variant="outline"
               onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
+              className="flex-shrink-0"
             >
               {viewMode === "grid" ? <List className="h-4 w-4" /> : <Grid className="h-4 w-4" />}
             </Button>
@@ -371,7 +372,7 @@ export default function PosMain() {
 
           {/* Menu items grid */}
           <ScrollArea className="flex-1">
-            <div className={viewMode === "grid" ? "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2" : "flex flex-col gap-2"}>
+            <div className={viewMode === "grid" ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-3" : "flex flex-col gap-2"}>
               {filteredItems.map((item) => (
                 <Card
                   key={item.id}
@@ -383,10 +384,10 @@ export default function PosMain() {
                     <img
                       src={item.image}
                       alt={item.name}
-                      className="w-full h-24 object-cover"
+                      className="w-full h-20 sm:h-24 object-cover"
                     />
                   )}
-                  <div className="p-3">
+                  <div className="p-2 sm:p-3">
                     <h3 className="font-semibold text-sm">{item.name}</h3>
                     <p className="text-xs text-muted-foreground line-clamp-1">{item.description}</p>
                     <p className="text-sm font-bold mt-1">Rs. {item.price.toLocaleString()}</p>
@@ -398,9 +399,9 @@ export default function PosMain() {
         </div>
 
         {/* Right: Cart/Order Summary */}
-        <Card className="w-full lg:w-80 xl:w-96 flex flex-col lg:max-h-full">
-          <div className="p-4 space-y-3 flex-1 flex flex-col overflow-hidden">
-            <h2 className="text-lg font-bold">Current Order</h2>
+        <Card className="w-full xl:w-80 2xl:w-96 flex flex-col xl:max-h-full">
+          <div className="p-3 sm:p-4 space-y-2 sm:space-y-3 flex-1 flex flex-col overflow-hidden">
+            <h2 className="text-base sm:text-lg font-bold">Current Order</h2>
 
             {/* Order type selection */}
             <Select value={orderType} onValueChange={(v: "dine-in" | "takeaway" | "delivery") => setOrderType(v)}>

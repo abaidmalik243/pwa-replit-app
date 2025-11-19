@@ -192,28 +192,39 @@ export default function PosSessions() {
   return (
     <div className="flex h-screen bg-background">
       {sidebarOpen && (
-        <div className="lg:hidden">
-          <AdminSidebar />
-        </div>
+        <div 
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden" 
+          onClick={() => setSidebarOpen(false)}
+        />
       )}
-
-      <div className="hidden lg:block">
-        <AdminSidebar />
+      <div className={`fixed md:static inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        <AdminSidebar
+          soundEnabled={true}
+          onToggleSound={() => {}}
+          onLogout={() => {
+            localStorage.removeItem("user");
+          }}
+        />
       </div>
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <AdminHeader breadcrumbs={["POS", "Sessions"]} onMenuToggle={() => setSidebarOpen(!sidebarOpen)} />
+        <AdminHeader 
+          breadcrumbs={["POS", "Sessions"]} 
+          notificationCount={0}
+          userName={user.fullName || "User"}
+          onMenuToggle={() => setSidebarOpen(!sidebarOpen)} 
+        />
 
-        <main className="flex-1 overflow-auto p-6">
-          <div className="max-w-7xl mx-auto space-y-6">
+        <main className="flex-1 overflow-auto p-3 sm:p-4 md:p-6">
+          <div className="max-w-7xl mx-auto space-y-4 md:space-y-6">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div>
-                <h1 className="text-3xl font-bold" data-testid="heading-sessions">Cash Register Sessions</h1>
-                <p className="text-muted-foreground">Manage cash register opening and closing</p>
+                <h1 className="text-2xl sm:text-3xl font-bold" data-testid="heading-sessions">Cash Register Sessions</h1>
+                <p className="text-sm text-muted-foreground">Manage cash register opening and closing</p>
               </div>
               {!activeSession && !viewingAllBranches && (
-                <Button onClick={() => setShowOpenDialog(true)} data-testid="button-open-session">
+                <Button onClick={() => setShowOpenDialog(true)} data-testid="button-open-session" className="w-full sm:w-auto">
                   <Plus className="w-4 h-4 mr-2" />
                   Open Session
                 </Button>
@@ -225,12 +236,12 @@ export default function PosSessions() {
 
             {/* Active session */}
             {activeSession && (
-              <Card className="p-6 border-2 border-primary">
+              <Card className="p-4 sm:p-6 border-2 border-primary">
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                     <div>
-                      <div className="flex items-center gap-2">
-                        <h2 className="text-xl font-bold">Active Session</h2>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h2 className="text-lg sm:text-xl font-bold">Active Session</h2>
                         <Badge variant="default" data-testid="badge-active">
                           <Clock className="w-3 h-3 mr-1" />
                           Open
@@ -244,6 +255,7 @@ export default function PosSessions() {
                       variant="destructive"
                       onClick={() => setShowCloseDialog(true)}
                       data-testid="button-close-session"
+                      className="w-full sm:w-auto"
                     >
                       Close Session
                     </Button>
@@ -251,7 +263,7 @@ export default function PosSessions() {
 
                   <Separator />
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                     <div>
                       <p className="text-sm text-muted-foreground">Opened At</p>
                       <p className="text-lg font-semibold" data-testid="text-opened-at">
@@ -276,12 +288,12 @@ export default function PosSessions() {
             )}
 
             {/* No active session message */}
-            {!activeSession && (
-              <Card className="p-12 text-center">
-                <DollarSign className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-xl font-semibold mb-2">No Active Session</p>
-                <p className="text-muted-foreground mb-4">Open a cash register session to start taking orders</p>
-                <Button onClick={() => setShowOpenDialog(true)} data-testid="button-open-first-session">
+            {!activeSession && !viewingAllBranches && (
+              <Card className="p-6 sm:p-12 text-center">
+                <DollarSign className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4 text-muted-foreground" />
+                <p className="text-lg sm:text-xl font-semibold mb-2">No Active Session</p>
+                <p className="text-sm sm:text-base text-muted-foreground mb-4">Open a cash register session to start taking orders</p>
+                <Button onClick={() => setShowOpenDialog(true)} data-testid="button-open-first-session" className="w-full sm:w-auto">
                   <Plus className="w-4 h-4 mr-2" />
                   Open Session
                 </Button>
@@ -290,10 +302,10 @@ export default function PosSessions() {
 
             {/* Session history */}
             <div>
-              <h2 className="text-xl font-bold mb-4">Session History</h2>
+              <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4">Session History</h2>
               <div className="space-y-3">
                 {sessions.length === 0 ? (
-                  <Card className="p-6 text-center text-muted-foreground">
+                  <Card className="p-4 sm:p-6 text-center text-muted-foreground text-sm sm:text-base">
                     No sessions yet
                   </Card>
                 ) : (
@@ -302,26 +314,26 @@ export default function PosSessions() {
                     const isActive = session.status === "open";
                     
                     return (
-                      <Card key={session.id} className="p-4" data-testid={`card-session-${session.id}`}>
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                              <p className="font-semibold" data-testid={`text-session-number-${session.id}`}>
+                      <Card key={session.id} className="p-3 sm:p-4" data-testid={`card-session-${session.id}`}>
+                        <div className="flex flex-col sm:flex-row items-start justify-between gap-3">
+                          <div className="flex-1 w-full">
+                            <div className="flex items-center gap-2 mb-2 flex-wrap">
+                              <p className="font-semibold text-sm sm:text-base" data-testid={`text-session-number-${session.id}`}>
                                 Session {session.sessionNumber}
                               </p>
                               {isActive ? (
-                                <Badge variant="default">
+                                <Badge variant="default" className="text-xs">
                                   <Clock className="w-3 h-3 mr-1" />
                                   Open
                                 </Badge>
                               ) : (
-                                <Badge variant="secondary">
+                                <Badge variant="secondary" className="text-xs">
                                   <CheckCircle className="w-3 h-3 mr-1" />
                                   Closed
                                 </Badge>
                               )}
                             </div>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 text-xs sm:text-sm">
                               <div>
                                 <p className="text-muted-foreground">Opened</p>
                                 <p className="font-medium">{format(new Date(session.openedAt), "PP")}</p>

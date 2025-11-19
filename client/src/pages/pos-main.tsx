@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import AdminSidebar from "@/components/AdminSidebar";
 import AdminHeader from "@/components/AdminHeader";
+import { PaymentDialog } from "@/components/PaymentDialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { MenuItem as DbMenuItem, Category, PosTable, PosSession, Branch } from "@shared/schema";
@@ -43,6 +44,12 @@ export default function PosMain() {
   const [orderType, setOrderType] = useState<"dine-in" | "takeaway" | "delivery">("dine-in");
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [pendingOrderForPayment, setPendingOrderForPayment] = useState<{
+    id: string;
+    orderNumber: string;
+    total: number;
+  } | null>(null);
 
   // Get user from localStorage
   const user = (() => {
@@ -160,11 +167,20 @@ export default function PosMain() {
     mutationFn: async (orderData: any) => {
       return await apiRequest("/api/orders", "POST", orderData);
     },
-    onSuccess: () => {
+    onSuccess: (createdOrder: any) => {
       toast({
         title: "Order created",
         description: "Order has been successfully placed",
       });
+      
+      // Open payment dialog for the newly created order
+      setPendingOrderForPayment({
+        id: createdOrder.id,
+        orderNumber: createdOrder.orderNumber,
+        total: parseFloat(createdOrder.total),
+      });
+      setShowPaymentDialog(true);
+      
       setCart([]);
       setCustomerName("");
       setCustomerPhone("");
@@ -513,6 +529,25 @@ export default function PosMain() {
             setSelectedItem(null);
           }}
           onAddToCart={handleAddToCart}
+        />
+      )}
+
+      {/* Payment Dialog */}
+      {pendingOrderForPayment && (
+        <PaymentDialog
+          open={showPaymentDialog}
+          onClose={() => {
+            setShowPaymentDialog(false);
+            setPendingOrderForPayment(null);
+          }}
+          orderId={pendingOrderForPayment.id}
+          orderNumber={pendingOrderForPayment.orderNumber}
+          totalAmount={pendingOrderForPayment.total}
+          branchId={userBranchId || ""}
+          onPaymentComplete={() => {
+            setShowPaymentDialog(false);
+            setPendingOrderForPayment(null);
+          }}
         />
       )}
     </div>

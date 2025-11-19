@@ -351,6 +351,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint for processing payment (used by Payment Dialog)
+  app.post("/api/orders/:id/payment", async (req, res) => {
+    try {
+      const { paymentMethod, paymentStatus, paymentDetails } = req.body;
+      
+      if (!paymentMethod || !paymentStatus) {
+        return res.status(400).json({ error: "Payment method and status are required" });
+      }
+
+      // Fetch current order
+      const currentOrder = await storage.getOrder(req.params.id);
+      if (!currentOrder) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+
+      // Update payment information
+      const updatedOrder = await storage.updateOrder(req.params.id, {
+        ...currentOrder,
+        discount: currentOrder.discount ?? undefined,
+        deliveryCharges: currentOrder.deliveryCharges ?? undefined,
+        paymentMethod,
+        paymentStatus,
+        // Store payment details if provided (for split payments, change details, etc.)
+        notes: paymentDetails ? `${currentOrder.notes || ""}\nPayment: ${paymentDetails}`.trim() : currentOrder.notes || undefined,
+      });
+
+      if (!updatedOrder) {
+        return res.status(500).json({ error: "Failed to process payment" });
+      }
+
+      res.json(updatedOrder);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message });
+    }
+  });
+
   // Simplified endpoint for updating order status (used by Kitchen Display)
   app.post("/api/orders/:id/status", async (req, res) => {
     try {
@@ -374,6 +410,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update only the status
       const updatedOrder = await storage.updateOrder(req.params.id, {
         ...currentOrder,
+        discount: currentOrder.discount ?? undefined,
+        deliveryCharges: currentOrder.deliveryCharges ?? undefined,
         status,
       });
 
@@ -623,7 +661,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Simplified endpoint for closing a session (used by Session Management)
   app.post("/api/pos/sessions/:id/close", async (req, res) => {
     try {
-      const { closingCash, notes, closedBy } = req.body;
+      const { closingCash, notes } = req.body;
       if (closingCash === undefined || closingCash === null) {
         return res.status(400).json({ error: "closingCash is required" });
       }
@@ -649,7 +687,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...currentSession,
         status: "closed",
         closingCash: cashAmount.toString(),
-        closedBy,
         notes,
       });
 

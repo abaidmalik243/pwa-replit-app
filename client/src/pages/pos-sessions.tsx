@@ -111,7 +111,6 @@ export default function PosSessions() {
         body: JSON.stringify({
           closingCash,
           notes,
-          closedBy: userId,
         }),
       });
       if (!response.ok) throw new Error("Failed to close session");

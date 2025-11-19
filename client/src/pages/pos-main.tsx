@@ -311,9 +311,9 @@ export default function PosMain() {
         />
 
         <main className="flex-1 overflow-hidden p-2">
-          <div className="flex h-full gap-2">
+          <div className="flex flex-col lg:flex-row h-full gap-2">
         {/* Left: Menu Items */}
-        <div className="flex-1 flex flex-col gap-2">
+        <div className="flex-1 flex flex-col gap-2 min-h-0">
           {/* Search and filters */}
           <div className="flex gap-2">
             <div className="relative flex-1">
@@ -388,8 +388,8 @@ export default function PosMain() {
         </div>
 
         {/* Right: Cart/Order Summary */}
-        <Card className="w-80 lg:w-96 flex flex-col">
-          <div className="p-4 space-y-3 flex-1 flex flex-col">
+        <Card className="w-full lg:w-80 xl:w-96 flex flex-col lg:max-h-full">
+          <div className="p-4 space-y-3 flex-1 flex flex-col overflow-hidden">
             <h2 className="text-lg font-bold">Current Order</h2>
 
             {/* Order type selection */}

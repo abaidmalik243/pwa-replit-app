@@ -62,6 +62,18 @@ export default function PosMain() {
   })();
   const userBranchId = user.branchId;
 
+  // Prevent access when viewing all branches
+  if (!userBranchId || userBranchId === "all") {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-center space-y-4">
+          <p className="text-lg text-muted-foreground">Please select a specific branch</p>
+          <p className="text-sm text-muted-foreground">POS operations require a specific branch to be selected</p>
+        </div>
+      </div>
+    );
+  }
+
   // Read table query parameter from URL
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);

@@ -140,6 +140,20 @@ The comprehensive Point of Sale (POS) system includes multiple integrated featur
 - Session-based sales aggregation
 - Visual cards for key performance indicators
 
+**8. Branch Switcher & Multi-Location Management**:
+- Admin header includes branch switcher dropdown for multi-location oversight
+- "All Branches" option allows viewing aggregated data across all locations
+- View modes:
+  - **Specific Branch**: Full access to all POS operations (orders, sessions, tables)
+  - **All Branches**: Read-only mode for reports, kitchen display, sessions history, and tables
+- Restrictions in "All Branches" mode:
+  - Cannot create orders (POS page requires specific branch)
+  - Cannot open new sessions
+  - Cannot add new tables
+  - Action buttons replaced with "Viewing All Branches" badge
+- Branch selection persists in localStorage for session continuity
+- All data queries automatically filter by selected branch or fetch all when "all" is selected
+
 **POS Backend Endpoints**:
 - `POST /api/orders/:id/status` - Update order status (Kitchen Display)
 - `POST /api/orders/:id/payment` - Process payment

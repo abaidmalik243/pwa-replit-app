@@ -163,18 +163,43 @@ export default function CustomerHome() {
         };
       }, { finalPrice: item.price, variants: [] as { groupName: string; optionName: string }[] });
 
-    const cartItem: CartItem = {
-      id: `${item.id}-${Date.now()}`,
-      name: item.name,
-      description: item.description,
-      price: finalPrice,
-      quantity: customization.quantity,
-      image: item.image,
-      variants: variants.length > 0 ? variants : undefined,
-      instructions: customization.instructions || undefined,
-    };
+    // Check if identical item already exists in cart
+    const existingItemIndex = cartItems.findIndex(cartItem => {
+      // Must match: same menu item, same variants, same instructions
+      if (cartItem.name !== item.name) return false;
+      if ((cartItem.instructions || '') !== (customization.instructions || '')) return false;
+      
+      // Compare variants
+      const cartVariantsStr = JSON.stringify(cartItem.variants || []);
+      const newVariantsStr = JSON.stringify(variants);
+      
+      return cartVariantsStr === newVariantsStr;
+    });
 
-    setCartItems((prev) => [...prev, cartItem]);
+    if (existingItemIndex !== -1) {
+      // Item exists, increase quantity
+      setCartItems((prev) =>
+        prev.map((cartItem, idx) =>
+          idx === existingItemIndex
+            ? { ...cartItem, quantity: cartItem.quantity + customization.quantity }
+            : cartItem
+        )
+      );
+    } else {
+      // New item, add to cart
+      const cartItem: CartItem = {
+        id: `${item.id}-${Date.now()}`,
+        name: item.name,
+        description: item.description,
+        price: finalPrice,
+        quantity: customization.quantity,
+        image: item.image,
+        variants: variants.length > 0 ? variants : undefined,
+        instructions: customization.instructions || undefined,
+      };
+
+      setCartItems((prev) => [...prev, cartItem]);
+    }
 
     toast({
       title: "Added to cart",

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Plus, Minus, Search, Grid, List, X } from "lucide-react";
@@ -45,8 +45,25 @@ export default function PosMain() {
   const [customerPhone, setCustomerPhone] = useState("");
 
   // Get user from localStorage
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const user = (() => {
+    try {
+      const stored = localStorage.getItem("user");
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  })();
   const userBranchId = user.branchId;
+
+  // Read table query parameter from URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tableId = urlParams.get("table");
+    if (tableId) {
+      setSelectedTable(tableId);
+      setOrderType("dine-in");
+    }
+  }, []);
 
   // Fetch menu items
   const { data: dbMenuItems = [] } = useQuery<DbMenuItem[]>({

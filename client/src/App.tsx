@@ -21,6 +21,7 @@ import AdminExpenses from "@/pages/admin-expenses";
 import AdminSettings from "@/pages/admin-settings";
 import AdminDemand from "@/pages/admin-demand";
 import PosMain from "@/pages/pos-main";
+import PosTables from "@/pages/pos-tables";
 
 function Router() {
   return (
@@ -33,9 +34,14 @@ function Router() {
       <Route path="/reset-password" component={ResetPassword} />
       <Route path="/terms-conditions" component={TermsConditions} />
       <Route path="/privacy-policy" component={PrivacyPolicy} />
-      <Route path="/pos">
+      <Route path="/admin/pos">
         <ProtectedRoute requireRole={["admin", "staff"]}>
           <PosMain />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/pos-tables">
+        <ProtectedRoute requireRole={["admin", "staff"]}>
+          <PosTables />
         </ProtectedRoute>
       </Route>
       <Route path="/admin">

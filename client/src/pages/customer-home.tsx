@@ -7,6 +7,7 @@ import Footer from "@/components/Footer";
 import CategoryFilter from "@/components/CategoryFilter";
 import MenuItemCard, { MenuItem } from "@/components/MenuItemCard";
 import CartDrawer, { CartItem } from "@/components/CartDrawer";
+import ItemCustomizationDialog, { VariantGroup, CustomizationSelection } from "@/components/ItemCustomizationDialog";
 import OrderTypeDialog from "@/components/OrderTypeDialog";
 import OrderConfirmationDialog, { OrderDetails } from "@/components/OrderConfirmationDialog";
 import { useToast } from "@/hooks/use-toast";
@@ -40,6 +41,8 @@ export default function CustomerHome() {
   const [isConfirmationOpen, setIsConfirmationOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
+  const [isCustomizationOpen, setIsCustomizationOpen] = useState(false);
+  const [selectedMenuItem, setSelectedMenuItem] = useState<MenuItem | null>(null);
   const [orderType, setOrderType] = useState<"delivery" | "pickup">("delivery");
   const [selectedBranchId, setSelectedBranchId] = useState<string>("");
   const [selectedArea, setSelectedArea] = useState<string>("");
@@ -102,16 +105,21 @@ export default function CustomerHome() {
   // Transform database menu items to component format
   const menuItems: MenuItem[] = dbMenuItems
     .filter((item) => item.isAvailable)
-    .map((item) => ({
-      id: item.id,
-      name: item.name,
-      description: item.description || "",
-      price: parseFloat(item.price),
-      image: item.imageUrl || Object.values(defaultImages)[0],
-      category: dbCategories.find((c) => c.id === item.categoryId)?.name || "Other",
-      isVegetarian: false,
-      isAvailable: item.isAvailable,
-    }));
+    .map((item) => {
+      const categoryName = dbCategories.find((c) => c.id === item.categoryId)?.name || "Other";
+      const hasVariants = categoryName === "Pizzas" || categoryName === "Fries";
+      return {
+        id: item.id,
+        name: item.name,
+        description: item.description || "",
+        price: parseFloat(item.price),
+        image: item.imageUrl || Object.values(defaultImages)[0],
+        category: categoryName,
+        isVegetarian: false,
+        isAvailable: item.isAvailable,
+        hasVariants,
+      };
+    });
 
   // Get unique categories from menu items + "All" and "Bestsellers"
   const uniqueCategories = Array.from(
@@ -127,15 +135,46 @@ export default function CustomerHome() {
   });
 
   const handleAddToCart = (item: MenuItem) => {
-    setCartItems((prev) => {
-      const existing = prev.find((i) => i.id === item.id);
-      if (existing) {
-        return prev.map((i) =>
-          i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
-        );
-      }
-      return [...prev, { id: item.id, name: item.name, price: item.price, quantity: 1, image: item.image }];
-    });
+    if (item.hasVariants) {
+      setSelectedMenuItem(item);
+      setIsCustomizationOpen(true);
+    } else {
+      addItemToCart(item, { variantSelections: {}, instructions: "", quantity: 1 });
+    }
+  };
+
+  const addItemToCart = (item: MenuItem, customization: CustomizationSelection) => {
+    const variantGroups = getVariantGroupsForItem(item);
+    
+    // Calculate final price including variant option prices - use reduce to avoid mutation
+    const { finalPrice, variants } = variantGroups
+      .filter(g => customization.variantSelections[g.id])
+      .reduce((acc, g) => {
+        const selectedOption = g.options.find(o => o.id === customization.variantSelections[g.id]);
+        return {
+          finalPrice: acc.finalPrice + (selectedOption?.price || 0),
+          variants: [
+            ...acc.variants,
+            {
+              groupName: g.name,
+              optionName: selectedOption?.name || ""
+            }
+          ]
+        };
+      }, { finalPrice: item.price, variants: [] as { groupName: string; optionName: string }[] });
+
+    const cartItem: CartItem = {
+      id: `${item.id}-${Date.now()}`,
+      name: item.name,
+      description: item.description,
+      price: finalPrice,
+      quantity: customization.quantity,
+      image: item.image,
+      variants: variants.length > 0 ? variants : undefined,
+      instructions: customization.instructions || undefined,
+    };
+
+    setCartItems((prev) => [...prev, cartItem]);
 
     toast({
       title: "Added to cart",
@@ -152,6 +191,65 @@ export default function CustomerHome() {
       );
     }
   };
+
+  const handleRemoveItem = (id: string) => {
+    setCartItems((prev) => prev.filter((item) => item.id !== id));
+    toast({
+      title: "Item removed",
+      description: "Item has been removed from your cart",
+    });
+  };
+
+  const handleClearCart = () => {
+    setCartItems([]);
+    toast({
+      title: "Cart cleared",
+      description: "All items have been removed from your cart",
+    });
+  };
+
+  const getVariantGroupsForItem = (item: MenuItem): VariantGroup[] => {
+    if (item.category === "Pizzas") {
+      return [
+        {
+          id: "crust",
+          name: "Crust Type",
+          required: true,
+          options: [
+            { id: "deep-pan", name: "Deep Pan" },
+            { id: "stuff-crust", name: "Stuff Crust" },
+          ],
+        },
+        {
+          id: "size",
+          name: "Size",
+          required: true,
+          options: [
+            { id: "6-inch", name: "Pan Pizza 6 Inches" },
+            { id: "9-inch", name: "Pan Pizza 9 Inches", price: 100 },
+            { id: "12-inch", name: "Pan Pizza 12 Inches", price: 200 },
+          ],
+        },
+      ];
+    }
+    if (item.category === "Fries") {
+      return [
+        {
+          id: "size",
+          name: "Size",
+          required: true,
+          options: [
+            { id: "small", name: "Small" },
+            { id: "medium", name: "Medium", price: 50 },
+            { id: "large", name: "Large", price: 100 },
+          ],
+        },
+      ];
+    }
+    return [];
+  };
+
+  const popularItems = menuItems.filter(item => item.category === "Pizzas" || item.category === "Burgers").slice(0, 5);
 
   const createOrderMutation = useMutation({
     mutationFn: async (orderData: any) => {
@@ -294,8 +392,23 @@ export default function CustomerHome() {
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}
         items={cartItems}
+        popularItems={popularItems}
         onUpdateQuantity={handleUpdateQuantity}
+        onRemoveItem={handleRemoveItem}
+        onClearCart={handleClearCart}
+        onAddPopularItem={handleAddToCart}
         onCheckout={handleCheckout}
+      />
+
+      <ItemCustomizationDialog
+        isOpen={isCustomizationOpen}
+        onClose={() => {
+          setIsCustomizationOpen(false);
+          setSelectedMenuItem(null);
+        }}
+        item={selectedMenuItem}
+        variantGroups={selectedMenuItem ? getVariantGroupsForItem(selectedMenuItem) : []}
+        onAddToCart={addItemToCart}
       />
 
       <OrderTypeDialog

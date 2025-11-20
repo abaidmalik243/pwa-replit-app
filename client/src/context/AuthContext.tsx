@@ -14,7 +14,7 @@ type User = {
 type AuthContextType = {
   user: User | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
 };
@@ -82,7 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     verifySession();
   }, []);
 
-  const login = async (email: string, password: string): Promise<void> => {
+  const login = async (email: string, password: string): Promise<User> => {
     try {
       // Call backend login endpoint
       const response = await fetch("/api/auth/login", {
@@ -106,6 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const userData = await meResponse.json();
         setUser(userData);
         localStorage.setItem("user", JSON.stringify(userData));
+        return userData;
       } else {
         throw new Error("Session verification failed");
       }

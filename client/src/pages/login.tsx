@@ -35,24 +35,20 @@ export default function Login() {
   const onSubmit = async (data: LoginForm) => {
     setIsLoading(true);
     try {
-      await login(data.email, data.password);
+      const userData = await login(data.email, data.password);
       
       toast({
         title: "Login successful",
         description: "Welcome to Kebabish Pizza!",
       });
       
-      // Redirect based on role (user will be populated after login)
-      const userStr = localStorage.getItem("user");
-      if (userStr) {
-        const userData = JSON.parse(userStr);
-        if (userData.role === "admin" || userData.role === "staff") {
-          setLocation("/admin");
-        } else if (userData.role === "rider") {
-          setLocation("/rider");
-        } else {
-          setLocation("/");
-        }
+      // Redirect based on role
+      if (userData.role === "admin" || userData.role === "staff") {
+        setLocation("/admin");
+      } else if (userData.role === "rider") {
+        setLocation("/rider");
+      } else {
+        setLocation("/");
       }
     } catch (error: any) {
       toast({

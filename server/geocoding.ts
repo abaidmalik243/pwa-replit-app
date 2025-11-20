@@ -38,13 +38,25 @@ export async function geocodeAddress(address: string): Promise<GeocodingResult |
   }
 
   // Rate limiting check
-  const now = Date.now();
   const recentRequests = geocodeRateLimits.get(normalizedAddress) || 0;
   
   if (recentRequests >= MAX_REQUESTS_PER_WINDOW) {
     console.warn('Geocoding rate limit exceeded for address:', normalizedAddress.substring(0, 20));
     return null;
   }
+
+  // Increment rate limit counter BEFORE making the request
+  // This prevents failed requests from bypassing the rate limit
+  geocodeRateLimits.set(normalizedAddress, recentRequests + 1);
+  setTimeout(() => {
+    const current = geocodeRateLimits.get(normalizedAddress) || 0;
+    if (current > 0) {
+      geocodeRateLimits.set(normalizedAddress, current - 1);
+    }
+    if (current <= 1) {
+      geocodeRateLimits.delete(normalizedAddress);
+    }
+  }, RATE_LIMIT_WINDOW);
 
   try {
     const encodedAddress = encodeURIComponent(address);
@@ -59,6 +71,8 @@ export async function geocodeAddress(address: string): Promise<GeocodingResult |
 
     if (!response.ok) {
       console.error('Geocoding API error:', response.statusText);
+      // Cache failed API response to prevent repeated attempts
+      cacheResult(normalizedAddress, null);
       return null;
     }
 
@@ -79,16 +93,12 @@ export async function geocodeAddress(address: string): Promise<GeocodingResult |
 
     // Cache successful result
     cacheResult(normalizedAddress, result);
-    
-    // Update rate limit counter
-    geocodeRateLimits.set(normalizedAddress, recentRequests + 1);
-    setTimeout(() => {
-      geocodeRateLimits.delete(normalizedAddress);
-    }, RATE_LIMIT_WINDOW);
 
     return result;
   } catch (error) {
     console.error('Geocoding error:', error);
+    // Cache exception results briefly to avoid hammering during outages
+    cacheResult(normalizedAddress, null);
     return null;
   }
 }

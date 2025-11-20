@@ -71,18 +71,25 @@ A comprehensive promo code management system featuring:
 -   **Database Schema**: `promo_codes` table stores code configurations, `promo_code_usage` table tracks each use, orders table includes `promoCodeId` reference for applied codes.
 
 ### Delivery Charges System
-A flexible delivery charges management system supporting both static and dynamic pricing models:
+A flexible delivery charges management system supporting both static and dynamic pricing models with address-based geocoding:
 -   **Admin Configuration Interface**: Branch-specific delivery charge settings with real-time preview. Admin page at `/admin/delivery-charges` provides centralized delivery charges management per branch.
 -   **Pricing Models**: 
     -   **Static Pricing**: Fixed delivery fee for all orders.
     -   **Dynamic Pricing**: Distance-based calculation with base charge plus per-kilometer rate.
+-   **Address-Based Distance Calculation**: 
+    -   Integrates OpenStreetMap Nominatim API for free geocoding (no API key required).
+    -   Haversine formula calculates distance between branch coordinates and delivery address.
+    -   Geocoding cache (24h TTL, 500 entries) reduces external API calls.
+    -   Rate limiting (10 requests/min per address) prevents DoS attacks.
+    -   Minimum address validation (5 characters) prevents abuse.
+    -   Graceful error handling: returns default charge (Rs. 50) on geocoding failures.
 -   **Free Delivery Threshold**: Configure minimum order amount for free delivery to incentivize larger orders.
 -   **Maximum Delivery Distance**: Set distance limits for dynamic pricing to control service area.
 -   **Configuration Status**: Toggle configurations active/inactive. Inactive configs automatically fallback to system defaults.
--   **Calculation API**: Backend endpoint `/api/delivery-charges/calculate` calculates delivery charges in real-time based on branch config, order amount, and distance (for dynamic pricing).
--   **Fallback Handling**: When branch config is inactive or missing, system uses DEFAULT_DELIVERY_CONFIG (static: Rs. 50, dynamic: Rs. 50 base + Rs. 20/km, free above Rs. 1500, max 15 KM).
--   **Response Indicators**: API includes `usingCustomConfig` flag to indicate whether custom config or defaults were applied.
--   **Database Schema**: `delivery_charges_config` table stores per-branch configuration with unique constraint on branchId.
+-   **Calculation API**: Backend endpoint `/api/delivery-charges/calculate` accepts `deliveryAddress` parameter, geocodes it, calculates distance from branch, and applies pricing model.
+-   **Fallback Handling**: When branch config is inactive, missing, or geocoding fails, system uses DEFAULT_DELIVERY_CONFIG (static: Rs. 50, dynamic: Rs. 50 base + Rs. 20/km, free above Rs. 1500, max 15 KM).
+-   **Response Indicators**: API includes `usingCustomConfig` flag to indicate whether custom config or defaults were applied, plus calculated `distance` when available.
+-   **Database Schema**: `delivery_charges_config` table stores per-branch configuration with unique constraint on branchId; `branches` table includes latitude/longitude coordinates; `orders` table stores customerAddress and deliveryDistance.
 
 ### Rider Management System
 A comprehensive delivery rider management module featuring:

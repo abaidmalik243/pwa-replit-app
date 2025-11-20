@@ -1,7 +1,19 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+// Global logout handler - will be set by AuthContext
+let globalLogoutHandler: (() => void) | null = null;
+
+export function setGlobalLogoutHandler(handler: () => void) {
+  globalLogoutHandler = handler;
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
+    // Handle 401 Unauthorized - trigger logout
+    if (res.status === 401 && globalLogoutHandler) {
+      globalLogoutHandler();
+    }
+    
     const text = (await res.text()) || res.statusText;
     throw new Error(`${res.status}: ${text}`);
   }

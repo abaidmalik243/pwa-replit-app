@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useLocation } from "wouter";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, setGlobalLogoutHandler } from "@/lib/queryClient";
 
 type User = {
   id: string;
@@ -25,6 +25,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [, setLocation] = useLocation();
+
+  const logout = async () => {
+    try {
+      // Call backend to clear JWT cookie
+      await apiRequest("/api/auth/logout", "POST");
+    } catch (error) {
+      console.error("Logout API call failed:", error);
+      // Continue with logout even if API call fails
+    }
+
+    // Clear all auth state
+    setUser(null);
+    localStorage.removeItem("user");
+    
+    // Clear React Query cache
+    queryClient.clear();
+    
+    // Redirect to login
+    setLocation("/login");
+  };
+
+  // Set up global 401 handler on mount
+  useEffect(() => {
+    setGlobalLogoutHandler(logout);
+  }, []);
 
   // Verify session with server on mount
   useEffect(() => {
@@ -90,26 +115,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem("user");
       throw error;
     }
-  };
-
-  const logout = async () => {
-    try {
-      // Call backend to clear JWT cookie
-      await apiRequest("/api/auth/logout", "POST");
-    } catch (error) {
-      console.error("Logout API call failed:", error);
-      // Continue with logout even if API call fails
-    }
-
-    // Clear all auth state
-    setUser(null);
-    localStorage.removeItem("user");
-    
-    // Clear React Query cache
-    queryClient.clear();
-    
-    // Redirect to login
-    setLocation("/login");
   };
 
   const value = {

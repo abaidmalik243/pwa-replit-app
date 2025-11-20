@@ -189,7 +189,8 @@ export default function PosMain() {
 
   const createOrderMutation = useMutation({
     mutationFn: async (orderData: any) => {
-      return await apiRequest("/api/orders", "POST", orderData);
+      const response = await apiRequest("/api/orders", "POST", orderData);
+      return await response.json();
     },
     onSuccess: (createdOrder: any) => {
       toast({
@@ -263,7 +264,24 @@ export default function PosMain() {
     // Calculate totals
     const subtotal = calculateTotal();
     const discount = 0;
-    const deliveryCharges = orderType === "delivery" ? 50 : 0;
+    
+    // Calculate delivery charges dynamically
+    let deliveryCharges = 0;
+    if (orderType === "delivery") {
+      try {
+        const response = await apiRequest("/api/delivery-charges/calculate", "POST", {
+          branchId: userBranchId,
+          orderAmount: subtotal,
+        });
+        const result = await response.json();
+        deliveryCharges = result.freeDelivery ? 0 : result.deliveryCharges;
+      } catch (error) {
+        console.error("Failed to calculate delivery charges:", error);
+        // Fallback to default delivery charge if calculation fails
+        deliveryCharges = 50;
+      }
+    }
+    
     const total = subtotal - discount + deliveryCharges;
 
     // Serialize cart items for database

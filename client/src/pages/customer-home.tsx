@@ -292,8 +292,8 @@ export default function CustomerHome() {
 
   const createOrderMutation = useMutation({
     mutationFn: async (orderData: any) => {
-      const res = await apiRequest("/api/orders", "POST", orderData);
-      return await res.json();
+      const response = await apiRequest("/api/orders", "POST", orderData);
+      return await response.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
@@ -341,15 +341,13 @@ export default function CustomerHome() {
     setIsConfirmationOpen(true);
   };
 
-  const handleConfirmOrder = (orderDetails: OrderDetails) => {
+  const handleConfirmOrder = async (orderDetails: OrderDetails) => {
     // Generate order number
     const orderNumber = `ORD-${Date.now().toString().slice(-8)}`;
 
     // Calculate amounts
     const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    const deliveryCharges = orderType === "delivery" ? 50 : 0; // TODO: Calculate based on distance
-    const total = subtotal + deliveryCharges;
-
+    
     // Validate required data
     if (!selectedBranchId) {
       console.error("Missing branchId - cannot create order");
@@ -360,6 +358,25 @@ export default function CustomerHome() {
       });
       return;
     }
+
+    // Calculate delivery charges dynamically
+    let deliveryCharges = 0;
+    if (orderType === "delivery") {
+      try {
+        const response = await apiRequest("/api/delivery-charges/calculate", "POST", {
+          branchId: selectedBranchId,
+          orderAmount: subtotal,
+        });
+        const result = await response.json();
+        deliveryCharges = result.freeDelivery ? 0 : result.deliveryCharges;
+      } catch (error) {
+        console.error("Failed to calculate delivery charges:", error);
+        // Fallback to default delivery charge if calculation fails
+        deliveryCharges = 50;
+      }
+    }
+    
+    const total = subtotal + deliveryCharges;
 
     // Prepare order data - required fields only, add optional fields conditionally
     const orderData: Record<string, any> = {
@@ -530,6 +547,7 @@ export default function CustomerHome() {
         onOpenChange={setIsConfirmationOpen}
         cartItems={cartItems}
         orderType={orderType}
+        branchId={selectedBranchId}
         branchName={selectedBranch?.name}
         selectedArea={selectedArea}
         onConfirmOrder={handleConfirmOrder}

@@ -70,6 +70,20 @@ A comprehensive promo code management system featuring:
 -   **Usage Tracking**: Complete audit trail of promo code usage linked to orders and users for reporting and analytics.
 -   **Database Schema**: `promo_codes` table stores code configurations, `promo_code_usage` table tracks each use, orders table includes `promoCodeId` reference for applied codes.
 
+### Delivery Charges System
+A flexible delivery charges management system supporting both static and dynamic pricing models:
+-   **Admin Configuration Interface**: Branch-specific delivery charge settings with real-time preview. Admin page at `/admin/delivery-charges` provides centralized delivery charges management per branch.
+-   **Pricing Models**: 
+    -   **Static Pricing**: Fixed delivery fee for all orders.
+    -   **Dynamic Pricing**: Distance-based calculation with base charge plus per-kilometer rate.
+-   **Free Delivery Threshold**: Configure minimum order amount for free delivery to incentivize larger orders.
+-   **Maximum Delivery Distance**: Set distance limits for dynamic pricing to control service area.
+-   **Configuration Status**: Toggle configurations active/inactive. Inactive configs automatically fallback to system defaults.
+-   **Calculation API**: Backend endpoint `/api/delivery-charges/calculate` calculates delivery charges in real-time based on branch config, order amount, and distance (for dynamic pricing).
+-   **Fallback Handling**: When branch config is inactive or missing, system uses DEFAULT_DELIVERY_CONFIG (static: Rs. 50, dynamic: Rs. 50 base + Rs. 20/km, free above Rs. 1500, max 15 KM).
+-   **Response Indicators**: API includes `usingCustomConfig` flag to indicate whether custom config or defaults were applied.
+-   **Database Schema**: `delivery_charges_config` table stores per-branch configuration with unique constraint on branchId.
+
 ### Rider Management System
 A comprehensive delivery rider management module featuring:
 -   **Rider CRUD Management**: Admin interface for creating, editing, and deleting riders with details including name, phone, email, vehicle type, vehicle number, and branch assignment.

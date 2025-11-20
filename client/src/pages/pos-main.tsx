@@ -94,7 +94,7 @@ export default function PosMain() {
     id: item.id,
     name: item.name,
     description: item.description || "",
-    price: parseFloat(item.price),
+    price: parseFloat(item.price) || 0,
     image: item.imageUrl || "",
     category: item.categoryId || "",
     isAvailable: item.isAvailable,

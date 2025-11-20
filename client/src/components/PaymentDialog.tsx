@@ -44,10 +44,13 @@ export function PaymentDialog({
     { id: "1", type: "cash", amount: 0 },
   ]);
 
+  // Ensure totalAmount is valid, default to 0 if NaN or invalid
+  const validTotalAmount = isNaN(totalAmount) || totalAmount === null || totalAmount === undefined ? 0 : totalAmount;
+
   const calculateChange = () => {
     if (paymentMode === "single" && singleMethod === "cash") {
       const received = parseFloat(cashReceived) || 0;
-      return Math.max(0, received - totalAmount);
+      return Math.max(0, received - validTotalAmount);
     }
     return 0;
   };
@@ -56,7 +59,7 @@ export function PaymentDialog({
     if (paymentMode === "single") {
       // For non-cash methods, the payment amount is automatically the order total
       if (singleMethod !== "cash") {
-        return totalAmount;
+        return validTotalAmount;
       }
       return parseFloat(cashReceived) || 0;
     }
@@ -71,9 +74,9 @@ export function PaymentDialog({
         return true;
       }
       // For cash, must receive at least the total amount
-      return totalPaid >= totalAmount;
+      return totalPaid >= validTotalAmount;
     }
-    return Math.abs(totalPaid - totalAmount) < 0.01; // Account for floating point precision
+    return Math.abs(totalPaid - validTotalAmount) < 0.01; // Account for floating point precision
   };
 
   const processPaymentMutation = useMutation({
@@ -177,7 +180,7 @@ export function PaymentDialog({
     }
   };
 
-  const remainingAmount = totalAmount - calculateTotalPaid();
+  const remainingAmount = validTotalAmount - calculateTotalPaid();
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -198,7 +201,7 @@ export function PaymentDialog({
                 <div className="text-right">
                   <p className="text-sm text-muted-foreground">Total Amount</p>
                   <p className="text-2xl font-bold text-primary" data-testid="text-total-amount">
-                    PKR {totalAmount.toFixed(2)}
+                    PKR {validTotalAmount.toFixed(2)}
                   </p>
                 </div>
               </div>
@@ -307,7 +310,7 @@ export function PaymentDialog({
                 <div className="p-4 bg-muted rounded-md">
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium">Payment Amount</span>
-                    <span className="text-lg font-bold">PKR {totalAmount.toFixed(2)}</span>
+                    <span className="text-lg font-bold">PKR {validTotalAmount.toFixed(2)}</span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">
                     {singleMethod === "card" ? "Process card payment for full amount" : "Process JazzCash payment for full amount"}

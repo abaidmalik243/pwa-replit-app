@@ -1,4 +1,4 @@
-import { LayoutDashboard, ShoppingBag, UtensilsCrossed, Users, Settings, LogOut, Volume2, VolumeX, FolderOpen, Receipt, TrendingUp, Building2, CreditCard, Table2, ChefHat, Calculator, BarChart3, Bike, Truck, MapPin, Tag } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, UtensilsCrossed, Users, Settings, LogOut, Volume2, VolumeX, FolderOpen, Receipt, TrendingUp, Building2, CreditCard, Table2, ChefHat, Calculator, BarChart3, Bike, Truck, MapPin, Tag, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Link, useLocation } from "wouter";
@@ -29,6 +29,7 @@ export default function AdminSidebar({ soundEnabled = true, onToggleSound, onLog
     { icon: Truck, label: "Deliveries", path: "/admin/deliveries" },
     { icon: MapPin, label: "Rider Tracking", path: "/admin/rider-tracking" },
     { icon: Tag, label: "Promo Codes", path: "/admin/promo-codes" },
+    { icon: DollarSign, label: "Delivery Charges", path: "/admin/delivery-charges" },
     { icon: Users, label: "Users & Roles", path: "/admin/users" },
     { icon: Settings, label: "Settings", path: "/admin/settings" },
   ];

@@ -5,7 +5,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
 import crypto from "crypto";
-import { insertUserSchema, insertOrderSchema, insertBranchSchema, insertRiderSchema, insertDeliverySchema } from "@shared/schema";
+import { insertUserSchema, insertOrderSchema, insertBranchSchema, insertRiderSchema, insertDeliverySchema, DEFAULT_DELIVERY_CONFIG } from "@shared/schema";
 
 // JWT secret - in production, this should be in environment variables
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
@@ -2137,8 +2137,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get branch-specific config or use defaults
       const config = await storage.getDeliveryChargesConfig(branchId);
-      const chargeType = config?.chargeType || schema.DEFAULT_DELIVERY_CONFIG.CHARGE_TYPE;
-      const freeDeliveryThreshold = parseFloat(config?.freeDeliveryThreshold || schema.DEFAULT_DELIVERY_CONFIG.FREE_DELIVERY_THRESHOLD.toString());
+      
+      // Use config only if it exists and is active, otherwise use defaults
+      const useConfig = config && config.isActive;
+      const chargeType = useConfig ? config.chargeType : DEFAULT_DELIVERY_CONFIG.CHARGE_TYPE;
+      const freeDeliveryThreshold = parseFloat(
+        useConfig ? (config.freeDeliveryThreshold || DEFAULT_DELIVERY_CONFIG.FREE_DELIVERY_THRESHOLD.toString()) 
+                  : DEFAULT_DELIVERY_CONFIG.FREE_DELIVERY_THRESHOLD.toString()
+      );
 
       // Check for free delivery
       if (orderAmount >= freeDeliveryThreshold) {
@@ -2154,7 +2160,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (chargeType === "static") {
         // Static pricing
-        const staticCharge = parseFloat(config?.staticCharge || schema.DEFAULT_DELIVERY_CONFIG.STATIC_CHARGE.toString());
+        const staticCharge = parseFloat(
+          useConfig ? (config.staticCharge || DEFAULT_DELIVERY_CONFIG.STATIC_CHARGE.toString())
+                    : DEFAULT_DELIVERY_CONFIG.STATIC_CHARGE.toString()
+        );
         deliveryCharges = staticCharge;
       } else {
         // Dynamic pricing based on distance
@@ -2162,9 +2171,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ error: "Distance is required for dynamic pricing" });
         }
 
-        const baseCharge = parseFloat(config?.baseCharge || schema.DEFAULT_DELIVERY_CONFIG.BASE_CHARGE.toString());
-        const perKmCharge = parseFloat(config?.perKmCharge || schema.DEFAULT_DELIVERY_CONFIG.PER_KM_CHARGE.toString());
-        const maxDistance = parseFloat(config?.maxDeliveryDistance || schema.DEFAULT_DELIVERY_CONFIG.MAX_DELIVERY_DISTANCE.toString());
+        const baseCharge = parseFloat(
+          useConfig ? (config.baseCharge || DEFAULT_DELIVERY_CONFIG.BASE_CHARGE.toString())
+                    : DEFAULT_DELIVERY_CONFIG.BASE_CHARGE.toString()
+        );
+        const perKmCharge = parseFloat(
+          useConfig ? (config.perKmCharge || DEFAULT_DELIVERY_CONFIG.PER_KM_CHARGE.toString())
+                    : DEFAULT_DELIVERY_CONFIG.PER_KM_CHARGE.toString()
+        );
+        const maxDistance = parseFloat(
+          useConfig ? (config.maxDeliveryDistance || DEFAULT_DELIVERY_CONFIG.MAX_DELIVERY_DISTANCE.toString())
+                    : DEFAULT_DELIVERY_CONFIG.MAX_DELIVERY_DISTANCE.toString()
+        );
 
         if (distance > maxDistance) {
           return res.status(400).json({ 
@@ -2180,6 +2198,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         chargeType: chargeType,
         freeDelivery: false,
         distance: distance || null,
+        usingCustomConfig: useConfig,
       });
     } catch (error: any) {
       console.error("Error calculating delivery charges:", error);

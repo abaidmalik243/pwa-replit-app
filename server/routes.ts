@@ -2530,6 +2530,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get complete variant group data (groups + options) for a menu item
+  app.get("/api/menu-items/:menuItemId/variant-groups", async (req, res) => {
+    try {
+      const { menuItemId } = req.params;
+      
+      // Get variant group assignments for this menu item
+      const menuItemVariants = await storage.getMenuItemVariants(menuItemId);
+      
+      // Get complete data for each variant group including options
+      const variantGroupsWithOptions = await Promise.all(
+        menuItemVariants.map(async (assignment) => {
+          const group = await storage.getVariantGroup(assignment.variantGroupId);
+          if (!group) return null;
+          
+          const options = await storage.getVariantOptionsByGroup(assignment.variantGroupId);
+          
+          return {
+            id: group.id,
+            name: group.name,
+            description: group.description,
+            selectionType: group.selectionType,
+            required: group.isRequired, // Rename to 'required' for consistency with ItemCustomizationDialog
+            displayOrder: group.displayOrder,
+            options: options.map(opt => ({
+              id: opt.id,
+              name: opt.name,
+              shortName: opt.shortName,
+              price: parseFloat(opt.priceModifier || "0"), // Rename to 'price' for consistency with ItemCustomizationDialog
+              isDefault: opt.isDefault,
+              displayOrder: opt.displayOrder,
+            })).filter(opt => opt).sort((a, b) => a.displayOrder - b.displayOrder),
+          };
+        })
+      );
+      
+      // Filter out null groups and sort by display order
+      const validGroups = variantGroupsWithOptions
+        .filter(g => g !== null)
+        .sort((a, b) => a!.displayOrder - b!.displayOrder);
+      
+      res.json(validGroups);
+    } catch (error: any) {
+      console.error("Error fetching menu item variant groups:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

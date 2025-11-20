@@ -26,6 +26,7 @@ export interface CustomizationSelection {
   variantSelections: Record<string, string>;
   instructions: string;
   quantity: number;
+  calculatedUnitPrice: number; // Price per unit including variant modifiers
 }
 
 interface ItemCustomizationDialogProps {
@@ -56,18 +57,22 @@ export default function ItemCustomizationDialog({
     }));
   };
 
-  const calculateTotalPrice = () => {
-    let total = item.price;
+  const calculateUnitPrice = () => {
+    let unitPrice = item.price;
     variantGroups.forEach(group => {
       const selectedOptionId = variantSelections[group.id];
       if (selectedOptionId) {
         const option = group.options.find(o => o.id === selectedOptionId);
         if (option?.price) {
-          total += option.price;
+          unitPrice += option.price;
         }
       }
     });
-    return total * quantity;
+    return unitPrice;
+  };
+
+  const calculateTotalPrice = () => {
+    return calculateUnitPrice() * quantity;
   };
 
   const handleAddToCart = () => {
@@ -81,7 +86,8 @@ export default function ItemCustomizationDialog({
     onAddToCart(item, {
       variantSelections,
       instructions,
-      quantity
+      quantity,
+      calculatedUnitPrice: calculateUnitPrice()
     });
 
     setVariantSelections({});

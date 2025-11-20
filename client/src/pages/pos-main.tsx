@@ -41,6 +41,7 @@ export default function PosMain() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedItem, setSelectedItem] = useState<ComponentMenuItem | null>(null);
   const [showCustomizationDialog, setShowCustomizationDialog] = useState(false);
+  const [variantGroups, setVariantGroups] = useState<any[]>([]);
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const [orderType, setOrderType] = useState<"dine-in" | "takeaway" | "delivery">("dine-in");
   const [customerName, setCustomerName] = useState("");
@@ -91,6 +92,23 @@ export default function PosMain() {
     queryKey: ["/api/menu-items"],
   });
 
+  // Query to get variant group counts for all menu items
+  const { data: menuItemVariantCounts = {} } = useQuery<Record<string, number>>({
+    queryKey: ["/api/menu-items/variant-counts"],
+    queryFn: async () => {
+      const counts: Record<string, number> = {};
+      for (const item of dbMenuItems) {
+        const response = await fetch(`/api/menu-items/${item.id}/variants`);
+        if (response.ok) {
+          const variants = await response.json();
+          counts[item.id] = variants.length;
+        }
+      }
+      return counts;
+    },
+    enabled: dbMenuItems.length > 0,
+  });
+
   // Convert database menu items to component menu items
   const menuItems: ComponentMenuItem[] = dbMenuItems.map(item => ({
     id: item.id,
@@ -100,7 +118,7 @@ export default function PosMain() {
     image: item.imageUrl || "",
     category: item.categoryId || "",
     isAvailable: item.isAvailable,
-    hasVariants: false, // TODO: Determine from variant groups
+    hasVariants: (menuItemVariantCounts[item.id] || 0) > 0,
   }));
 
   // Fetch categories
@@ -141,22 +159,45 @@ export default function PosMain() {
     return matchesSearch && matchesCategory && item.isAvailable;
   });
 
-  const handleItemClick = (item: ComponentMenuItem) => {
+  const handleItemClick = async (item: ComponentMenuItem) => {
     setSelectedItem(item);
+    
+    // Fetch variant groups for this menu item
+    try {
+      const response = await fetch(`/api/menu-items/${item.id}/variant-groups`);
+      if (response.ok) {
+        const groups = await response.json();
+        setVariantGroups(groups);
+      } else {
+        setVariantGroups([]);
+      }
+    } catch (error) {
+      console.error("Error fetching variant groups:", error);
+      setVariantGroups([]);
+    }
+    
     setShowCustomizationDialog(true);
   };
 
   const handleAddToCart = (item: ComponentMenuItem, customization: CustomizationSelection) => {
     const cartItemId = `${item.id}-${Date.now()}`;
-    const variants = Object.entries(customization.variantSelections).map(([groupName, optionName]) => ({
-      groupName,
-      optionName,
-    }));
+    
+    // Map variant IDs to human-readable names using the fetched variant groups
+    const variants = Object.entries(customization.variantSelections).map(([groupId, optionId]) => {
+      const group = variantGroups.find(g => g.id === groupId);
+      const option = group?.options.find((o: any) => o.id === optionId);
+      
+      return {
+        groupName: group?.name || groupId,
+        optionName: option?.name || optionId,
+      };
+    });
+    
     const newCartItem: CartItem = {
       id: cartItemId,
       itemId: item.id,
       name: item.name,
-      price: item.price,
+      price: customization.calculatedUnitPrice, // Use calculated price including variant modifiers
       quantity: customization.quantity,
       variants,
       specialInstructions: customization.instructions,
@@ -579,10 +620,12 @@ export default function PosMain() {
       {selectedItem && (
         <ItemCustomizationDialog
           item={selectedItem}
+          variantGroups={variantGroups}
           isOpen={showCustomizationDialog}
           onClose={() => {
             setShowCustomizationDialog(false);
             setSelectedItem(null);
+            setVariantGroups([]);
           }}
           onAddToCart={handleAddToCart}
         />

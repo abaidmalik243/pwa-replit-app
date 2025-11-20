@@ -2316,6 +2316,178 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== Variant Management Routes ====================
+
+  // Get all variant groups
+  app.get("/api/variant-groups", async (req, res) => {
+    try {
+      const groups = await storage.getAllVariantGroups();
+      res.json(groups);
+    } catch (error: any) {
+      console.error("Error fetching variant groups:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get single variant group
+  app.get("/api/variant-groups/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const group = await storage.getVariantGroup(id);
+      if (!group) {
+        return res.status(404).json({ error: "Variant group not found" });
+      }
+      res.json(group);
+    } catch (error: any) {
+      console.error("Error fetching variant group:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Create variant group (admin/staff only)
+  app.post("/api/variant-groups", authenticate, authorize("admin", "staff"), async (req, res) => {
+    try {
+      const group = await storage.createVariantGroup(req.body);
+      res.json(group);
+    } catch (error: any) {
+      console.error("Error creating variant group:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Update variant group (admin/staff only)
+  app.patch("/api/variant-groups/:id", authenticate, authorize("admin", "staff"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const group = await storage.updateVariantGroup(id, req.body);
+      if (!group) {
+        return res.status(404).json({ error: "Variant group not found" });
+      }
+      res.json(group);
+    } catch (error: any) {
+      console.error("Error updating variant group:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Delete variant group (admin only)
+  app.delete("/api/variant-groups/:id", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteVariantGroup(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Variant group not found" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting variant group:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get all variant options
+  app.get("/api/variant-options", async (req, res) => {
+    try {
+      const { groupId } = req.query;
+      let options;
+      if (groupId && typeof groupId === 'string') {
+        options = await storage.getVariantOptionsByGroup(groupId);
+      } else {
+        options = await storage.getAllVariantOptions();
+      }
+      res.json(options);
+    } catch (error: any) {
+      console.error("Error fetching variant options:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Create variant option (admin/staff only)
+  app.post("/api/variant-options", authenticate, authorize("admin", "staff"), async (req, res) => {
+    try {
+      const option = await storage.createVariantOption(req.body);
+      res.json(option);
+    } catch (error: any) {
+      console.error("Error creating variant option:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Update variant option (admin/staff only)
+  app.patch("/api/variant-options/:id", authenticate, authorize("admin", "staff"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const option = await storage.updateVariantOption(id, req.body);
+      if (!option) {
+        return res.status(404).json({ error: "Variant option not found" });
+      }
+      res.json(option);
+    } catch (error: any) {
+      console.error("Error updating variant option:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Delete variant option (admin only)
+  app.delete("/api/variant-options/:id", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteVariantOption(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Variant option not found" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting variant option:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get menu item variants (variant groups assigned to a menu item)
+  app.get("/api/menu-items/:menuItemId/variants", async (req, res) => {
+    try {
+      const { menuItemId } = req.params;
+      const variants = await storage.getMenuItemVariants(menuItemId);
+      res.json(variants);
+    } catch (error: any) {
+      console.error("Error fetching menu item variants:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Assign variant group to menu item (admin/staff only)
+  app.post("/api/menu-items/:menuItemId/variants", authenticate, authorize("admin", "staff"), async (req, res) => {
+    try {
+      const { menuItemId } = req.params;
+      const { variantGroupId } = req.body;
+      
+      const menuItemVariant = await storage.createMenuItemVariant({
+        menuItemId,
+        variantGroupId,
+      });
+      
+      res.json(menuItemVariant);
+    } catch (error: any) {
+      console.error("Error assigning variant to menu item:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Remove variant group from menu item (admin only)
+  app.delete("/api/menu-items/:menuItemId/variants/:id", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteMenuItemVariant(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Menu item variant assignment not found" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error removing variant from menu item:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

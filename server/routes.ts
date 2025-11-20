@@ -1368,6 +1368,156 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============= Rider Management Routes =============
+  
+  // Get all riders
+  app.get("/api/riders", async (req, res) => {
+    try {
+      const riders = await storage.getAllRiders();
+      res.json(riders);
+    } catch (error: any) {
+      console.error("Error fetching riders:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get riders by branch
+  app.get("/api/riders/branch/:branchId", async (req, res) => {
+    try {
+      const { branchId } = req.params;
+      const riders = await storage.getRidersByBranch(branchId);
+      res.json(riders);
+    } catch (error: any) {
+      console.error("Error fetching riders by branch:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get available riders for assignment
+  app.get("/api/riders/available/:branchId", async (req, res) => {
+    try {
+      const { branchId } = req.params;
+      const riders = await storage.getAvailableRiders(branchId);
+      res.json(riders);
+    } catch (error: any) {
+      console.error("Error fetching available riders:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get single rider
+  app.get("/api/riders/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const rider = await storage.getRider(id);
+      if (!rider) {
+        return res.status(404).json({ error: "Rider not found" });
+      }
+      res.json(rider);
+    } catch (error: any) {
+      console.error("Error fetching rider:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Create new rider
+  app.post("/api/riders", async (req, res) => {
+    try {
+      const validatedData = schema.insertRiderSchema.parse(req.body);
+      
+      // Check if phone already exists
+      const existingRider = await storage.getRiderByPhone(validatedData.phone);
+      if (existingRider) {
+        return res.status(400).json({ error: "Phone number already registered" });
+      }
+
+      const rider = await storage.createRider(validatedData);
+      res.status(201).json(rider);
+    } catch (error: any) {
+      console.error("Error creating rider:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Validation error", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Update rider
+  app.patch("/api/riders/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const rider = await storage.updateRider(id, req.body);
+      if (!rider) {
+        return res.status(404).json({ error: "Rider not found" });
+      }
+      res.json(rider);
+    } catch (error: any) {
+      console.error("Error updating rider:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Update rider GPS location
+  app.patch("/api/riders/:id/location", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { latitude, longitude } = req.body;
+
+      if (!latitude || !longitude) {
+        return res.status(400).json({ error: "Latitude and longitude are required" });
+      }
+
+      // Update rider location
+      const rider = await storage.updateRiderLocation(id, latitude, longitude);
+      if (!rider) {
+        return res.status(404).json({ error: "Rider not found" });
+      }
+
+      // Save location history
+      await storage.createRiderLocationHistory({
+        riderId: id,
+        latitude,
+        longitude,
+        speed: req.body.speed,
+        heading: req.body.heading,
+        accuracy: req.body.accuracy,
+      });
+
+      res.json(rider);
+    } catch (error: any) {
+      console.error("Error updating rider location:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Delete rider
+  app.delete("/api/riders/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const success = await storage.deleteRider(id);
+      if (!success) {
+        return res.status(404).json({ error: "Rider not found" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting rider:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get rider location history
+  app.get("/api/riders/:id/location-history", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 100;
+      const history = await storage.getRiderLocationHistory(id, limit);
+      res.json(history);
+    } catch (error: any) {
+      console.error("Error fetching location history:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

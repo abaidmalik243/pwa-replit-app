@@ -104,6 +104,30 @@ export interface IStorage {
   createTableReservation(reservation: schema.InsertTableReservation): Promise<schema.TableReservation>;
   updateTableReservation(id: string, reservation: Partial<schema.InsertTableReservation>): Promise<schema.TableReservation | undefined>;
   deleteTableReservation(id: string): Promise<boolean>;
+
+  // Riders
+  getAllRiders(): Promise<schema.Rider[]>;
+  getRider(id: string): Promise<schema.Rider | undefined>;
+  getRidersByBranch(branchId: string): Promise<schema.Rider[]>;
+  getAvailableRiders(branchId: string): Promise<schema.Rider[]>;
+  getRiderByPhone(phone: string): Promise<schema.Rider | undefined>;
+  createRider(rider: schema.InsertRider): Promise<schema.Rider>;
+  updateRider(id: string, rider: Partial<schema.InsertRider>): Promise<schema.Rider | undefined>;
+  updateRiderLocation(id: string, latitude: string, longitude: string): Promise<schema.Rider | undefined>;
+  deleteRider(id: string): Promise<boolean>;
+
+  // Deliveries
+  getAllDeliveries(): Promise<schema.Delivery[]>;
+  getDelivery(id: string): Promise<schema.Delivery | undefined>;
+  getDeliveriesByRider(riderId: string): Promise<schema.Delivery[]>;
+  getActiveDeliveriesByRider(riderId: string): Promise<schema.Delivery[]>;
+  getDeliveryByOrder(orderId: string): Promise<schema.Delivery | undefined>;
+  createDelivery(delivery: schema.InsertDelivery): Promise<schema.Delivery>;
+  updateDelivery(id: string, delivery: Partial<schema.InsertDelivery>): Promise<schema.Delivery | undefined>;
+
+  // Rider Location History
+  getRiderLocationHistory(riderId: string, limit?: number): Promise<schema.RiderLocationHistory[]>;
+  createRiderLocationHistory(location: schema.InsertRiderLocationHistory): Promise<schema.RiderLocationHistory>;
 }
 
 export class DbStorage implements IStorage {
@@ -482,6 +506,110 @@ export class DbStorage implements IStorage {
   async deleteTableReservation(id: string) {
     await db.delete(schema.tableReservations).where(eq(schema.tableReservations.id, id));
     return true;
+  }
+
+  // Riders
+  async getAllRiders() {
+    return await db.select().from(schema.riders).orderBy(desc(schema.riders.createdAt));
+  }
+
+  async getRider(id: string) {
+    const result = await db.select().from(schema.riders).where(eq(schema.riders.id, id));
+    return result[0];
+  }
+
+  async getRidersByBranch(branchId: string) {
+    return await db.select().from(schema.riders).where(eq(schema.riders.branchId, branchId)).orderBy(desc(schema.riders.createdAt));
+  }
+
+  async getAvailableRiders(branchId: string) {
+    return await db.select().from(schema.riders).where(
+      and(
+        eq(schema.riders.branchId, branchId),
+        eq(schema.riders.isAvailable, true),
+        eq(schema.riders.isActive, true)
+      )
+    ).orderBy(desc(schema.riders.createdAt));
+  }
+
+  async getRiderByPhone(phone: string) {
+    const result = await db.select().from(schema.riders).where(eq(schema.riders.phone, phone));
+    return result[0];
+  }
+
+  async createRider(rider: schema.InsertRider) {
+    const result = await db.insert(schema.riders).values(rider).returning();
+    return result[0];
+  }
+
+  async updateRider(id: string, rider: Partial<schema.InsertRider>) {
+    const result = await db.update(schema.riders).set(rider).where(eq(schema.riders.id, id)).returning();
+    return result[0];
+  }
+
+  async updateRiderLocation(id: string, latitude: string, longitude: string) {
+    const result = await db.update(schema.riders).set({
+      currentLatitude: latitude,
+      currentLongitude: longitude,
+      lastLocationUpdate: new Date()
+    }).where(eq(schema.riders.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteRider(id: string) {
+    await db.delete(schema.riders).where(eq(schema.riders.id, id));
+    return true;
+  }
+
+  // Deliveries
+  async getAllDeliveries() {
+    return await db.select().from(schema.deliveries).orderBy(desc(schema.deliveries.assignedAt));
+  }
+
+  async getDelivery(id: string) {
+    const result = await db.select().from(schema.deliveries).where(eq(schema.deliveries.id, id));
+    return result[0];
+  }
+
+  async getDeliveriesByRider(riderId: string) {
+    return await db.select().from(schema.deliveries).where(eq(schema.deliveries.riderId, riderId)).orderBy(desc(schema.deliveries.assignedAt));
+  }
+
+  async getActiveDeliveriesByRider(riderId: string) {
+    return await db.select().from(schema.deliveries).where(
+      and(
+        eq(schema.deliveries.riderId, riderId),
+        eq(schema.deliveries.status, "assigned")
+      )
+    ).orderBy(desc(schema.deliveries.assignedAt));
+  }
+
+  async getDeliveryByOrder(orderId: string) {
+    const result = await db.select().from(schema.deliveries).where(eq(schema.deliveries.orderId, orderId));
+    return result[0];
+  }
+
+  async createDelivery(delivery: schema.InsertDelivery) {
+    const result = await db.insert(schema.deliveries).values(delivery).returning();
+    return result[0];
+  }
+
+  async updateDelivery(id: string, delivery: Partial<schema.InsertDelivery>) {
+    const result = await db.update(schema.deliveries).set(delivery).where(eq(schema.deliveries.id, id)).returning();
+    return result[0];
+  }
+
+  // Rider Location History
+  async getRiderLocationHistory(riderId: string, limit: number = 100) {
+    return await db.select().from(schema.riderLocationHistory)
+      .where(eq(schema.riderLocationHistory.riderId, riderId))
+      .orderBy(desc(schema.riderLocationHistory.timestamp))
+      .limit(limit);
+  }
+
+  async createRiderLocationHistory(location: schema.InsertRiderLocationHistory) {
+    const result = await db.insert(schema.riderLocationHistory).values(location).returning();
+    return result[0];
   }
 }
 

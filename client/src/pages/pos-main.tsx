@@ -10,6 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import AdminSidebar from "@/components/AdminSidebar";
 import AdminHeader from "@/components/AdminHeader";
 import { PaymentDialog } from "@/components/PaymentDialog";
@@ -44,6 +45,7 @@ export default function PosMain() {
   const [orderType, setOrderType] = useState<"dine-in" | "takeaway" | "delivery">("dine-in");
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [customerAddress, setCustomerAddress] = useState("");
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [pendingOrderForPayment, setPendingOrderForPayment] = useState<{
     id: string;
@@ -209,6 +211,7 @@ export default function PosMain() {
       setCart([]);
       setCustomerName("");
       setCustomerPhone("");
+      setCustomerAddress("");
       setSelectedTable(null);
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
     },
@@ -272,6 +275,7 @@ export default function PosMain() {
         const response = await apiRequest("/api/delivery-charges/calculate", "POST", {
           branchId: userBranchId,
           orderAmount: subtotal,
+          deliveryAddress: customerAddress.trim() || undefined,
         });
         const result = await response.json();
         deliveryCharges = result.freeDelivery ? 0 : result.deliveryCharges;
@@ -316,7 +320,7 @@ export default function PosMain() {
     if (activeSession?.id) orderData.sessionId = activeSession.id;
     if (orderType === "dine-in" && selectedTable) orderData.tableId = selectedTable;
     if (orderType === "delivery") {
-      orderData.customerAddress = "";
+      orderData.customerAddress = customerAddress.trim();
       orderData.deliveryArea = "";
     }
 
@@ -474,6 +478,17 @@ export default function PosMain() {
               value={customerPhone}
               onChange={(e) => setCustomerPhone(e.target.value)}
             />
+            
+            {/* Delivery address for delivery orders */}
+            {orderType === "delivery" && (
+              <Textarea
+                data-testid="input-customer-address"
+                placeholder="Delivery address"
+                value={customerAddress}
+                onChange={(e) => setCustomerAddress(e.target.value)}
+                className="min-h-[60px]"
+              />
+            )}
 
             <Separator />
 

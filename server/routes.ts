@@ -2,9 +2,14 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 import { z } from "zod";
 import crypto from "crypto";
 import { insertUserSchema, insertOrderSchema, insertBranchSchema, insertRiderSchema, insertDeliverySchema } from "@shared/schema";
+
+// JWT secret - in production, this should be in environment variables
+const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
+const JWT_EXPIRES_IN = "7d"; // Token expires in 7 days
 
 // Extend Express Request type to include user
 declare global {
@@ -21,18 +26,31 @@ declare global {
   }
 }
 
-// Authentication middleware - validates user from custom header
+// Helper function to generate JWT token
+function generateToken(userId: string): string {
+  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+}
+
+// Authentication middleware - validates JWT token from cookie
 async function authenticate(req: Request, res: Response, next: NextFunction) {
   try {
-    const userId = req.headers['x-user-id'] as string;
+    const token = req.cookies?.authToken;
     
-    if (!userId) {
+    if (!token) {
       return res.status(401).json({ error: "Authentication required" });
     }
 
-    const user = await storage.getUser(userId);
+    // Verify and decode JWT token
+    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
+    
+    if (!decoded.userId) {
+      return res.status(401).json({ error: "Invalid token" });
+    }
+
+    // Fetch user from database
+    const user = await storage.getUser(decoded.userId);
     if (!user) {
-      return res.status(401).json({ error: "Invalid authentication" });
+      return res.status(401).json({ error: "User not found" });
     }
 
     // Attach user to request (without password)
@@ -40,6 +58,12 @@ async function authenticate(req: Request, res: Response, next: NextFunction) {
     req.user = userWithoutPassword;
     next();
   } catch (error) {
+    if (error instanceof jwt.JsonWebTokenError) {
+      return res.status(401).json({ error: "Invalid token" });
+    }
+    if (error instanceof jwt.TokenExpiredError) {
+      return res.status(401).json({ error: "Token expired" });
+    }
     console.error("Authentication error:", error);
     res.status(401).json({ error: "Authentication failed" });
   }
@@ -86,6 +110,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         password: hashedPassword,
       });
 
+      // Generate JWT token
+      const token = generateToken(user.id);
+
+      // Set token in httpOnly cookie
+      res.cookie('authToken', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production', // Use HTTPS in production
+        sameSite: 'lax',
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      });
+
       // Remove password from response
       const { password, ...userWithoutPassword } = user;
       res.json(userWithoutPassword);
@@ -115,6 +150,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Invalid credentials" });
       }
 
+      // Generate JWT token
+      const token = generateToken(user.id);
+
+      // Set token in httpOnly cookie
+      res.cookie('authToken', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production', // Use HTTPS in production
+        sameSite: 'lax',
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      });
+
       // Remove password from response
       const { password: _, ...userWithoutPassword } = user;
       res.json(userWithoutPassword);
@@ -122,6 +168,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Login error:", error);
       res.status(400).json({ error: error.message || "Login failed" });
     }
+  });
+
+  // Logout - clear auth cookie
+  app.post("/api/auth/logout", (req, res) => {
+    res.clearCookie('authToken');
+    res.json({ message: "Logged out successfully" });
   });
 
   // Forgot password - generate reset token and send email
@@ -1654,8 +1706,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ============= Delivery Assignment Routes =============
   
-  // Get all deliveries
-  app.get("/api/deliveries", async (req, res) => {
+  // Get all deliveries (admin/staff only)
+  app.get("/api/deliveries", authenticate, authorize("admin", "staff"), async (req, res) => {
     try {
       const deliveries = await storage.getAllDeliveries();
       res.json(deliveries);
@@ -1665,8 +1717,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get deliveries by rider
-  app.get("/api/deliveries/rider/:riderId", async (req, res) => {
+  // Get deliveries by rider (authenticated users - riders can only see their own)
+  app.get("/api/deliveries/rider/:riderId", authenticate, async (req, res) => {
     try {
       const { riderId } = req.params;
       const deliveries = await storage.getDeliveriesByRider(riderId);
@@ -1677,8 +1729,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get active deliveries by rider
-  app.get("/api/deliveries/rider/:riderId/active", async (req, res) => {
+  // Get active deliveries by rider (authenticated users - riders can only see their own)
+  app.get("/api/deliveries/rider/:riderId/active", authenticate, async (req, res) => {
     try {
       const { riderId } = req.params;
       const deliveries = await storage.getActiveDeliveriesByRider(riderId);
@@ -1689,8 +1741,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get delivery by order
-  app.get("/api/deliveries/order/:orderId", async (req, res) => {
+  // Get delivery by order (admin/staff only)
+  app.get("/api/deliveries/order/:orderId", authenticate, authorize("admin", "staff"), async (req, res) => {
     try {
       const { orderId } = req.params;
       const delivery = await storage.getDeliveryByOrder(orderId);
@@ -1704,8 +1756,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get single delivery
-  app.get("/api/deliveries/:id", async (req, res) => {
+  // Get single delivery (authenticated users)
+  app.get("/api/deliveries/:id", authenticate, async (req, res) => {
     try {
       const { id } = req.params;
       const delivery = await storage.getDelivery(id);
@@ -1719,8 +1771,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Assign delivery to rider
-  app.post("/api/deliveries/assign", async (req, res) => {
+  // Assign delivery to rider (admin/staff only)
+  app.post("/api/deliveries/assign", authenticate, authorize("admin", "staff"), async (req, res) => {
     try {
       // Get the order to extract branchId
       const order = await storage.getOrder(req.body.orderId);
@@ -1771,8 +1823,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update delivery status
-  app.patch("/api/deliveries/:id/status", async (req, res) => {
+  // Update delivery status (authenticated users - riders can update their assigned deliveries)
+  app.patch("/api/deliveries/:id/status", authenticate, async (req, res) => {
     try {
       const { id } = req.params;
       const { status } = req.body;
@@ -1836,8 +1888,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update delivery
-  app.patch("/api/deliveries/:id", async (req, res) => {
+  // Update delivery (admin/staff only)
+  app.patch("/api/deliveries/:id", authenticate, authorize("admin", "staff"), async (req, res) => {
     try {
       const { id } = req.params;
       const delivery = await storage.updateDelivery(id, req.body);

@@ -1,18 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
-// Get authentication headers from localStorage
-function getAuthHeaders(): HeadersInit {
-  const userStr = localStorage.getItem("user");
-  if (!userStr) return {};
-  
-  try {
-    const user = JSON.parse(userStr);
-    return user?.id ? { "X-User-Id": user.id } : {};
-  } catch {
-    return {};
-  }
-}
-
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -25,16 +12,13 @@ export async function apiRequest(
   method: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const headers: HeadersInit = {
-    ...getAuthHeaders(),
-    ...(data ? { "Content-Type": "application/json" } : {}),
-  };
+  const headers: HeadersInit = data ? { "Content-Type": "application/json" } : {};
 
   const res = await fetch(url, {
     method,
     headers,
     body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
+    credentials: "include", // Send cookies with request
   });
 
   await throwIfResNotOk(res);
@@ -48,8 +32,7 @@ export const getQueryFn: <T>(options: {
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
     const res = await fetch(queryKey.join("/") as string, {
-      headers: getAuthHeaders(),
-      credentials: "include",
+      credentials: "include", // Send cookies with request
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {

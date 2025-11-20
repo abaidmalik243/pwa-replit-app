@@ -16,7 +16,7 @@ Preferred communication style: Simple, everyday language.
 **Database**: PostgreSQL with Drizzle ORM (Neon Serverless PostgreSQL).
 
 ### Database Architecture
-A relational database with UUID primary keys supports entities like Branches, Users (with role-based access), Categories, Menu Items, Orders, Expenses, POS Tables, POS Sessions, and Kitchen Tickets.
+A relational database with UUID primary keys supports entities like Branches, Users (with role-based access), Categories, Menu Items, Orders, Expenses, POS Tables, POS Sessions, Kitchen Tickets, Riders, Deliveries, and Rider Location History for GPS tracking.
 
 ### Authentication System
 Features Bcrypt hashing, cookie-based session management, and role-based access control (admin, staff, customer) with protected routes.
@@ -56,6 +56,15 @@ A comprehensive Point of Sale system integrates:
 
 ### Customer Payment System
 Supports **Cash on Delivery (COD)** and **JazzCash**. The JazzCash flow involves customer selection, order creation with pending status, a dialog for payment instructions, transaction ID/payer phone collection, and submission for manual staff verification, updating order status to "awaiting_verification."
+
+### Rider Management System
+A comprehensive delivery rider management module featuring:
+-   **Rider CRUD Management**: Admin interface for creating, editing, and deleting riders with details including name, phone, email, vehicle type, vehicle number, and branch assignment.
+-   **GPS Location Tracking**: Real-time location updates for riders with history tracking (latitude, longitude, speed, heading, accuracy) stored in the database.
+-   **Delivery Assignment**: Automated assignment of delivery orders to available riders with status tracking (assigned, accepted, picked_up, in_transit, delivered, cancelled).
+-   **Rider Status Management**: Track rider availability (online, offline, busy, on_break) with automatic status updates based on delivery assignments.
+-   **Performance Tracking**: Monitor rider statistics including total deliveries completed and average rating.
+-   **API Endpoints**: RESTful endpoints for rider management (`/api/riders`), delivery assignment (`/api/deliveries`), and GPS location updates (`/api/riders/:id/location`).
 
 ## External Dependencies
 

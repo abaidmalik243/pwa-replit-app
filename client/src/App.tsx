@@ -26,6 +26,7 @@ import KitchenDisplay from "@/pages/kitchen-display";
 import PosSessions from "@/pages/pos-sessions";
 import PosReports from "@/pages/pos-reports";
 import Reports from "@/pages/reports";
+import AdminRiders from "@/pages/admin-riders";
 
 function Router() {
   return (
@@ -106,6 +107,11 @@ function Router() {
       <Route path="/admin/expenses">
         <ProtectedRoute requireRole={["admin", "staff"]}>
           <AdminExpenses />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/riders">
+        <ProtectedRoute requireRole={["admin", "staff"]}>
+          <AdminRiders />
         </ProtectedRoute>
       </Route>
       <Route path="/admin/settings">

@@ -1588,7 +1588,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Assign delivery to rider
   app.post("/api/deliveries/assign", async (req, res) => {
     try {
-      const validatedData = insertDeliverySchema.parse(req.body);
+      // Get the order to extract branchId
+      const order = await storage.getOrder(req.body.orderId);
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+
+      // Add branchId from order to the request data
+      const deliveryData = {
+        ...req.body,
+        branchId: order.branchId,
+      };
+
+      const validatedData = insertDeliverySchema.parse(deliveryData);
       
       // Check if order already has a delivery assigned
       const existingDelivery = await storage.getDeliveryByOrder(validatedData.orderId);

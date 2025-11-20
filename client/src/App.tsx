@@ -27,6 +27,7 @@ import PosSessions from "@/pages/pos-sessions";
 import PosReports from "@/pages/pos-reports";
 import Reports from "@/pages/reports";
 import AdminRiders from "@/pages/admin-riders";
+import AdminDeliveries from "@/pages/admin-deliveries";
 
 function Router() {
   return (
@@ -112,6 +113,11 @@ function Router() {
       <Route path="/admin/riders">
         <ProtectedRoute requireRole={["admin", "staff"]}>
           <AdminRiders />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/deliveries">
+        <ProtectedRoute requireRole={["admin", "staff"]}>
+          <AdminDeliveries />
         </ProtectedRoute>
       </Route>
       <Route path="/admin/settings">

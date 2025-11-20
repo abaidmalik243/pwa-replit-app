@@ -1,13 +1,15 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Upload } from "lucide-react";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Upload, Layers } from "lucide-react";
 import type { Category } from "@shared/schema";
 
 const menuItemSchema = z.object({
@@ -17,18 +19,46 @@ const menuItemSchema = z.object({
   categoryId: z.string().min(1, "Category is required"),
   isAvailable: z.boolean().default(true),
   imageUrl: z.string().optional(),
+  variantGroupIds: z.array(z.string()).default([]),
 });
 
 type MenuItemFormData = z.infer<typeof menuItemSchema>;
 
+interface VariantGroup {
+  id: string;
+  name: string;
+  description?: string;
+  selectionType: string;
+  isRequired: boolean;
+  isActive: boolean;
+}
+
 interface MenuItemFormProps {
-  initialData?: Partial<MenuItemFormData>;
+  initialData?: Partial<MenuItemFormData> & { id?: string };
   categories: Category[];
   onSubmit: (data: MenuItemFormData) => void;
   onCancel?: () => void;
 }
 
 export default function MenuItemForm({ initialData, categories, onSubmit, onCancel }: MenuItemFormProps) {
+  const { data: variantGroups = [] } = useQuery<VariantGroup[]>({
+    queryKey: ["/api/variant-groups"],
+  });
+
+  const { data: existingVariants = [] } = useQuery<Array<{ variantGroupId: string }>>({
+    queryKey: ["/api/menu-items", initialData?.id, "variants"],
+    queryFn: async () => {
+      if (!initialData?.id) return [];
+      const response = await fetch(`/api/menu-items/${initialData.id}/variants`);
+      if (!response.ok) throw new Error("Failed to fetch variants");
+      return response.json();
+    },
+    enabled: !!initialData?.id,
+  });
+
+  // Extract existing variant group IDs from the junction table data
+  const existingVariantGroupIds = existingVariants.map((v) => v.variantGroupId);
+
   const form = useForm<MenuItemFormData>({
     resolver: zodResolver(menuItemSchema),
     defaultValues: {
@@ -38,8 +68,11 @@ export default function MenuItemForm({ initialData, categories, onSubmit, onCanc
       categoryId: initialData?.categoryId || "",
       isAvailable: initialData?.isAvailable ?? true,
       imageUrl: initialData?.imageUrl || "",
+      variantGroupIds: initialData?.variantGroupIds || existingVariantGroupIds || [],
     },
   });
+
+  const activeVariantGroups = variantGroups.filter(g => g.isActive);
 
   return (
     <Form {...form}>
@@ -102,7 +135,7 @@ export default function MenuItemForm({ initialData, categories, onSubmit, onCanc
             name="price"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Price ($)</FormLabel>
+                <FormLabel>Base Price (₨)</FormLabel>
                 <FormControl>
                   <Input 
                     {...field}
@@ -112,6 +145,9 @@ export default function MenuItemForm({ initialData, categories, onSubmit, onCanc
                     data-testid="input-price"
                   />
                 </FormControl>
+                <FormDescription className="text-xs">
+                  Base price before variant modifiers
+                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -142,6 +178,77 @@ export default function MenuItemForm({ initialData, categories, onSubmit, onCanc
             )}
           />
         </div>
+
+        <FormField
+          control={form.control}
+          name="variantGroupIds"
+          render={() => (
+            <FormItem>
+              <div className="mb-4">
+                <FormLabel className="flex items-center gap-2">
+                  <Layers className="h-4 w-4" />
+                  Variant Groups
+                </FormLabel>
+                <FormDescription>
+                  Select which variant groups apply to this item (e.g., Size, Crust Type)
+                </FormDescription>
+              </div>
+              {activeVariantGroups.length === 0 ? (
+                <div className="text-sm text-muted-foreground p-4 border border-dashed rounded-lg text-center">
+                  No variant groups available. Create them in the <a href="/admin/variants" className="underline">Variants</a> page first.
+                </div>
+              ) : (
+                <div className="space-y-3 border rounded-lg p-4">
+                  {activeVariantGroups.map((group) => (
+                    <FormField
+                      key={group.id}
+                      control={form.control}
+                      name="variantGroupIds"
+                      render={({ field }) => {
+                        return (
+                          <FormItem
+                            key={group.id}
+                            className="flex flex-row items-start space-x-3 space-y-0"
+                          >
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value?.includes(group.id)}
+                                onCheckedChange={(checked) => {
+                                  return checked
+                                    ? field.onChange([...field.value, group.id])
+                                    : field.onChange(
+                                        field.value?.filter(
+                                          (value) => value !== group.id
+                                        )
+                                      )
+                                }}
+                                data-testid={`checkbox-variant-${group.id}`}
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-none flex-1">
+                              <FormLabel className="font-medium cursor-pointer">
+                                {group.name}
+                                {group.isRequired && (
+                                  <span className="text-destructive ml-1">*</span>
+                                )}
+                              </FormLabel>
+                              {group.description && (
+                                <FormDescription className="text-xs">
+                                  {group.description} ({group.selectionType === "single" ? "Choose one" : "Choose multiple"})
+                                </FormDescription>
+                              )}
+                            </div>
+                          </FormItem>
+                        );
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <FormField
           control={form.control}

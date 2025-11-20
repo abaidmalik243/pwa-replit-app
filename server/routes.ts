@@ -389,7 +389,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/menu-items", async (req, res) => {
     try {
-      const menuItem = await storage.createMenuItem(req.body);
+      const { variantGroupIds, ...menuItemData } = req.body;
+      const menuItem = await storage.createMenuItem(menuItemData);
+      
+      // If variant groups are provided, create the associations
+      if (variantGroupIds && Array.isArray(variantGroupIds)) {
+        for (const variantGroupId of variantGroupIds) {
+          await storage.createMenuItemVariant({
+            menuItemId: menuItem.id,
+            variantGroupId,
+          });
+        }
+      }
+      
       res.json(menuItem);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -398,10 +410,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/menu-items/:id", async (req, res) => {
     try {
-      const menuItem = await storage.updateMenuItem(req.params.id, req.body);
+      const { variantGroupIds, ...menuItemData } = req.body;
+      const menuItem = await storage.updateMenuItem(req.params.id, menuItemData);
       if (!menuItem) {
         return res.status(404).json({ error: "Menu item not found" });
       }
+      
+      // If variant groups are provided, update the associations
+      if (variantGroupIds && Array.isArray(variantGroupIds)) {
+        // Get existing variant group assignments
+        const existingVariants = await storage.getMenuItemVariants(req.params.id);
+        const existingGroupIds = existingVariants.map(v => v.variantGroupId);
+        
+        // Determine which to add and which to remove
+        const toAdd = variantGroupIds.filter(id => !existingGroupIds.includes(id));
+        const toRemove = existingGroupIds.filter(id => !variantGroupIds.includes(id));
+        
+        // Remove deselected variant groups
+        for (const variantGroupId of toRemove) {
+          const variant = existingVariants.find(v => v.variantGroupId === variantGroupId);
+          if (variant) {
+            await storage.deleteMenuItemVariant(variant.id);
+          }
+        }
+        
+        // Add new variant groups
+        for (const variantGroupId of toAdd) {
+          await storage.createMenuItemVariant({
+            menuItemId: req.params.id,
+            variantGroupId,
+          });
+        }
+      }
+      
       res.json(menuItem);
     } catch (error: any) {
       res.status(400).json({ error: error.message });

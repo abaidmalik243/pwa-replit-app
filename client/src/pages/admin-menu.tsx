@@ -236,10 +236,11 @@ export default function AdminMenu() {
           </DialogHeader>
           <MenuItemForm
             initialData={editingItem ? {
+              id: editingItem.id,
               name: editingItem.name,
               description: editingItem.description || "",
               price: parseFloat(editingItem.price),
-              categoryId: editingItem.categoryId,
+              categoryId: editingItem.categoryId || undefined,
               imageUrl: editingItem.imageUrl || "",
               isAvailable: editingItem.isAvailable,
             } : undefined}

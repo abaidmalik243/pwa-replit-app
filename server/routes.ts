@@ -2101,6 +2101,130 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== Delivery Charges Configuration Routes ====================
+
+  // Get all delivery charges configurations (admin/staff only)
+  app.get("/api/delivery-charges", authenticate, authorize("admin", "staff"), async (req, res) => {
+    try {
+      const configs = await storage.getAllDeliveryChargesConfigs();
+      res.json(configs);
+    } catch (error: any) {
+      console.error("Error fetching delivery charges configs:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get delivery charges config for a specific branch
+  app.get("/api/delivery-charges/:branchId", async (req, res) => {
+    try {
+      const { branchId } = req.params;
+      const config = await storage.getDeliveryChargesConfig(branchId);
+      res.json(config || null);
+    } catch (error: any) {
+      console.error("Error fetching delivery charges config:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Calculate delivery charges based on config and distance
+  app.post("/api/delivery-charges/calculate", authenticate, async (req, res) => {
+    try {
+      const { branchId, orderAmount, distance } = req.body;
+
+      if (!branchId || !orderAmount) {
+        return res.status(400).json({ error: "Branch ID and order amount are required" });
+      }
+
+      // Get branch-specific config or use defaults
+      const config = await storage.getDeliveryChargesConfig(branchId);
+      const chargeType = config?.chargeType || schema.DEFAULT_DELIVERY_CONFIG.CHARGE_TYPE;
+      const freeDeliveryThreshold = parseFloat(config?.freeDeliveryThreshold || schema.DEFAULT_DELIVERY_CONFIG.FREE_DELIVERY_THRESHOLD.toString());
+
+      // Check for free delivery
+      if (orderAmount >= freeDeliveryThreshold) {
+        return res.json({
+          deliveryCharges: 0,
+          chargeType: chargeType,
+          freeDelivery: true,
+          message: `Free delivery for orders above ₨${freeDeliveryThreshold}`,
+        });
+      }
+
+      let deliveryCharges = 0;
+
+      if (chargeType === "static") {
+        // Static pricing
+        const staticCharge = parseFloat(config?.staticCharge || schema.DEFAULT_DELIVERY_CONFIG.STATIC_CHARGE.toString());
+        deliveryCharges = staticCharge;
+      } else {
+        // Dynamic pricing based on distance
+        if (!distance) {
+          return res.status(400).json({ error: "Distance is required for dynamic pricing" });
+        }
+
+        const baseCharge = parseFloat(config?.baseCharge || schema.DEFAULT_DELIVERY_CONFIG.BASE_CHARGE.toString());
+        const perKmCharge = parseFloat(config?.perKmCharge || schema.DEFAULT_DELIVERY_CONFIG.PER_KM_CHARGE.toString());
+        const maxDistance = parseFloat(config?.maxDeliveryDistance || schema.DEFAULT_DELIVERY_CONFIG.MAX_DELIVERY_DISTANCE.toString());
+
+        if (distance > maxDistance) {
+          return res.status(400).json({ 
+            error: `Delivery not available for distances over ${maxDistance} KM` 
+          });
+        }
+
+        deliveryCharges = baseCharge + (distance * perKmCharge);
+      }
+
+      res.json({
+        deliveryCharges: parseFloat(deliveryCharges.toFixed(2)),
+        chargeType: chargeType,
+        freeDelivery: false,
+        distance: distance || null,
+      });
+    } catch (error: any) {
+      console.error("Error calculating delivery charges:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Create or update delivery charges config (admin only)
+  app.post("/api/delivery-charges/:branchId", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      const { branchId } = req.params;
+      const configData = { ...req.body, branchId };
+
+      // Check if config already exists
+      const existing = await storage.getDeliveryChargesConfig(branchId);
+      
+      let config;
+      if (existing) {
+        config = await storage.updateDeliveryChargesConfig(branchId, configData);
+      } else {
+        config = await storage.createDeliveryChargesConfig(configData);
+      }
+
+      res.json(config);
+    } catch (error: any) {
+      console.error("Error saving delivery charges config:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Delete delivery charges config (admin only)
+  app.delete("/api/delivery-charges/:branchId", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      const { branchId } = req.params;
+      const deleted = await storage.deleteDeliveryChargesConfig(branchId);
+      if (!deleted) {
+        return res.status(404).json({ error: "Delivery charges config not found" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting delivery charges config:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

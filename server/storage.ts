@@ -142,6 +142,13 @@ export interface IStorage {
   getPromoCodeUsage(promoCodeId: string): Promise<schema.PromoCodeUsage[]>;
   getUserPromoCodeUsageCount(promoCodeId: string, userId: string): Promise<number>;
   createPromoCodeUsage(usage: schema.InsertPromoCodeUsage): Promise<schema.PromoCodeUsage>;
+
+  // Delivery Charges Configuration
+  getDeliveryChargesConfig(branchId: string): Promise<schema.DeliveryChargesConfig | undefined>;
+  getAllDeliveryChargesConfigs(): Promise<schema.DeliveryChargesConfig[]>;
+  createDeliveryChargesConfig(config: schema.InsertDeliveryChargesConfig): Promise<schema.DeliveryChargesConfig>;
+  updateDeliveryChargesConfig(branchId: string, config: Partial<schema.InsertDeliveryChargesConfig>): Promise<schema.DeliveryChargesConfig | undefined>;
+  deleteDeliveryChargesConfig(branchId: string): Promise<boolean>;
 }
 
 export class DbStorage implements IStorage {
@@ -688,6 +695,34 @@ export class DbStorage implements IStorage {
   async createPromoCodeUsage(usage: schema.InsertPromoCodeUsage) {
     const result = await db.insert(schema.promoCodeUsage).values(usage).returning();
     return result[0];
+  }
+
+  // Delivery Charges Configuration
+  async getDeliveryChargesConfig(branchId: string) {
+    const result = await db.select().from(schema.deliveryChargesConfig).where(eq(schema.deliveryChargesConfig.branchId, branchId));
+    return result[0];
+  }
+
+  async getAllDeliveryChargesConfigs() {
+    return await db.select().from(schema.deliveryChargesConfig);
+  }
+
+  async createDeliveryChargesConfig(config: schema.InsertDeliveryChargesConfig) {
+    const result = await db.insert(schema.deliveryChargesConfig).values(config).returning();
+    return result[0];
+  }
+
+  async updateDeliveryChargesConfig(branchId: string, config: Partial<schema.InsertDeliveryChargesConfig>) {
+    const result = await db.update(schema.deliveryChargesConfig)
+      .set({ ...config, updatedAt: new Date() })
+      .where(eq(schema.deliveryChargesConfig.branchId, branchId))
+      .returning();
+    return result[0];
+  }
+
+  async deleteDeliveryChargesConfig(branchId: string) {
+    await db.delete(schema.deliveryChargesConfig).where(eq(schema.deliveryChargesConfig.branchId, branchId));
+    return true;
   }
 }
 

@@ -175,9 +175,30 @@ export const insertOrderSchema = createInsertSchema(orders).omit({ id: true, cre
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type Order = typeof orders.$inferSelect;
 
-// Delivery charges configuration
-export const DELIVERY_CONFIG = {
-  BASE_CHARGE: 50, // Fixed delivery charge in PKR
+// Delivery Charges Configuration (per branch)
+export const deliveryChargesConfig = pgTable("delivery_charges_config", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  branchId: varchar("branch_id").references(() => branches.id).notNull().unique(),
+  chargeType: text("charge_type").notNull().default("static"), // static or dynamic
+  staticCharge: decimal("static_charge", { precision: 10, scale: 2 }).default("50"), // Fixed charge for static pricing
+  baseCharge: decimal("base_charge", { precision: 10, scale: 2 }).default("50"), // Base charge for dynamic pricing
+  perKmCharge: decimal("per_km_charge", { precision: 10, scale: 2 }).default("20"), // Per KM charge for dynamic pricing
+  freeDeliveryThreshold: decimal("free_delivery_threshold", { precision: 10, scale: 2 }).default("1500"), // Free delivery above this amount
+  maxDeliveryDistance: decimal("max_delivery_distance", { precision: 5, scale: 2 }).default("15"), // Maximum delivery distance in KM
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertDeliveryChargesConfigSchema = createInsertSchema(deliveryChargesConfig).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertDeliveryChargesConfig = z.infer<typeof insertDeliveryChargesConfigSchema>;
+export type DeliveryChargesConfig = typeof deliveryChargesConfig.$inferSelect;
+
+// Default delivery charges configuration (fallback if no branch config exists)
+export const DEFAULT_DELIVERY_CONFIG = {
+  CHARGE_TYPE: "static",
+  STATIC_CHARGE: 50, // Fixed delivery charge in PKR
+  BASE_CHARGE: 50, // Base charge for dynamic pricing in PKR
   PER_KM_CHARGE: 20, // Per kilometer charge in PKR
   FREE_DELIVERY_THRESHOLD: 1500, // Free delivery above this order amount in PKR
   MAX_DELIVERY_DISTANCE: 15, // Maximum delivery distance in KM

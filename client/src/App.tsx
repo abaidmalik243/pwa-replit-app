@@ -28,6 +28,8 @@ import PosReports from "@/pages/pos-reports";
 import Reports from "@/pages/reports";
 import AdminRiders from "@/pages/admin-riders";
 import AdminDeliveries from "@/pages/admin-deliveries";
+import AdminRiderTracking from "@/pages/admin-rider-tracking";
+import RiderDashboard from "@/pages/rider-dashboard";
 
 function Router() {
   return (
@@ -118,6 +120,16 @@ function Router() {
       <Route path="/admin/deliveries">
         <ProtectedRoute requireRole={["admin", "staff"]}>
           <AdminDeliveries />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/rider-tracking">
+        <ProtectedRoute requireRole={["admin", "staff"]}>
+          <AdminRiderTracking />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/rider">
+        <ProtectedRoute requireRole={["rider"]}>
+          <RiderDashboard />
         </ProtectedRoute>
       </Route>
       <Route path="/admin/settings">

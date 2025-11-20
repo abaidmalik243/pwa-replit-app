@@ -537,6 +537,11 @@ export class DbStorage implements IStorage {
     return result[0];
   }
 
+  async getRiderByUserId(userId: string) {
+    const result = await db.select().from(schema.riders).where(eq(schema.riders.userId, userId));
+    return result[0];
+  }
+
   async createRider(rider: schema.InsertRider) {
     const result = await db.insert(schema.riders).values(rider).returning();
     return result[0];

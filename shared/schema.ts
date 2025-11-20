@@ -30,7 +30,7 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   fullName: text("full_name").notNull(),
   phone: text("phone"),
-  role: text("role").notNull().default("customer"), // admin, staff, customer
+  role: text("role").notNull().default("customer"), // admin, staff, customer, rider
   permissions: text("permissions").array(), // Feature-based permissions (e.g., "manage_menu", "view_reports")
   branchId: varchar("branch_id").references(() => branches.id),
   isActive: boolean("is_active").notNull().default(true),

@@ -1423,7 +1423,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create new rider
   app.post("/api/riders", async (req, res) => {
     try {
-      const validatedData = insertRiderSchema.parse(req.body);
+      const { password, ...riderData } = req.body;
+      const validatedData = insertRiderSchema.parse(riderData);
       
       // Check if phone already exists
       const existingRider = await storage.getRiderByPhone(validatedData.phone);
@@ -1431,7 +1432,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Phone number already registered" });
       }
 
-      const rider = await storage.createRider(validatedData);
+      // Create user account for the rider if userId not provided
+      let userId = validatedData.userId;
+      
+      if (!userId && validatedData.email) {
+        // Check if email already has a user
+        const existingUser = await storage.getUserByEmail(validatedData.email);
+        
+        if (existingUser) {
+          userId = existingUser.id;
+        } else {
+          // Create new user account
+          const defaultPassword = password || "rider123"; // Use provided password or default
+          const hashedPassword = await bcrypt.hash(defaultPassword, 10);
+          
+          const newUser = await storage.createUser({
+            username: validatedData.email.split("@")[0] + "_rider",
+            email: validatedData.email,
+            password: hashedPassword,
+            fullName: validatedData.name,
+            phone: validatedData.phone,
+            role: "rider",
+            branchId: validatedData.branchId,
+            isActive: true,
+          });
+          
+          userId = newUser.id;
+        }
+      }
+
+      // Create rider with userId link
+      const rider = await storage.createRider({
+        ...validatedData,
+        userId,
+      });
+      
       res.status(201).json(rider);
     } catch (error: any) {
       console.error("Error creating rider:", error);

@@ -19,7 +19,7 @@ Preferred communication style: Simple, everyday language.
 A relational database with UUID primary keys supports entities like Branches, Users (with role-based access), Categories, Menu Items, Orders, Expenses, POS Tables, POS Sessions, Kitchen Tickets, Riders, Deliveries, and Rider Location History for GPS tracking.
 
 ### Authentication System
-Features Bcrypt hashing, cookie-based session management, and role-based access control (admin, staff, customer) with protected routes.
+Features Bcrypt hashing, cookie-based session management, and role-based access control (admin, staff, customer, rider) with protected routes. Riders are automatically assigned user accounts during creation, enabling them to login and access their dedicated dashboard.
 
 ### API Architecture
 RESTful Express.js endpoints under `/api` handle JSON requests/responses for authentication and resource management, including custom middleware for request logging.
@@ -60,11 +60,15 @@ Supports **Cash on Delivery (COD)** and **JazzCash**. The JazzCash flow involves
 ### Rider Management System
 A comprehensive delivery rider management module featuring:
 -   **Rider CRUD Management**: Admin interface for creating, editing, and deleting riders with details including name, phone, email, vehicle type, vehicle number, and branch assignment.
+-   **User Account Integration**: Automatic user account creation for riders with "rider" role during rider creation. Each rider is linked to a user account via `userId` field, enabling authentication.
 -   **GPS Location Tracking**: Real-time location updates for riders with history tracking (latitude, longitude, speed, heading, accuracy) stored in the database.
 -   **Delivery Assignment**: Automated assignment of delivery orders to available riders with status tracking (assigned, accepted, picked_up, in_transit, delivered, cancelled).
 -   **Rider Status Management**: Track rider availability (online, offline, busy, on_break) with automatic status updates based on delivery assignments.
 -   **Performance Tracking**: Monitor rider statistics including total deliveries completed and average rating.
--   **API Endpoints**: RESTful endpoints for rider management (`/api/riders`), delivery assignment (`/api/deliveries`), and GPS location updates (`/api/riders/:id/location`).
+-   **Live Rider Tracking Dashboard**: Admin interface with visual map representation showing all active riders, their real-time locations, current deliveries, and status. Features branch filtering, auto-refresh, and detailed delivery tracking.
+-   **Rider Mobile Dashboard**: Mobile-friendly interface for riders to view assigned deliveries, update delivery status, manage availability, and share GPS location. Displays active and completed deliveries with customer information and navigation.
+-   **Rider Authentication**: Role-based authentication system with "rider" role. Riders can login using their email and password. Protected routes ensure only authenticated riders can access the rider dashboard.
+-   **API Endpoints**: RESTful endpoints for rider management (`/api/riders`), authenticated rider data (`/api/riders/me`), delivery assignment (`/api/deliveries/assign`), delivery status updates (`/api/deliveries/:id/status`), and GPS location updates (`/api/riders/:id/location`).
 
 ## External Dependencies
 

@@ -4,7 +4,48 @@ interface GeocodingResult {
   displayName: string;
 }
 
+// Simple in-memory cache for geocoding results
+const geocodeCache = new Map<string, { result: GeocodingResult | null; timestamp: number }>();
+const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+const CACHE_MAX_SIZE = 500;
+
+// Rate limiting
+const geocodeRateLimits = new Map<string, number>();
+const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
+const MAX_REQUESTS_PER_WINDOW = 10;
+
+export function validateAddress(address: string): { valid: boolean; error?: string } {
+  const trimmed = address.trim();
+  
+  if (!trimmed) {
+    return { valid: false, error: "Address is required" };
+  }
+  
+  if (trimmed.length < 5) {
+    return { valid: false, error: "Address too short (minimum 5 characters)" };
+  }
+  
+  return { valid: true };
+}
+
 export async function geocodeAddress(address: string): Promise<GeocodingResult | null> {
+  const normalizedAddress = address.trim().toLowerCase();
+  
+  // Check cache first
+  const cached = geocodeCache.get(normalizedAddress);
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    return cached.result;
+  }
+
+  // Rate limiting check
+  const now = Date.now();
+  const recentRequests = geocodeRateLimits.get(normalizedAddress) || 0;
+  
+  if (recentRequests >= MAX_REQUESTS_PER_WINDOW) {
+    console.warn('Geocoding rate limit exceeded for address:', normalizedAddress.substring(0, 20));
+    return null;
+  }
+
   try {
     const encodedAddress = encodeURIComponent(address);
     const response = await fetch(
@@ -25,19 +66,44 @@ export async function geocodeAddress(address: string): Promise<GeocodingResult |
     
     if (!data || data.length === 0) {
       console.warn('No geocoding results for address:', address);
+      // Cache null result to prevent repeated failed lookups
+      cacheResult(normalizedAddress, null);
       return null;
     }
 
-    const result = data[0];
-    return {
-      latitude: parseFloat(result.lat),
-      longitude: parseFloat(result.lon),
-      displayName: result.display_name
+    const result: GeocodingResult = {
+      latitude: parseFloat(data[0].lat),
+      longitude: parseFloat(data[0].lon),
+      displayName: data[0].display_name
     };
+
+    // Cache successful result
+    cacheResult(normalizedAddress, result);
+    
+    // Update rate limit counter
+    geocodeRateLimits.set(normalizedAddress, recentRequests + 1);
+    setTimeout(() => {
+      geocodeRateLimits.delete(normalizedAddress);
+    }, RATE_LIMIT_WINDOW);
+
+    return result;
   } catch (error) {
     console.error('Geocoding error:', error);
     return null;
   }
+}
+
+function cacheResult(address: string, result: GeocodingResult | null) {
+  // Evict oldest entries if cache is full
+  if (geocodeCache.size >= CACHE_MAX_SIZE) {
+    const oldestKey = geocodeCache.keys().next().value;
+    geocodeCache.delete(oldestKey);
+  }
+
+  geocodeCache.set(address, {
+    result,
+    timestamp: Date.now()
+  });
 }
 
 export function calculateDistance(

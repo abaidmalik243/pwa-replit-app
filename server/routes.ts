@@ -2171,19 +2171,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Dynamic pricing based on distance
         // If delivery address provided, calculate distance from branch
         if (deliveryAddress && !providedDistance) {
-          const { geocodeAddress, calculateDistance } = await import("./geocoding");
+          const { geocodeAddress, calculateDistance, validateAddress } = await import("./geocoding");
           
+          // Validate address length to prevent abuse
+          const validation = validateAddress(deliveryAddress);
+          if (!validation.valid) {
+            console.warn('Address validation failed:', validation.error);
+            // Fall back to default static charge instead of failing
+            const defaultStaticCharge = parseFloat(DEFAULT_DELIVERY_CONFIG.STATIC_CHARGE.toString());
+            return res.json({
+              deliveryCharges: defaultStaticCharge,
+              chargeType: "static",
+              freeDelivery: false,
+              distance: null,
+              usingCustomConfig: false,
+              message: "Using default delivery charge (invalid address)",
+            });
+          }
+
           // Get branch coordinates
           const branch = await storage.getBranch(branchId);
           if (!branch || !branch.latitude || !branch.longitude) {
-            return res.status(400).json({ error: "Branch coordinates not available" });
+            console.warn('Branch coordinates not available for branch:', branchId);
+            // Fall back to default static charge instead of 500 error
+            const defaultStaticCharge = parseFloat(DEFAULT_DELIVERY_CONFIG.STATIC_CHARGE.toString());
+            return res.json({
+              deliveryCharges: defaultStaticCharge,
+              chargeType: "static",
+              freeDelivery: false,
+              distance: null,
+              usingCustomConfig: false,
+              message: "Using default delivery charge (branch coordinates unavailable)",
+            });
           }
 
           // Geocode delivery address
           const geocoded = await geocodeAddress(deliveryAddress);
           if (!geocoded) {
-            return res.status(400).json({ 
-              error: "Unable to geocode delivery address. Please provide a valid address." 
+            console.warn('Geocoding failed for address:', deliveryAddress.substring(0, 30));
+            // Fall back to default static charge instead of failing
+            const defaultStaticCharge = parseFloat(DEFAULT_DELIVERY_CONFIG.STATIC_CHARGE.toString());
+            return res.json({
+              deliveryCharges: defaultStaticCharge,
+              chargeType: "static",
+              freeDelivery: false,
+              distance: null,
+              usingCustomConfig: false,
+              message: "Using default delivery charge (address not found)",
             });
           }
 
@@ -2196,9 +2230,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           );
         }
 
+        // If still no distance after attempting geocoding, use default charge
         if (!calculatedDistance) {
-          return res.status(400).json({ 
-            error: "Distance or delivery address is required for dynamic pricing" 
+          const defaultStaticCharge = parseFloat(DEFAULT_DELIVERY_CONFIG.STATIC_CHARGE.toString());
+          return res.json({
+            deliveryCharges: defaultStaticCharge,
+            chargeType: "static",
+            freeDelivery: false,
+            distance: null,
+            usingCustomConfig: false,
+            message: "Using default delivery charge",
           });
         }
 

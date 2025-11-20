@@ -422,10 +422,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint for processing payment (used by Payment Dialog)
   app.post("/api/orders/:id/payment", async (req, res) => {
     try {
-      const { paymentMethod, paymentStatus, paymentDetails } = req.body;
+      const { 
+        paymentMethod, 
+        paymentStatus, 
+        paymentDetails,
+        jazzCashTransactionId,
+        jazzCashPayerPhone,
+        jazzCashScreenshotUrl
+      } = req.body;
       
       if (!paymentMethod || !paymentStatus) {
         return res.status(400).json({ error: "Payment method and status are required" });
+      }
+
+      // Validate JazzCash payment fields if payment method is JazzCash
+      if (paymentMethod === "jazzcash" && paymentStatus === "awaiting_verification") {
+        if (!jazzCashTransactionId || !jazzCashPayerPhone) {
+          return res.status(400).json({ 
+            error: "Transaction ID and payer phone are required for JazzCash payments" 
+          });
+        }
       }
 
       // Fetch current order
@@ -441,6 +457,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         deliveryCharges: currentOrder.deliveryCharges ?? undefined,
         paymentMethod,
         paymentStatus,
+        jazzCashTransactionId: jazzCashTransactionId || currentOrder.jazzCashTransactionId || undefined,
+        jazzCashPayerPhone: jazzCashPayerPhone || currentOrder.jazzCashPayerPhone || undefined,
+        jazzCashScreenshotUrl: jazzCashScreenshotUrl || currentOrder.jazzCashScreenshotUrl || undefined,
         // Store payment details if provided (for split payments, change details, etc.)
         notes: paymentDetails ? `${currentOrder.notes || ""}\nPayment: ${paymentDetails}`.trim() : currentOrder.notes || undefined,
       });

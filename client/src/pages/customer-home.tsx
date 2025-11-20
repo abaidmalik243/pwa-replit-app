@@ -10,6 +10,7 @@ import CartDrawer, { CartItem } from "@/components/CartDrawer";
 import ItemCustomizationDialog, { VariantGroup, CustomizationSelection } from "@/components/ItemCustomizationDialog";
 import OrderTypeDialog from "@/components/OrderTypeDialog";
 import OrderConfirmationDialog, { OrderDetails } from "@/components/OrderConfirmationDialog";
+import { CustomerJazzCashDialog } from "@/components/CustomerJazzCashDialog";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
@@ -46,6 +47,12 @@ export default function CustomerHome() {
   const [orderType, setOrderType] = useState<"delivery" | "pickup">("delivery");
   const [selectedBranchId, setSelectedBranchId] = useState<string>("");
   const [selectedArea, setSelectedArea] = useState<string>("");
+  const [showJazzCashDialog, setShowJazzCashDialog] = useState(false);
+  const [pendingJazzCashOrder, setPendingJazzCashOrder] = useState<{
+    id: string;
+    orderNumber: string;
+    total: number;
+  } | null>(null);
   const { toast } = useToast();
 
   // Fetch branches from API
@@ -283,13 +290,33 @@ export default function CustomerHome() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-      toast({
-        title: "Order placed successfully!",
-        description: `Your order #${data.orderNumber} has been received. We'll notify you when it's ready.`,
-      });
+      
+      // Close the cart and confirmation dialog
       setCartItems([]);
       setIsCartOpen(false);
       setIsConfirmationOpen(false);
+      
+      // Check payment method
+      if (data.paymentMethod === "jazzcash") {
+        // Open JazzCash payment dialog
+        setPendingJazzCashOrder({
+          id: data.id,
+          orderNumber: data.orderNumber,
+          total: parseFloat(data.total),
+        });
+        setShowJazzCashDialog(true);
+        
+        toast({
+          title: "Order Created!",
+          description: "Please complete your JazzCash payment to confirm your order.",
+        });
+      } else {
+        // Cash on Delivery - no payment needed
+        toast({
+          title: "Order placed successfully!",
+          description: `Your order #${data.orderNumber} has been received. We'll notify you when it's ready.`,
+        });
+      }
     },
     onError: (error: any) => {
       toast({
@@ -458,6 +485,25 @@ export default function CustomerHome() {
         onConfirmOrder={handleConfirmOrder}
         isSubmitting={createOrderMutation.isPending}
       />
+
+      {/* JazzCash Payment Dialog */}
+      {pendingJazzCashOrder && (
+        <CustomerJazzCashDialog
+          open={showJazzCashDialog}
+          onClose={() => {
+            setShowJazzCashDialog(false);
+            setPendingJazzCashOrder(null);
+          }}
+          orderId={pendingJazzCashOrder.id}
+          orderNumber={pendingJazzCashOrder.orderNumber}
+          totalAmount={pendingJazzCashOrder.total}
+          branchId={selectedBranchId}
+          onPaymentComplete={() => {
+            setShowJazzCashDialog(false);
+            setPendingJazzCashOrder(null);
+          }}
+        />
+      )}
     </div>
   );
 }

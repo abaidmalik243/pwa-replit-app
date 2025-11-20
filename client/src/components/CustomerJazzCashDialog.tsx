@@ -59,8 +59,8 @@ export function CustomerJazzCashDialog({
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to submit payment");
+        const errorData = await response.json();
+        throw new Error(errorData.error || errorData.message || "Failed to submit payment");
       }
       return response.json();
     },

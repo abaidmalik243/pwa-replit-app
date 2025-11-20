@@ -57,13 +57,23 @@ export default function OrderConfirmationDialog({
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const total = subtotal + deliveryFee;
 
-  // Calculate delivery charges when dialog opens or subtotal changes
+  // Calculate delivery charges when dialog opens, subtotal changes, or address changes
   useEffect(() => {
     let isMounted = true;
+    let timeoutId: NodeJS.Timeout;
 
     const calculateDeliveryCharges = async () => {
       if (orderType !== "delivery" || !branchId || !open) {
         if (isMounted) setDeliveryFee(0);
+        return;
+      }
+
+      // Skip calculation if address is empty (will use default charge)
+      if (!customerAddress.trim()) {
+        if (isMounted) {
+          setDeliveryFee(50); // Default charge when no address
+          setFeeCalculationError(null);
+        }
         return;
       }
 
@@ -76,6 +86,7 @@ export default function OrderConfirmationDialog({
         const response = await apiRequest("/api/delivery-charges/calculate", "POST", {
           branchId,
           orderAmount: subtotal,
+          deliveryAddress: customerAddress.trim(),
         });
         const result = await response.json();
         if (isMounted) {
@@ -94,12 +105,18 @@ export default function OrderConfirmationDialog({
       }
     };
 
-    calculateDeliveryCharges();
+    // Debounce address changes to avoid excessive API calls
+    if (customerAddress.trim()) {
+      timeoutId = setTimeout(calculateDeliveryCharges, 800);
+    } else {
+      calculateDeliveryCharges();
+    }
 
     return () => {
       isMounted = false;
+      if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [orderType, branchId, subtotal, open]);
+  }, [orderType, branchId, subtotal, customerAddress, open]);
 
   const validatePhone = (phone: string): boolean => {
     // Pakistani phone number format: 03XX XXXXXXX or 03XXXXXXXXX

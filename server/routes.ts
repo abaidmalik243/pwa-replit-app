@@ -416,8 +416,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Menu item not found" });
       }
       
-      // If variant groups are provided, update the associations
-      if (variantGroupIds && Array.isArray(variantGroupIds)) {
+      // Only update variant associations if variantGroupIds is explicitly provided
+      // This prevents accidental deletion when updating other fields (e.g., availability toggle)
+      if (variantGroupIds !== undefined && Array.isArray(variantGroupIds)) {
         // Get existing variant group assignments
         const existingVariants = await storage.getMenuItemVariants(req.params.id);
         const existingGroupIds = existingVariants.map(v => v.variantGroupId);

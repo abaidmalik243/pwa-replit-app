@@ -2,6 +2,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -68,9 +69,16 @@ export default function MenuItemForm({ initialData, categories, onSubmit, onCanc
       categoryId: initialData?.categoryId || "",
       isAvailable: initialData?.isAvailable ?? true,
       imageUrl: initialData?.imageUrl || "",
-      variantGroupIds: initialData?.variantGroupIds || existingVariantGroupIds || [],
+      variantGroupIds: initialData?.variantGroupIds || [],
     },
   });
+
+  // Rehydrate variant group IDs when the query resolves
+  useEffect(() => {
+    if (existingVariantGroupIds.length > 0 && !initialData?.variantGroupIds) {
+      form.setValue("variantGroupIds", existingVariantGroupIds);
+    }
+  }, [existingVariantGroupIds.length, form, initialData?.variantGroupIds]);
 
   const activeVariantGroups = variantGroups.filter(g => g.isActive);
 

@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import MenuItemForm from "@/components/MenuItemForm";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
 import type { MenuItem as DBMenuItem, Category } from "@shared/schema";
 
 export default function AdminMenu() {
@@ -18,6 +19,7 @@ export default function AdminMenu() {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { toast } = useToast();
+  const { logout } = useAuth();
 
   // Fetch menu items and categories
   const { data: dbItems = [], isLoading: itemsLoading } = useQuery<DBMenuItem[]>({
@@ -114,7 +116,7 @@ export default function AdminMenu() {
         <AdminSidebar
           soundEnabled={soundEnabled}
           onToggleSound={() => setSoundEnabled(!soundEnabled)}
-          onLogout={() => console.log("Logout")}
+          onLogout={logout}
         />
       </div>
 

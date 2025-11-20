@@ -5,6 +5,7 @@ import AdminSidebar from "@/components/AdminSidebar";
 import AdminHeader from "@/components/AdminHeader";
 import OrderCard, { Order } from "@/components/OrderCard";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
 import { playNotificationSound } from "@/lib/notificationSound";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +17,7 @@ export default function AdminDashboard() {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { toast } = useToast();
+  const { logout } = useAuth();
   const previousPendingCount = useRef(0);
   const hasInitialized = useRef(false);
 
@@ -226,7 +228,7 @@ export default function AdminDashboard() {
         <AdminSidebar
           soundEnabled={soundEnabled}
           onToggleSound={() => setSoundEnabled(!soundEnabled)}
-          onLogout={() => console.log("Logout")}
+          onLogout={logout}
         />
       </div>
 

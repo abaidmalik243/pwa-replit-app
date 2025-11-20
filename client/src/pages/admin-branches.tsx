@@ -12,6 +12,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
 import { Plus, Pencil, Trash2, MapPin, Phone, Building2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -38,6 +39,7 @@ export default function AdminBranches() {
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
   const [newArea, setNewArea] = useState("");
   const { toast } = useToast();
+  const { logout } = useAuth();
 
   const { data: branches = [], isLoading } = useQuery<Branch[]>({
     queryKey: ["/api/branches"],
@@ -159,7 +161,7 @@ export default function AdminBranches() {
         <AdminSidebar
           soundEnabled={true}
           onToggleSound={() => {}}
-          onLogout={() => console.log("Logout")}
+          onLogout={logout}
         />
       </div>
 

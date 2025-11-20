@@ -15,6 +15,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
 import type { User, Branch } from "@shared/schema";
 
 const userFormSchema = z.object({
@@ -44,6 +45,7 @@ export default function AdminUsers() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { toast } = useToast();
+  const { logout } = useAuth();
 
   const { data: dbUsers = [], isLoading } = useQuery<User[]>({
     queryKey: ["/api/users"],
@@ -176,7 +178,7 @@ export default function AdminUsers() {
         <AdminSidebar
           soundEnabled={soundEnabled}
           onToggleSound={() => setSoundEnabled(!soundEnabled)}
-          onLogout={() => console.log("Logout")}
+          onLogout={logout}
         />
       </div>
 

@@ -2129,7 +2129,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Calculate delivery charges based on config and distance
   app.post("/api/delivery-charges/calculate", authenticate, async (req, res) => {
     try {
-      const { branchId, orderAmount, distance } = req.body;
+      const { branchId, orderAmount, distance: providedDistance, deliveryAddress } = req.body;
 
       if (!branchId || !orderAmount) {
         return res.status(400).json({ error: "Branch ID and order amount are required" });
@@ -2153,10 +2153,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           chargeType: chargeType,
           freeDelivery: true,
           message: `Free delivery for orders above ₨${freeDeliveryThreshold}`,
+          usingCustomConfig: useConfig,
         });
       }
 
       let deliveryCharges = 0;
+      let calculatedDistance = providedDistance;
 
       if (chargeType === "static") {
         // Static pricing
@@ -2167,8 +2169,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         deliveryCharges = staticCharge;
       } else {
         // Dynamic pricing based on distance
-        if (!distance) {
-          return res.status(400).json({ error: "Distance is required for dynamic pricing" });
+        // If delivery address provided, calculate distance from branch
+        if (deliveryAddress && !providedDistance) {
+          const { geocodeAddress, calculateDistance } = await import("./geocoding");
+          
+          // Get branch coordinates
+          const branch = await storage.getBranch(branchId);
+          if (!branch || !branch.latitude || !branch.longitude) {
+            return res.status(400).json({ error: "Branch coordinates not available" });
+          }
+
+          // Geocode delivery address
+          const geocoded = await geocodeAddress(deliveryAddress);
+          if (!geocoded) {
+            return res.status(400).json({ 
+              error: "Unable to geocode delivery address. Please provide a valid address." 
+            });
+          }
+
+          // Calculate distance
+          calculatedDistance = calculateDistance(
+            parseFloat(branch.latitude),
+            parseFloat(branch.longitude),
+            geocoded.latitude,
+            geocoded.longitude
+          );
+        }
+
+        if (!calculatedDistance) {
+          return res.status(400).json({ 
+            error: "Distance or delivery address is required for dynamic pricing" 
+          });
         }
 
         const baseCharge = parseFloat(
@@ -2184,20 +2215,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     : DEFAULT_DELIVERY_CONFIG.MAX_DELIVERY_DISTANCE.toString()
         );
 
-        if (distance > maxDistance) {
+        if (calculatedDistance > maxDistance) {
           return res.status(400).json({ 
             error: `Delivery not available for distances over ${maxDistance} KM` 
           });
         }
 
-        deliveryCharges = baseCharge + (distance * perKmCharge);
+        deliveryCharges = baseCharge + (calculatedDistance * perKmCharge);
       }
 
       res.json({
         deliveryCharges: parseFloat(deliveryCharges.toFixed(2)),
         chargeType: chargeType,
         freeDelivery: false,
-        distance: distance || null,
+        distance: calculatedDistance || null,
         usingCustomConfig: useConfig,
       });
     } catch (error: any) {

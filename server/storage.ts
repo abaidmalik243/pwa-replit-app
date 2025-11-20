@@ -149,6 +149,27 @@ export interface IStorage {
   createDeliveryChargesConfig(config: schema.InsertDeliveryChargesConfig): Promise<schema.DeliveryChargesConfig>;
   updateDeliveryChargesConfig(branchId: string, config: Partial<schema.InsertDeliveryChargesConfig>): Promise<schema.DeliveryChargesConfig | undefined>;
   deleteDeliveryChargesConfig(branchId: string): Promise<boolean>;
+
+  // Variant Groups
+  getAllVariantGroups(): Promise<schema.VariantGroup[]>;
+  getVariantGroup(id: string): Promise<schema.VariantGroup | undefined>;
+  createVariantGroup(group: schema.InsertVariantGroup): Promise<schema.VariantGroup>;
+  updateVariantGroup(id: string, group: Partial<schema.InsertVariantGroup>): Promise<schema.VariantGroup | undefined>;
+  deleteVariantGroup(id: string): Promise<boolean>;
+
+  // Variant Options
+  getAllVariantOptions(): Promise<schema.VariantOption[]>;
+  getVariantOption(id: string): Promise<schema.VariantOption | undefined>;
+  getVariantOptionsByGroup(groupId: string): Promise<schema.VariantOption[]>;
+  createVariantOption(option: schema.InsertVariantOption): Promise<schema.VariantOption>;
+  updateVariantOption(id: string, option: Partial<schema.InsertVariantOption>): Promise<schema.VariantOption | undefined>;
+  deleteVariantOption(id: string): Promise<boolean>;
+
+  // Menu Item Variants
+  getMenuItemVariants(menuItemId: string): Promise<schema.MenuItemVariant[]>;
+  createMenuItemVariant(menuItemVariant: schema.InsertMenuItemVariant): Promise<schema.MenuItemVariant>;
+  deleteMenuItemVariant(id: string): Promise<boolean>;
+  deleteMenuItemVariantsByMenuItem(menuItemId: string): Promise<boolean>;
 }
 
 export class DbStorage implements IStorage {
@@ -722,6 +743,82 @@ export class DbStorage implements IStorage {
 
   async deleteDeliveryChargesConfig(branchId: string) {
     await db.delete(schema.deliveryChargesConfig).where(eq(schema.deliveryChargesConfig.branchId, branchId));
+    return true;
+  }
+
+  // Variant Groups
+  async getAllVariantGroups() {
+    return await db.select().from(schema.variantGroups).orderBy(schema.variantGroups.displayOrder, desc(schema.variantGroups.createdAt));
+  }
+
+  async getVariantGroup(id: string) {
+    const result = await db.select().from(schema.variantGroups).where(eq(schema.variantGroups.id, id));
+    return result[0];
+  }
+
+  async createVariantGroup(group: schema.InsertVariantGroup) {
+    const result = await db.insert(schema.variantGroups).values(group).returning();
+    return result[0];
+  }
+
+  async updateVariantGroup(id: string, group: Partial<schema.InsertVariantGroup>) {
+    const result = await db.update(schema.variantGroups).set(group).where(eq(schema.variantGroups.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteVariantGroup(id: string) {
+    await db.delete(schema.variantGroups).where(eq(schema.variantGroups.id, id));
+    return true;
+  }
+
+  // Variant Options
+  async getAllVariantOptions() {
+    return await db.select().from(schema.variantOptions).orderBy(schema.variantOptions.displayOrder);
+  }
+
+  async getVariantOption(id: string) {
+    const result = await db.select().from(schema.variantOptions).where(eq(schema.variantOptions.id, id));
+    return result[0];
+  }
+
+  async getVariantOptionsByGroup(groupId: string) {
+    return await db.select().from(schema.variantOptions)
+      .where(eq(schema.variantOptions.variantGroupId, groupId))
+      .orderBy(schema.variantOptions.displayOrder);
+  }
+
+  async createVariantOption(option: schema.InsertVariantOption) {
+    const result = await db.insert(schema.variantOptions).values(option).returning();
+    return result[0];
+  }
+
+  async updateVariantOption(id: string, option: Partial<schema.InsertVariantOption>) {
+    const result = await db.update(schema.variantOptions).set(option).where(eq(schema.variantOptions.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteVariantOption(id: string) {
+    await db.delete(schema.variantOptions).where(eq(schema.variantOptions.id, id));
+    return true;
+  }
+
+  // Menu Item Variants
+  async getMenuItemVariants(menuItemId: string) {
+    return await db.select().from(schema.menuItemVariants).where(eq(schema.menuItemVariants.menuItemId, menuItemId));
+  }
+
+  async createMenuItemVariant(menuItemVariant: schema.InsertMenuItemVariant) {
+    const result = await db.insert(schema.menuItemVariants).values(menuItemVariant).returning();
+    return result[0];
+  }
+
+  async deleteMenuItemVariant(id: string) {
+    await db.delete(schema.menuItemVariants).where(eq(schema.menuItemVariants.id, id));
+    return true;
+  }
+
+  async deleteMenuItemVariantsByMenuItem(menuItemId: string) {
+    await db.delete(schema.menuItemVariants).where(eq(schema.menuItemVariants.menuItemId, menuItemId));
     return true;
   }
 }

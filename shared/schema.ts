@@ -91,6 +91,51 @@ export const insertMenuItemSchema = createInsertSchema(menuItems).omit({ id: tru
 export type InsertMenuItem = z.infer<typeof insertMenuItemSchema>;
 export type MenuItem = typeof menuItems.$inferSelect;
 
+// Variant Groups (e.g., "Size", "Crust Type", "Toppings")
+export const variantGroups = pgTable("variant_groups", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(), // e.g., "Size", "Crust", "Toppings"
+  description: text("description"),
+  displayOrder: integer("display_order").default(0), // Order to display in UI
+  selectionType: text("selection_type").notNull().default("single"), // single or multiple
+  isRequired: boolean("is_required").notNull().default(true), // Must select at least one option
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertVariantGroupSchema = createInsertSchema(variantGroups).omit({ id: true, createdAt: true });
+export type InsertVariantGroup = z.infer<typeof insertVariantGroupSchema>;
+export type VariantGroup = typeof variantGroups.$inferSelect;
+
+// Variant Options (e.g., "Small", "Medium", "Large" for Size group)
+export const variantOptions = pgTable("variant_options", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  variantGroupId: varchar("variant_group_id").references(() => variantGroups.id, { onDelete: "cascade" }).notNull(),
+  name: text("name").notNull(), // e.g., "Small", "Medium", "Large"
+  shortName: text("short_name"), // e.g., "S", "M", "L" for compact display
+  priceModifier: decimal("price_modifier", { precision: 10, scale: 2 }).default("0"), // +/- price adjustment
+  displayOrder: integer("display_order").default(0),
+  isDefault: boolean("is_default").notNull().default(false), // Pre-select this option
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertVariantOptionSchema = createInsertSchema(variantOptions).omit({ id: true, createdAt: true });
+export type InsertVariantOption = z.infer<typeof insertVariantOptionSchema>;
+export type VariantOption = typeof variantOptions.$inferSelect;
+
+// Menu Item Variants - Junction table linking menu items to variant groups
+export const menuItemVariants = pgTable("menu_item_variants", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  menuItemId: varchar("menu_item_id").references(() => menuItems.id, { onDelete: "cascade" }).notNull(),
+  variantGroupId: varchar("variant_group_id").references(() => variantGroups.id, { onDelete: "cascade" }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertMenuItemVariantSchema = createInsertSchema(menuItemVariants).omit({ id: true, createdAt: true });
+export type InsertMenuItemVariant = z.infer<typeof insertMenuItemVariantSchema>;
+export type MenuItemVariant = typeof menuItemVariants.$inferSelect;
+
 // Promo Codes
 export const promoCodes = pgTable("promo_codes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

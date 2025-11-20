@@ -170,6 +170,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get current authenticated user
+  app.get("/api/auth/me", authenticate, (req, res) => {
+    res.json(req.user);
+  });
+
   // Logout - clear auth cookie
   app.post("/api/auth/logout", (req, res) => {
     res.clearCookie('authToken');

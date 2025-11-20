@@ -122,7 +122,19 @@ export default function PosMain() {
 
   // Filter menu items
   const filteredItems = menuItems.filter(item => {
-    const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
+    // Check if search query is a number (price search)
+    const searchNumber = parseFloat(searchQuery);
+    const isPriceSearch = !isNaN(searchNumber) && searchQuery.trim() !== "";
+    
+    let matchesSearch = false;
+    if (isPriceSearch) {
+      // If searching by price, match items within ±50 PKR range
+      matchesSearch = Math.abs(item.price - searchNumber) <= 50;
+    } else {
+      // Otherwise search by name
+      matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
+    }
+    
     const matchesCategory = !selectedCategory || item.category === selectedCategory;
     return matchesSearch && matchesCategory && item.isAvailable;
   });
@@ -330,7 +342,7 @@ export default function PosMain() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 data-testid="input-search-menu"
-                placeholder="Search menu..."
+                placeholder="Search by name or price..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"

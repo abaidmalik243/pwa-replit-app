@@ -14,7 +14,7 @@ type User = {
 type AuthContextType = {
   user: User | null;
   isLoading: boolean;
-  login: (userData: User) => void;
+  login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
 };
@@ -57,9 +57,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     verifySession();
   }, []);
 
-  const login = (userData: User) => {
-    setUser(userData);
-    localStorage.setItem("user", JSON.stringify(userData));
+  const login = async (email: string, password: string): Promise<void> => {
+    try {
+      // Call backend login endpoint
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Login failed");
+      }
+
+      // Backend sets JWT cookie, now verify session
+      const meResponse = await fetch("/api/auth/me", {
+        credentials: "include",
+      });
+
+      if (meResponse.ok) {
+        const userData = await meResponse.json();
+        setUser(userData);
+        localStorage.setItem("user", JSON.stringify(userData));
+      } else {
+        throw new Error("Session verification failed");
+      }
+    } catch (error) {
+      // Clear any stale data
+      setUser(null);
+      localStorage.removeItem("user");
+      throw error;
+    }
   };
 
   const logout = async () => {

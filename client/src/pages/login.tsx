@@ -3,13 +3,12 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useLocation } from "wouter";
-import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
 import { Loader2 } from "lucide-react";
 
 const loginSchema = z.object({
@@ -22,6 +21,8 @@ type LoginForm = z.infer<typeof loginSchema>;
 export default function Login() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { login, user } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
   
   const form = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -31,46 +32,37 @@ export default function Login() {
     },
   });
 
-  const loginMutation = useMutation({
-    mutationFn: async (data: LoginForm) => {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Login failed");
-      }
-      return response.json();
-    },
-    onSuccess: (data: any) => {
+  const onSubmit = async (data: LoginForm) => {
+    setIsLoading(true);
+    try {
+      await login(data.email, data.password);
+      
       toast({
         title: "Login successful",
         description: "Welcome to Kebabish Pizza!",
       });
       
-      // Store user data in localStorage
-      localStorage.setItem("user", JSON.stringify(data));
-      
-      // Redirect based on role
-      if (data.role === "admin" || data.role === "staff") {
-        setLocation("/admin");
-      } else {
-        setLocation("/order");
+      // Redirect based on role (user will be populated after login)
+      const userStr = localStorage.getItem("user");
+      if (userStr) {
+        const userData = JSON.parse(userStr);
+        if (userData.role === "admin" || userData.role === "staff") {
+          setLocation("/admin");
+        } else if (userData.role === "rider") {
+          setLocation("/rider");
+        } else {
+          setLocation("/");
+        }
       }
-    },
-    onError: (error: any) => {
+    } catch (error: any) {
       toast({
         title: "Login failed",
         description: error.message || "Invalid credentials",
         variant: "destructive",
       });
-    },
-  });
-
-  const onSubmit = (data: LoginForm) => {
-    loginMutation.mutate(data);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -139,10 +131,10 @@ export default function Login() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={loginMutation.isPending}
+                disabled={isLoading}
                 data-testid="button-login"
               >
-                {loginMutation.isPending && (
+                {isLoading && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
                 Sign In

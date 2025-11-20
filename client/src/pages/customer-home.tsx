@@ -11,9 +11,10 @@ import ItemCustomizationDialog, { VariantGroup, CustomizationSelection } from "@
 import OrderTypeDialog from "@/components/OrderTypeDialog";
 import OrderConfirmationDialog, { OrderDetails } from "@/components/OrderConfirmationDialog";
 import { CustomerJazzCashDialog } from "@/components/CustomerJazzCashDialog";
+import ScrollToTop from "@/components/ScrollToTop";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Search, TrendingUp } from "lucide-react";
 import type { MenuItem as DBMenuItem, Category, Branch } from "@shared/schema";
 
 import burgerImage from "@assets/generated_images/Gourmet_burger_hero_image_fed670c3.png";
@@ -68,6 +69,12 @@ export default function CustomerHome() {
   // Fetch categories from API
   const { data: dbCategories = [] } = useQuery<Category[]>({
     queryKey: ["/api/categories"],
+  });
+
+  // Fetch bestselling items from API
+  const { data: bestsellingItems = [] } = useQuery<(DBMenuItem & { orderCount: number })[]>({
+    queryKey: ["/api/menu-items/bestselling", selectedBranchId],
+    enabled: !!selectedBranchId && selectedBranchId !== "",
   });
 
   // Check if user has already selected location
@@ -405,6 +412,47 @@ export default function CustomerHome() {
 
       <ImageSlider />
 
+      {/* Bestselling Items Section */}
+      {bestsellingItems.length > 0 && (
+        <div className="bg-gradient-to-br from-primary/5 via-primary/10 to-primary/5 py-8 border-y">
+          <div className="container px-4">
+            <div className="flex items-center gap-2 mb-6">
+              <TrendingUp className="h-6 w-6 text-primary" />
+              <h2 className="text-2xl font-bold" data-testid="text-bestselling-title">
+                Bestselling Items
+              </h2>
+              <span className="text-sm text-muted-foreground ml-auto">Top 5 Most Ordered</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              {bestsellingItems.map((item) => {
+                const categoryName = dbCategories.find((c) => c.id === item.categoryId)?.name || "Other";
+                const menuItem: MenuItem = {
+                  id: item.id,
+                  name: item.name,
+                  description: item.description || "",
+                  price: parseFloat(item.price),
+                  image: item.imageUrl || Object.values(defaultImages)[0],
+                  category: categoryName,
+                  isVegetarian: false,
+                };
+                return (
+                  <div 
+                    key={item.id} 
+                    className="relative"
+                    data-testid={`card-bestselling-${item.id}`}
+                  >
+                    <div className="absolute -top-2 -right-2 bg-primary text-primary-foreground rounded-full w-8 h-8 flex items-center justify-center text-xs font-bold z-10 shadow-lg">
+                      {item.orderCount}
+                    </div>
+                    <MenuItemCard item={menuItem} onAddToCart={handleAddToCart} />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="container px-4 py-6">
         <div className="relative max-w-2xl mx-auto mb-6">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -439,6 +487,8 @@ export default function CustomerHome() {
       </main>
 
       <Footer />
+
+      <ScrollToTop />
 
       <CartDrawer
         isOpen={isCartOpen}

@@ -25,6 +25,7 @@ import PosTables from "@/pages/pos-tables";
 import KitchenDisplay from "@/pages/kitchen-display";
 import PosSessions from "@/pages/pos-sessions";
 import PosReports from "@/pages/pos-reports";
+import Reports from "@/pages/reports";
 
 function Router() {
   return (
@@ -60,6 +61,11 @@ function Router() {
       <Route path="/admin/pos-reports">
         <ProtectedRoute requireRole={["admin", "staff"]}>
           <PosReports />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/reports">
+        <ProtectedRoute requireRole={["admin", "staff"]}>
+          <Reports />
         </ProtectedRoute>
       </Route>
       <Route path="/admin">

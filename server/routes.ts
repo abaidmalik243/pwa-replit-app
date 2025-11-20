@@ -306,6 +306,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get bestselling menu items (top 5 by order count)
+  app.get("/api/menu-items/bestselling/:branchId", async (req, res) => {
+    try {
+      const { branchId } = req.params;
+      
+      // Get all completed orders for the branch
+      const orders = await storage.getOrdersByBranch(branchId);
+      const completedOrders = orders.filter(o => o.status === "completed" || o.status === "ready");
+      
+      // Count item occurrences
+      const itemCounts = new Map<string, number>();
+      
+      completedOrders.forEach(order => {
+        try {
+          const items = JSON.parse(order.items);
+          items.forEach((item: any) => {
+            const count = itemCounts.get(item.itemId) || 0;
+            itemCounts.set(item.itemId, count + (item.quantity || 1));
+          });
+        } catch (e) {
+          console.error("Error parsing order items:", e);
+        }
+      });
+      
+      // Get menu items with their counts
+      const allMenuItems = await storage.getAllMenuItems();
+      const itemsWithCounts = allMenuItems
+        .map(item => ({
+          ...item,
+          orderCount: itemCounts.get(item.id) || 0,
+        }))
+        .filter(item => item.orderCount > 0 && item.isAvailable)
+        .sort((a, b) => b.orderCount - a.orderCount)
+        .slice(0, 5);
+      
+      res.json(itemsWithCounts);
+    } catch (error: any) {
+      console.error("Error fetching bestselling items:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Order routes
   app.get("/api/orders", async (req, res) => {
     try {
@@ -401,7 +443,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         discount: discountValue.toString(),
         discountReason,
         deliveryCharges: currentOrder.deliveryCharges ?? undefined,
-        deliveryDistance: currentOrder.deliveryDistance ?? undefined,
+        deliveryDistance: currentOrder.deliveryDistance || undefined,
         total: newTotal.toString(),
         status: currentOrder.status,
         waiterId: currentOrder.waiterId || undefined,
@@ -455,6 +497,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...currentOrder,
         discount: currentOrder.discount ?? undefined,
         deliveryCharges: currentOrder.deliveryCharges ?? undefined,
+        deliveryDistance: currentOrder.deliveryDistance || undefined,
         paymentMethod,
         paymentStatus,
         jazzCashTransactionId: jazzCashTransactionId || currentOrder.jazzCashTransactionId || undefined,
@@ -499,6 +542,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...currentOrder,
         discount: currentOrder.discount ?? undefined,
         deliveryCharges: currentOrder.deliveryCharges ?? undefined,
+        deliveryDistance: currentOrder.deliveryDistance || undefined,
         status,
       });
 
@@ -933,6 +977,192 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error: any) {
       res.status(400).json({ error: error.message });
+    }
+  });
+
+  // Reports API endpoint
+  app.get("/api/reports", async (req, res) => {
+    try {
+      const { startDate, endDate, branchId } = req.query;
+      
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "Start date and end date are required" });
+      }
+
+      // Fetch orders within date range
+      let orders;
+      if (branchId && branchId !== "all") {
+        orders = await storage.getOrdersByBranch(branchId as string);
+      } else {
+        orders = await storage.getAllOrders();
+      }
+
+      // Filter by date range
+      const start = new Date(startDate as string);
+      const end = new Date(endDate as string);
+      end.setHours(23, 59, 59, 999);
+      
+      const filteredOrders = orders.filter(order => {
+        const orderDate = new Date(order.createdAt);
+        return orderDate >= start && orderDate <= end;
+      });
+
+      // Get menu items for category mapping
+      const menuItems = await storage.getAllMenuItems();
+      const categories = await storage.getAllCategories();
+
+      // Calculate overview metrics
+      const totalOrders = filteredOrders.length;
+      const completedOrders = filteredOrders.filter(o => o.status === "completed").length;
+      const totalRevenue = filteredOrders.reduce((sum, o) => sum + parseFloat(o.total), 0);
+      const totalDiscounts = filteredOrders.reduce((sum, o) => sum + parseFloat(o.discount || "0"), 0);
+      const totalDeliveryCharges = filteredOrders.reduce((sum, o) => sum + parseFloat(o.deliveryCharges || "0"), 0);
+      const deliveryOrders = filteredOrders.filter(o => o.orderType === "delivery").length;
+      const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+      // Order status distribution
+      const statusCounts: Record<string, number> = {};
+      filteredOrders.forEach(order => {
+        statusCounts[order.status] = (statusCounts[order.status] || 0) + 1;
+      });
+      const orderStatusDistribution = Object.entries(statusCounts).map(([name, value]) => ({
+        name,
+        value,
+      }));
+
+      // Sales by order type
+      const salesByType: Record<string, { count: number; revenue: number }> = {};
+      filteredOrders.forEach(order => {
+        if (!salesByType[order.orderType]) {
+          salesByType[order.orderType] = { count: 0, revenue: 0 };
+        }
+        salesByType[order.orderType].count++;
+        salesByType[order.orderType].revenue += parseFloat(order.total);
+      });
+      const salesByOrderType = Object.entries(salesByType).map(([type, data]) => ({
+        type,
+        count: data.count,
+        revenue: data.revenue,
+      }));
+
+      // Order type counts
+      const orderTypeCounts: Record<string, number> = {};
+      filteredOrders.forEach(order => {
+        orderTypeCounts[order.orderType] = (orderTypeCounts[order.orderType] || 0) + 1;
+      });
+
+      // Top selling products
+      const itemCounts = new Map<string, { name: string; quantity: number; revenue: number }>();
+      filteredOrders.forEach(order => {
+        try {
+          const items = JSON.parse(order.items);
+          items.forEach((item: any) => {
+            const existing = itemCounts.get(item.itemId);
+            if (existing) {
+              existing.quantity += item.quantity || 1;
+              existing.revenue += (item.price || 0) * (item.quantity || 1);
+            } else {
+              itemCounts.set(item.itemId, {
+                name: item.name || "Unknown",
+                quantity: item.quantity || 1,
+                revenue: (item.price || 0) * (item.quantity || 1),
+              });
+            }
+          });
+        } catch (e) {
+          console.error("Error parsing order items:", e);
+        }
+      });
+
+      const topSellingProducts = Array.from(itemCounts.values())
+        .sort((a, b) => b.quantity - a.quantity)
+        .slice(0, 10);
+
+      // Sales by category
+      const categorySales = new Map<string, number>();
+      filteredOrders.forEach(order => {
+        try {
+          const items = JSON.parse(order.items);
+          items.forEach((item: any) => {
+            const menuItem = menuItems.find(m => m.id === item.itemId);
+            if (menuItem) {
+              const category = categories.find(c => c.id === menuItem.categoryId);
+              const categoryName = category?.name || "Other";
+              const revenue = (item.price || 0) * (item.quantity || 1);
+              categorySales.set(categoryName, (categorySales.get(categoryName) || 0) + revenue);
+            }
+          });
+        } catch (e) {
+          console.error("Error parsing order items:", e);
+        }
+      });
+
+      const salesByCategory = Array.from(categorySales.entries()).map(([name, revenue]) => ({
+        name,
+        revenue,
+      }));
+
+      // Payment method breakdown
+      const paymentMethods = new Map<string, { amount: number; count: number }>();
+      filteredOrders.forEach(order => {
+        const method = order.paymentMethod;
+        const existing = paymentMethods.get(method);
+        if (existing) {
+          existing.amount += parseFloat(order.total);
+          existing.count++;
+        } else {
+          paymentMethods.set(method, {
+            amount: parseFloat(order.total),
+            count: 1,
+          });
+        }
+      });
+
+      const paymentMethodBreakdown = Array.from(paymentMethods.entries()).map(([method, data]) => ({
+        method,
+        amount: data.amount,
+        count: data.count,
+      }));
+
+      // Daily sales trend
+      const dailySalesMap = new Map<string, number>();
+      filteredOrders.forEach(order => {
+        const date = new Date(order.createdAt).toISOString().split('T')[0];
+        dailySalesMap.set(date, (dailySalesMap.get(date) || 0) + parseFloat(order.total));
+      });
+
+      const dailySales = Array.from(dailySalesMap.entries())
+        .map(([date, revenue]) => ({ date, revenue }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      // Order source counts
+      const orderSourceCounts: Record<string, number> = {};
+      filteredOrders.forEach(order => {
+        orderSourceCounts[order.orderSource] = (orderSourceCounts[order.orderSource] || 0) + 1;
+      });
+
+      res.json({
+        overview: {
+          totalRevenue,
+          totalOrders,
+          completedOrders,
+          averageOrderValue,
+          totalDiscounts,
+          totalDeliveryCharges,
+          deliveryOrders,
+        },
+        orderStatusDistribution,
+        salesByOrderType,
+        orderTypeCounts,
+        topSellingProducts,
+        salesByCategory,
+        paymentMethodBreakdown,
+        dailySales,
+        orderSourceCounts,
+      });
+    } catch (error: any) {
+      console.error("Error generating reports:", error);
+      res.status(500).json({ error: error.message });
     }
   });
 

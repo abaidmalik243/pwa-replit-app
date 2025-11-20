@@ -55,32 +55,13 @@ type Rider = {
 
 export default function RiderDashboard() {
   const { toast } = useToast();
-  const [riderId, setRiderId] = useState<string | null>(null);
 
-  // Get user from localStorage (client-side auth)
-  const userStr = localStorage.getItem("user");
-  const currentUser = userStr ? JSON.parse(userStr) : null;
-
-  // Get all riders and find the one linked to current user
-  const { data: riders = [] } = useQuery<Rider[]>({
-    queryKey: ["/api/riders"],
-  });
-
-  // Find rider by userId
-  useEffect(() => {
-    if (currentUser && riders.length > 0 && !riderId) {
-      const myRider = riders.find((r) => r.userId === currentUser.id);
-      if (myRider) {
-        setRiderId(myRider.id);
-      }
-    }
-  }, [currentUser, riders, riderId]);
-
-  // Get current rider data
+  // Get current authenticated rider's data from /api/riders/me
   const { data: rider, isLoading: riderLoading } = useQuery<Rider>({
-    queryKey: ["/api/riders", riderId],
-    enabled: !!riderId,
+    queryKey: ["/api/riders/me"],
   });
+
+  const riderId = rider?.id;
 
   const { data: deliveries = [], isLoading: deliveriesLoading } = useQuery<Delivery[]>({
     queryKey: ["/api/deliveries"],
@@ -108,8 +89,7 @@ export default function RiderDashboard() {
       return await res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/riders", riderId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/riders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/riders/me"] });
       toast({
         title: "Status updated",
         description: "Your availability has been updated",
@@ -161,8 +141,7 @@ export default function RiderDashboard() {
       return await res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/riders", riderId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/riders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/riders/me"] });
       toast({
         title: "Location updated",
         description: "Your GPS location has been shared",

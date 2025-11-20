@@ -1,10 +1,64 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import bcrypt from "bcrypt";
 import { z } from "zod";
 import crypto from "crypto";
 import { insertUserSchema, insertOrderSchema, insertBranchSchema, insertRiderSchema, insertDeliverySchema } from "@shared/schema";
+
+// Extend Express Request type to include user
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        id: string;
+        email: string;
+        username: string;
+        role: string;
+        branchId: string | null;
+      };
+    }
+  }
+}
+
+// Authentication middleware - validates user from custom header
+async function authenticate(req: Request, res: Response, next: NextFunction) {
+  try {
+    const userId = req.headers['x-user-id'] as string;
+    
+    if (!userId) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    const user = await storage.getUser(userId);
+    if (!user) {
+      return res.status(401).json({ error: "Invalid authentication" });
+    }
+
+    // Attach user to request (without password)
+    const { password: _, ...userWithoutPassword } = user;
+    req.user = userWithoutPassword;
+    next();
+  } catch (error) {
+    console.error("Authentication error:", error);
+    res.status(401).json({ error: "Authentication failed" });
+  }
+}
+
+// Role-based authorization middleware
+function authorize(...allowedRoles: string[]) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({ error: "Insufficient permissions" });
+    }
+
+    next();
+  };
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication routes
@@ -1370,8 +1424,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ============= Rider Management Routes =============
   
-  // Get all riders
-  app.get("/api/riders", async (req, res) => {
+  // Get all riders (admin/staff only)
+  app.get("/api/riders", authenticate, authorize("admin", "staff"), async (req, res) => {
     try {
       const riders = await storage.getAllRiders();
       res.json(riders);
@@ -1381,8 +1435,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get riders by branch
-  app.get("/api/riders/branch/:branchId", async (req, res) => {
+  // Get riders by branch (admin/staff only)
+  app.get("/api/riders/branch/:branchId", authenticate, authorize("admin", "staff"), async (req, res) => {
     try {
       const { branchId } = req.params;
       const riders = await storage.getRidersByBranch(branchId);
@@ -1393,8 +1447,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get available riders for assignment
-  app.get("/api/riders/available/:branchId", async (req, res) => {
+  // Get current authenticated rider's data
+  app.get("/api/riders/me", authenticate, authorize("rider"), async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const rider = await storage.getRiderByUserId(req.user.id);
+      if (!rider) {
+        return res.status(404).json({ error: "Rider profile not found" });
+      }
+
+      res.json(rider);
+    } catch (error: any) {
+      console.error("Error fetching current rider:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get available riders for assignment (admin/staff only)
+  app.get("/api/riders/available/:branchId", authenticate, authorize("admin", "staff"), async (req, res) => {
     try {
       const { branchId } = req.params;
       const riders = await storage.getAvailableRiders(branchId);
@@ -1405,14 +1478,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get single rider
-  app.get("/api/riders/:id", async (req, res) => {
+  // Get single rider (admin/staff or rider viewing their own profile)
+  app.get("/api/riders/:id", authenticate, async (req, res) => {
     try {
       const { id } = req.params;
       const rider = await storage.getRider(id);
       if (!rider) {
         return res.status(404).json({ error: "Rider not found" });
       }
+
+      // Check authorization: admin/staff can view any rider, riders can only view their own profile
+      if (req.user!.role !== "admin" && req.user!.role !== "staff") {
+        if (rider.userId !== req.user!.id) {
+          return res.status(403).json({ error: "Insufficient permissions" });
+        }
+      }
+
       res.json(rider);
     } catch (error: any) {
       console.error("Error fetching rider:", error);
@@ -1420,8 +1501,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create new rider
-  app.post("/api/riders", async (req, res) => {
+  // Create new rider (admin/staff only)
+  app.post("/api/riders", authenticate, authorize("admin", "staff"), async (req, res) => {
     try {
       const { password, ...riderData } = req.body;
       const validatedData = insertRiderSchema.parse(riderData);
@@ -1477,14 +1558,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update rider
-  app.patch("/api/riders/:id", async (req, res) => {
+  // Update rider (admin/staff or rider updating their own profile)
+  app.patch("/api/riders/:id", authenticate, async (req, res) => {
     try {
       const { id } = req.params;
-      const rider = await storage.updateRider(id, req.body);
-      if (!rider) {
+      const existingRider = await storage.getRider(id);
+      if (!existingRider) {
         return res.status(404).json({ error: "Rider not found" });
       }
+
+      // Check authorization: admin/staff can update any rider, riders can only update their own profile
+      if (req.user!.role !== "admin" && req.user!.role !== "staff") {
+        if (existingRider.userId !== req.user!.id) {
+          return res.status(403).json({ error: "Insufficient permissions" });
+        }
+      }
+
+      const rider = await storage.updateRider(id, req.body);
       res.json(rider);
     } catch (error: any) {
       console.error("Error updating rider:", error);
@@ -1492,8 +1582,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update rider GPS location
-  app.patch("/api/riders/:id/location", async (req, res) => {
+  // Update rider GPS location (authenticated rider only - can only update their own location)
+  app.patch("/api/riders/:id/location", authenticate, async (req, res) => {
     try {
       const { id } = req.params;
       const { latitude, longitude } = req.body;
@@ -1502,11 +1592,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Latitude and longitude are required" });
       }
 
-      // Update rider location
-      const rider = await storage.updateRiderLocation(id, latitude, longitude);
-      if (!rider) {
+      const existingRider = await storage.getRider(id);
+      if (!existingRider) {
         return res.status(404).json({ error: "Rider not found" });
       }
+
+      // Check authorization: admin/staff can update any location, riders can only update their own
+      if (req.user!.role !== "admin" && req.user!.role !== "staff") {
+        if (existingRider.userId !== req.user!.id) {
+          return res.status(403).json({ error: "Insufficient permissions" });
+        }
+      }
+
+      // Update rider location
+      const rider = await storage.updateRiderLocation(id, latitude, longitude);
 
       // Save location history
       await storage.createRiderLocationHistory({
@@ -1525,8 +1624,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Delete rider
-  app.delete("/api/riders/:id", async (req, res) => {
+  // Delete rider (admin only)
+  app.delete("/api/riders/:id", authenticate, authorize("admin"), async (req, res) => {
     try {
       const { id } = req.params;
       const success = await storage.deleteRider(id);

@@ -272,3 +272,72 @@ export const tableReservations = pgTable("table_reservations", {
 export const insertTableReservationSchema = createInsertSchema(tableReservations).omit({ id: true, createdAt: true });
 export type InsertTableReservation = z.infer<typeof insertTableReservationSchema>;
 export type TableReservation = typeof tableReservations.$inferSelect;
+
+// Riders for Delivery Management
+export const riders = pgTable("riders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  phone: text("phone").notNull().unique(),
+  email: text("email"),
+  vehicleType: text("vehicle_type").notNull(), // bike, motorcycle, car, bicycle
+  vehicleNumber: text("vehicle_number").notNull(), // License plate number
+  branchId: varchar("branch_id").references(() => branches.id).notNull(),
+  userId: varchar("user_id").references(() => users.id), // Link to user account for authentication
+  status: text("status").notNull().default("offline"), // online, offline, busy, on_break
+  isAvailable: boolean("is_available").notNull().default(true), // Can accept new deliveries
+  isActive: boolean("is_active").notNull().default(true), // Account active/inactive
+  currentLatitude: decimal("current_latitude", { precision: 10, scale: 7 }), // Current GPS location
+  currentLongitude: decimal("current_longitude", { precision: 10, scale: 7 }), // Current GPS location
+  lastLocationUpdate: timestamp("last_location_update"), // Last time location was updated
+  totalDeliveries: integer("total_deliveries").default(0), // Lifetime delivery count
+  rating: decimal("rating", { precision: 3, scale: 2 }).default("5.00"), // Average rating
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertRiderSchema = createInsertSchema(riders).omit({ id: true, createdAt: true });
+export type InsertRider = z.infer<typeof insertRiderSchema>;
+export type Rider = typeof riders.$inferSelect;
+
+// Deliveries - Assignment of orders to riders
+export const deliveries = pgTable("deliveries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orderId: varchar("order_id").references(() => orders.id).notNull(),
+  riderId: varchar("rider_id").references(() => riders.id).notNull(),
+  branchId: varchar("branch_id").references(() => branches.id).notNull(),
+  assignedBy: varchar("assigned_by").references(() => users.id), // Staff who assigned the delivery
+  status: text("status").notNull().default("assigned"), // assigned, accepted, picked_up, in_transit, delivered, cancelled
+  customerLatitude: decimal("customer_latitude", { precision: 10, scale: 7 }), // Delivery destination
+  customerLongitude: decimal("customer_longitude", { precision: 10, scale: 7 }), // Delivery destination
+  estimatedDistance: decimal("estimated_distance", { precision: 5, scale: 2 }), // Distance in KM
+  estimatedTime: integer("estimated_time"), // Estimated delivery time in minutes
+  actualDistance: decimal("actual_distance", { precision: 5, scale: 2 }), // Actual distance traveled
+  actualTime: integer("actual_time"), // Actual time taken in minutes
+  assignedAt: timestamp("assigned_at").notNull().defaultNow(),
+  acceptedAt: timestamp("accepted_at"),
+  pickedUpAt: timestamp("picked_up_at"),
+  deliveredAt: timestamp("delivered_at"),
+  cancelledAt: timestamp("cancelled_at"),
+  cancellationReason: text("cancellation_reason"),
+  notes: text("notes"),
+});
+
+export const insertDeliverySchema = createInsertSchema(deliveries).omit({ id: true, assignedAt: true });
+export type InsertDelivery = z.infer<typeof insertDeliverySchema>;
+export type Delivery = typeof deliveries.$inferSelect;
+
+// Rider Location History - GPS tracking trail
+export const riderLocationHistory = pgTable("rider_location_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  riderId: varchar("rider_id").references(() => riders.id).notNull(),
+  deliveryId: varchar("delivery_id").references(() => deliveries.id), // Optional: link to active delivery
+  latitude: decimal("latitude", { precision: 10, scale: 7 }).notNull(),
+  longitude: decimal("longitude", { precision: 10, scale: 7 }).notNull(),
+  speed: decimal("speed", { precision: 5, scale: 2 }), // Speed in km/h
+  heading: decimal("heading", { precision: 5, scale: 2 }), // Direction in degrees
+  accuracy: decimal("accuracy", { precision: 6, scale: 2 }), // GPS accuracy in meters
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
+});
+
+export const insertRiderLocationHistorySchema = createInsertSchema(riderLocationHistory).omit({ id: true, timestamp: true });
+export type InsertRiderLocationHistory = z.infer<typeof insertRiderLocationHistorySchema>;
+export type RiderLocationHistory = typeof riderLocationHistory.$inferSelect;

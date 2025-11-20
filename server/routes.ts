@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import bcrypt from "bcrypt";
 import { z } from "zod";
 import crypto from "crypto";
-import { insertUserSchema, insertOrderSchema, insertBranchSchema } from "@shared/schema";
+import { insertUserSchema, insertOrderSchema, insertBranchSchema, insertRiderSchema, insertDeliverySchema } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication routes
@@ -1423,7 +1423,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create new rider
   app.post("/api/riders", async (req, res) => {
     try {
-      const validatedData = schema.insertRiderSchema.parse(req.body);
+      const validatedData = insertRiderSchema.parse(req.body);
       
       // Check if phone already exists
       const existingRider = await storage.getRiderByPhone(validatedData.phone);
@@ -1514,6 +1514,193 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(history);
     } catch (error: any) {
       console.error("Error fetching location history:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============= Delivery Assignment Routes =============
+  
+  // Get all deliveries
+  app.get("/api/deliveries", async (req, res) => {
+    try {
+      const deliveries = await storage.getAllDeliveries();
+      res.json(deliveries);
+    } catch (error: any) {
+      console.error("Error fetching deliveries:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get deliveries by rider
+  app.get("/api/deliveries/rider/:riderId", async (req, res) => {
+    try {
+      const { riderId } = req.params;
+      const deliveries = await storage.getDeliveriesByRider(riderId);
+      res.json(deliveries);
+    } catch (error: any) {
+      console.error("Error fetching deliveries by rider:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get active deliveries by rider
+  app.get("/api/deliveries/rider/:riderId/active", async (req, res) => {
+    try {
+      const { riderId } = req.params;
+      const deliveries = await storage.getActiveDeliveriesByRider(riderId);
+      res.json(deliveries);
+    } catch (error: any) {
+      console.error("Error fetching active deliveries:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get delivery by order
+  app.get("/api/deliveries/order/:orderId", async (req, res) => {
+    try {
+      const { orderId } = req.params;
+      const delivery = await storage.getDeliveryByOrder(orderId);
+      if (!delivery) {
+        return res.status(404).json({ error: "Delivery not found for this order" });
+      }
+      res.json(delivery);
+    } catch (error: any) {
+      console.error("Error fetching delivery by order:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get single delivery
+  app.get("/api/deliveries/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const delivery = await storage.getDelivery(id);
+      if (!delivery) {
+        return res.status(404).json({ error: "Delivery not found" });
+      }
+      res.json(delivery);
+    } catch (error: any) {
+      console.error("Error fetching delivery:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Assign delivery to rider
+  app.post("/api/deliveries/assign", async (req, res) => {
+    try {
+      const validatedData = insertDeliverySchema.parse(req.body);
+      
+      // Check if order already has a delivery assigned
+      const existingDelivery = await storage.getDeliveryByOrder(validatedData.orderId);
+      if (existingDelivery) {
+        return res.status(400).json({ error: "This order already has a delivery assigned" });
+      }
+
+      // Verify rider exists and is available
+      const rider = await storage.getRider(validatedData.riderId);
+      if (!rider) {
+        return res.status(404).json({ error: "Rider not found" });
+      }
+
+      if (!rider.isAvailable || !rider.isActive) {
+        return res.status(400).json({ error: "Rider is not available for assignment" });
+      }
+
+      // Create delivery assignment
+      const delivery = await storage.createDelivery(validatedData);
+
+      // Update rider status to busy
+      await storage.updateRider(validatedData.riderId, { 
+        isAvailable: false,
+        status: "busy"
+      });
+
+      res.status(201).json(delivery);
+    } catch (error: any) {
+      console.error("Error assigning delivery:", error);
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Validation error", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Update delivery status
+  app.patch("/api/deliveries/:id/status", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+
+      if (!status) {
+        return res.status(400).json({ error: "Status is required" });
+      }
+
+      const delivery = await storage.getDelivery(id);
+      if (!delivery) {
+        return res.status(404).json({ error: "Delivery not found" });
+      }
+
+      // Update timestamps based on status
+      const updates: any = { status };
+      const now = new Date();
+
+      switch (status) {
+        case "accepted":
+          updates.acceptedAt = now;
+          break;
+        case "picked_up":
+          updates.pickedUpAt = now;
+          break;
+        case "delivered":
+          updates.deliveredAt = now;
+          // Calculate actual time taken
+          if (delivery.assignedAt) {
+            const actualTime = Math.floor((now.getTime() - new Date(delivery.assignedAt).getTime()) / 60000);
+            updates.actualTime = actualTime;
+          }
+          // Mark rider as available again
+          await storage.updateRider(delivery.riderId, { 
+            isAvailable: true,
+            status: "online"
+          });
+          // Increment rider's total deliveries
+          const rider = await storage.getRider(delivery.riderId);
+          if (rider) {
+            await storage.updateRider(delivery.riderId, {
+              totalDeliveries: (rider.totalDeliveries || 0) + 1
+            });
+          }
+          break;
+        case "cancelled":
+          updates.cancelledAt = now;
+          updates.cancellationReason = req.body.cancellationReason || "Cancelled by admin";
+          // Mark rider as available again
+          await storage.updateRider(delivery.riderId, { 
+            isAvailable: true,
+            status: "online"
+          });
+          break;
+      }
+
+      const updatedDelivery = await storage.updateDelivery(id, updates);
+      res.json(updatedDelivery);
+    } catch (error: any) {
+      console.error("Error updating delivery status:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Update delivery
+  app.patch("/api/deliveries/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const delivery = await storage.updateDelivery(id, req.body);
+      if (!delivery) {
+        return res.status(404).json({ error: "Delivery not found" });
+      }
+      res.json(delivery);
+    } catch (error: any) {
+      console.error("Error updating delivery:", error);
       res.status(500).json({ error: error.message });
     }
   });

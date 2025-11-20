@@ -107,7 +107,10 @@ export const orders = pgTable("orders", {
   orderType: text("order_type").notNull().default("takeaway"), // takeaway, delivery, or dine-in
   orderSource: text("order_source").notNull().default("online"), // online, pos, phone
   paymentMethod: text("payment_method").notNull().default("cash"), // cash, card, or jazzcash
-  paymentStatus: text("payment_status").notNull().default("pending"), // pending, paid, partial
+  paymentStatus: text("payment_status").notNull().default("pending"), // pending, awaiting_verification, paid, failed, partial
+  jazzCashTransactionId: text("jazzcash_transaction_id"), // JazzCash transaction ID provided by customer
+  jazzCashPayerPhone: text("jazzcash_payer_phone"), // Phone number used for JazzCash payment
+  jazzCashScreenshotUrl: text("jazzcash_screenshot_url"), // Optional payment screenshot URL
   items: text("items").notNull(), // JSON string
   subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(), // Order subtotal before delivery/discount
   discount: decimal("discount", { precision: 10, scale: 2 }).default("0"), // POS: Discount amount

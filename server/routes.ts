@@ -348,6 +348,208 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Comprehensive reports endpoint
+  app.get("/api/reports", async (req, res) => {
+    try {
+      const { startDate, endDate, branchId } = req.query;
+      
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "Start date and end date are required" });
+      }
+
+      // Get all orders and expenses
+      const allOrders = branchId && branchId !== "all" 
+        ? await storage.getOrdersByBranch(branchId as string)
+        : await storage.getAllOrders();
+      
+      const allExpenses = branchId && branchId !== "all"
+        ? await storage.getExpensesByBranch(branchId as string)
+        : await storage.getAllExpenses();
+
+      // Filter by date range
+      const start = new Date(startDate as string);
+      const end = new Date(endDate as string);
+      end.setHours(23, 59, 59, 999); // Include the entire end date
+
+      const filteredOrders = allOrders.filter(order => {
+        const orderDate = new Date(order.createdAt);
+        return orderDate >= start && orderDate <= end;
+      });
+
+      const filteredExpenses = allExpenses.filter(expense => {
+        const expenseDate = new Date(expense.date);
+        return expenseDate >= start && expenseDate <= end;
+      });
+
+      // Calculate overview metrics
+      const totalOrders = filteredOrders.length;
+      const completedOrders = filteredOrders.filter(o => o.status === "completed").length;
+      const totalRevenue = filteredOrders.reduce((sum, order) => sum + Number(order.totalAmount), 0);
+      const totalDiscounts = filteredOrders.reduce((sum, order) => sum + (Number(order.discountAmount) || 0), 0);
+      const totalDeliveryCharges = filteredOrders
+        .filter(o => o.orderType === "delivery")
+        .reduce((sum, order) => sum + (Number(order.deliveryFee) || 0), 0);
+      const deliveryOrders = filteredOrders.filter(o => o.orderType === "delivery").length;
+      const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+      const totalExpenses = filteredExpenses.reduce((sum, expense) => sum + Number(expense.amount), 0);
+      const netRevenue = totalRevenue - totalExpenses;
+
+      // Payment method breakdown
+      const paymentBreakdown = filteredOrders.reduce((acc, order) => {
+        const method = order.paymentMethod || "cash";
+        acc[method] = (acc[method] || 0) + Number(order.totalAmount);
+        return acc;
+      }, {} as Record<string, number>);
+
+      // Order status distribution
+      const orderStatusDistribution = [
+        { name: "Pending", value: filteredOrders.filter(o => o.status === "pending").length },
+        { name: "Preparing", value: filteredOrders.filter(o => o.status === "preparing").length },
+        { name: "Ready", value: filteredOrders.filter(o => o.status === "ready").length },
+        { name: "Completed", value: filteredOrders.filter(o => o.status === "completed").length },
+        { name: "Cancelled", value: filteredOrders.filter(o => o.status === "cancelled").length },
+      ].filter(item => item.value > 0);
+
+      // Sales by order type
+      const orderTypeData = {
+        "dine-in": { count: 0, revenue: 0 },
+        "takeaway": { count: 0, revenue: 0 },
+        "delivery": { count: 0, revenue: 0 },
+      };
+
+      filteredOrders.forEach(order => {
+        const type = order.orderType || "takeaway";
+        if (orderTypeData[type as keyof typeof orderTypeData]) {
+          orderTypeData[type as keyof typeof orderTypeData].count++;
+          orderTypeData[type as keyof typeof orderTypeData].revenue += Number(order.totalAmount);
+        }
+      });
+
+      const salesByOrderType = Object.entries(orderTypeData).map(([type, data]) => ({
+        type,
+        revenue: data.revenue,
+      }));
+
+      const orderTypeCounts = {
+        dinein: orderTypeData["dine-in"].count,
+        takeaway: orderTypeData["takeaway"].count,
+        delivery: orderTypeData["delivery"].count,
+      };
+
+      // Order source counts
+      const orderSourceCounts = {
+        online: filteredOrders.filter(o => o.orderSource === "online").length,
+        pos: filteredOrders.filter(o => o.orderSource === "pos").length,
+        phone: filteredOrders.filter(o => o.orderSource === "phone").length,
+      };
+
+      // Top selling items
+      const itemCounts = new Map<string, { quantity: number; revenue: number; name: string }>();
+      
+      filteredOrders.forEach(order => {
+        if (order.status === "completed" || order.status === "ready") {
+          try {
+            const items = JSON.parse(order.items);
+            items.forEach((item: any) => {
+              const existing = itemCounts.get(item.itemId) || { quantity: 0, revenue: 0, name: item.name };
+              itemCounts.set(item.itemId, {
+                quantity: existing.quantity + (item.quantity || 1),
+                revenue: existing.revenue + (item.total || item.price * (item.quantity || 1)),
+                name: item.name,
+              });
+            });
+          } catch (e) {
+            console.error("Error parsing order items:", e);
+          }
+        }
+      });
+
+      const topSellingProducts = Array.from(itemCounts.entries())
+        .map(([id, data]) => ({
+          id,
+          name: data.name,
+          quantity: data.quantity,
+          revenue: data.revenue,
+        }))
+        .sort((a, b) => b.quantity - a.quantity)
+        .slice(0, 10);
+
+      // Sales by category
+      const categoryRevenue = new Map<string, number>();
+      const allMenuItems = await storage.getAllMenuItems();
+      
+      filteredOrders.forEach(order => {
+        try {
+          const items = JSON.parse(order.items);
+          items.forEach((item: any) => {
+            const menuItem = allMenuItems.find(mi => mi.id === item.itemId);
+            if (menuItem?.categoryId) {
+              const current = categoryRevenue.get(menuItem.categoryId) || 0;
+              categoryRevenue.set(menuItem.categoryId, current + (item.total || item.price * (item.quantity || 1)));
+            }
+          });
+        } catch (e) {
+          console.error("Error parsing order items for categories:", e);
+        }
+      });
+
+      const allCategories = await storage.getAllCategories();
+      const salesByCategory = Array.from(categoryRevenue.entries())
+        .map(([categoryId, revenue]) => {
+          const category = allCategories.find(c => c.id === categoryId);
+          return {
+            name: category?.name || "Unknown",
+            value: revenue,
+          };
+        })
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 8);
+
+      // Daily sales trends (for charts)
+      const dailySalesMap = new Map<string, number>();
+      filteredOrders.forEach(order => {
+        const dateKey = new Date(order.createdAt).toISOString().split('T')[0];
+        dailySalesMap.set(dateKey, (dailySalesMap.get(dateKey) || 0) + Number(order.totalAmount));
+      });
+
+      const dailySales = Array.from(dailySalesMap.entries())
+        .map(([date, sales]) => ({ date, sales }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      // Payment method breakdown for charts
+      const paymentMethodBreakdown = Object.entries(paymentBreakdown).map(([method, amount]) => ({
+        method: method.charAt(0).toUpperCase() + method.slice(1),
+        amount,
+      }));
+
+      // Response data structure matching the frontend expectations
+      res.json({
+        overview: {
+          totalRevenue,
+          totalDiscounts,
+          totalOrders,
+          completedOrders,
+          averageOrderValue,
+          totalDeliveryCharges,
+          deliveryOrders,
+          totalExpenses,
+          netRevenue,
+        },
+        orderStatusDistribution,
+        salesByOrderType,
+        orderTypeCounts,
+        topSellingProducts,
+        salesByCategory,
+        paymentMethodBreakdown,
+        dailySales,
+        orderSourceCounts,
+      });
+    } catch (error: any) {
+      console.error("Error fetching reports:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Order routes
   app.get("/api/orders", async (req, res) => {
     try {

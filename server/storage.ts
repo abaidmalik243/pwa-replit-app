@@ -128,6 +128,20 @@ export interface IStorage {
   // Rider Location History
   getRiderLocationHistory(riderId: string, limit?: number): Promise<schema.RiderLocationHistory[]>;
   createRiderLocationHistory(location: schema.InsertRiderLocationHistory): Promise<schema.RiderLocationHistory>;
+
+  // Promo Codes
+  getAllPromoCodes(): Promise<schema.PromoCode[]>;
+  getPromoCode(id: string): Promise<schema.PromoCode | undefined>;
+  getPromoCodeByCode(code: string): Promise<schema.PromoCode | undefined>;
+  createPromoCode(promoCode: schema.InsertPromoCode): Promise<schema.PromoCode>;
+  updatePromoCode(id: string, promoCode: Partial<schema.InsertPromoCode>): Promise<schema.PromoCode | undefined>;
+  deletePromoCode(id: string): Promise<boolean>;
+  incrementPromoCodeUsage(id: string): Promise<void>;
+
+  // Promo Code Usage
+  getPromoCodeUsage(promoCodeId: string): Promise<schema.PromoCodeUsage[]>;
+  getUserPromoCodeUsageCount(promoCodeId: string, userId: string): Promise<number>;
+  createPromoCodeUsage(usage: schema.InsertPromoCodeUsage): Promise<schema.PromoCodeUsage>;
 }
 
 export class DbStorage implements IStorage {
@@ -614,6 +628,65 @@ export class DbStorage implements IStorage {
 
   async createRiderLocationHistory(location: schema.InsertRiderLocationHistory) {
     const result = await db.insert(schema.riderLocationHistory).values(location).returning();
+    return result[0];
+  }
+
+  // Promo Codes
+  async getAllPromoCodes() {
+    return await db.select().from(schema.promoCodes).orderBy(desc(schema.promoCodes.createdAt));
+  }
+
+  async getPromoCode(id: string) {
+    const result = await db.select().from(schema.promoCodes).where(eq(schema.promoCodes.id, id));
+    return result[0];
+  }
+
+  async getPromoCodeByCode(code: string) {
+    const result = await db.select().from(schema.promoCodes).where(eq(schema.promoCodes.code, code));
+    return result[0];
+  }
+
+  async createPromoCode(promoCode: schema.InsertPromoCode) {
+    const result = await db.insert(schema.promoCodes).values(promoCode).returning();
+    return result[0];
+  }
+
+  async updatePromoCode(id: string, promoCode: Partial<schema.InsertPromoCode>) {
+    const result = await db.update(schema.promoCodes).set(promoCode).where(eq(schema.promoCodes.id, id)).returning();
+    return result[0];
+  }
+
+  async deletePromoCode(id: string) {
+    await db.delete(schema.promoCodes).where(eq(schema.promoCodes.id, id));
+    return true;
+  }
+
+  async incrementPromoCodeUsage(id: string) {
+    const promoCode = await this.getPromoCode(id);
+    if (promoCode) {
+      await db.update(schema.promoCodes)
+        .set({ usageCount: (promoCode.usageCount || 0) + 1 })
+        .where(eq(schema.promoCodes.id, id));
+    }
+  }
+
+  // Promo Code Usage
+  async getPromoCodeUsage(promoCodeId: string) {
+    return await db.select().from(schema.promoCodeUsage).where(eq(schema.promoCodeUsage.promoCodeId, promoCodeId)).orderBy(desc(schema.promoCodeUsage.usedAt));
+  }
+
+  async getUserPromoCodeUsageCount(promoCodeId: string, userId: string) {
+    const result = await db.select().from(schema.promoCodeUsage).where(
+      and(
+        eq(schema.promoCodeUsage.promoCodeId, promoCodeId),
+        eq(schema.promoCodeUsage.userId, userId)
+      )
+    );
+    return result.length;
+  }
+
+  async createPromoCodeUsage(usage: schema.InsertPromoCodeUsage) {
+    const result = await db.insert(schema.promoCodeUsage).values(usage).returning();
     return result[0];
   }
 }

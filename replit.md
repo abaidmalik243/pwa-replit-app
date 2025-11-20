@@ -57,6 +57,19 @@ A comprehensive Point of Sale system integrates:
 ### Customer Payment System
 Supports **Cash on Delivery (COD)** and **JazzCash**. The JazzCash flow involves customer selection, order creation with pending status, a dialog for payment instructions, transaction ID/payer phone collection, and submission for manual staff verification, updating order status to "awaiting_verification."
 
+### Promotional Codes System
+A comprehensive promo code management system featuring:
+-   **Admin Management Interface**: Create, edit, and delete promotional codes with detailed configuration options. Admin page at `/admin/promo-codes` provides centralized promo code management.
+-   **Flexible Discount Types**: Support for both percentage-based and fixed-amount discounts with optional maximum discount caps for percentage types.
+-   **Usage Controls**: Configurable total usage limits and per-user limits to prevent abuse. Real-time usage tracking shows used count vs. limit.
+-   **Time-Based Validity**: Set start dates (validFrom) and expiration dates (validUntil) for time-sensitive promotions.
+-   **Minimum Order Requirements**: Configure minimum order amounts to incentivize larger orders.
+-   **Branch-Specific Codes**: Option to restrict promo codes to specific branches or make them available chain-wide.
+-   **Status Management**: Toggle codes active/inactive to control availability without deletion.
+-   **Validation API**: Backend endpoint `/api/promo-codes/validate` validates codes in real-time, checking expiry, usage limits, minimum order amount, and branch restrictions.
+-   **Usage Tracking**: Complete audit trail of promo code usage linked to orders and users for reporting and analytics.
+-   **Database Schema**: `promo_codes` table stores code configurations, `promo_code_usage` table tracks each use, orders table includes `promoCodeId` reference for applied codes.
+
 ### Rider Management System
 A comprehensive delivery rider management module featuring:
 -   **Rider CRUD Management**: Admin interface for creating, editing, and deleting riders with details including name, phone, email, vehicle type, vehicle number, and branch assignment.

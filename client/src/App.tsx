@@ -30,6 +30,7 @@ import Reports from "@/pages/reports";
 import AdminRiders from "@/pages/admin-riders";
 import AdminDeliveries from "@/pages/admin-deliveries";
 import AdminRiderTracking from "@/pages/admin-rider-tracking";
+import AdminPromoCodes from "@/pages/admin-promo-codes";
 import RiderDashboard from "@/pages/rider-dashboard";
 
 function Router() {
@@ -126,6 +127,11 @@ function Router() {
       <Route path="/admin/rider-tracking">
         <ProtectedRoute requireRole={["admin", "staff"]}>
           <AdminRiderTracking />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/promo-codes">
+        <ProtectedRoute requireRole={["admin"]}>
+          <AdminPromoCodes />
         </ProtectedRoute>
       </Route>
       <Route path="/rider">

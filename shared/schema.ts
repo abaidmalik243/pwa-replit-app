@@ -91,6 +91,44 @@ export const insertMenuItemSchema = createInsertSchema(menuItems).omit({ id: tru
 export type InsertMenuItem = z.infer<typeof insertMenuItemSchema>;
 export type MenuItem = typeof menuItems.$inferSelect;
 
+// Promo Codes
+export const promoCodes = pgTable("promo_codes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: text("code").notNull().unique(), // Promo code (e.g., SAVE20, FIRSTORDER)
+  description: text("description"), // Description of the promo
+  discountType: text("discount_type").notNull().default("percentage"), // percentage or fixed
+  discountValue: decimal("discount_value", { precision: 10, scale: 2 }).notNull(), // Percentage (e.g., 20) or fixed amount (e.g., 100)
+  minOrderAmount: decimal("min_order_amount", { precision: 10, scale: 2 }).default("0"), // Minimum order amount required
+  maxDiscountAmount: decimal("max_discount_amount", { precision: 10, scale: 2 }), // Max discount cap for percentage types
+  usageLimit: integer("usage_limit"), // Total usage limit (null = unlimited)
+  usageCount: integer("usage_count").notNull().default(0), // Current usage count
+  perUserLimit: integer("per_user_limit"), // Usage limit per user (null = unlimited)
+  validFrom: timestamp("valid_from").notNull().defaultNow(), // Start date
+  validUntil: timestamp("valid_until"), // Expiry date (null = no expiry)
+  isActive: boolean("is_active").notNull().default(true),
+  branchId: varchar("branch_id").references(() => branches.id), // null = valid for all branches
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertPromoCodeSchema = createInsertSchema(promoCodes).omit({ id: true, createdAt: true, usageCount: true });
+export type InsertPromoCode = z.infer<typeof insertPromoCodeSchema>;
+export type PromoCode = typeof promoCodes.$inferSelect;
+
+// Promo Code Usage Tracking
+export const promoCodeUsage = pgTable("promo_code_usage", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  promoCodeId: varchar("promo_code_id").references(() => promoCodes.id, { onDelete: "cascade" }).notNull(),
+  orderId: varchar("order_id").references(() => orders.id).notNull(),
+  userId: varchar("user_id").references(() => users.id),
+  discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }).notNull(),
+  usedAt: timestamp("used_at").notNull().defaultNow(),
+});
+
+export const insertPromoCodeUsageSchema = createInsertSchema(promoCodeUsage).omit({ id: true, usedAt: true });
+export type InsertPromoCodeUsage = z.infer<typeof insertPromoCodeUsageSchema>;
+export type PromoCodeUsage = typeof promoCodeUsage.$inferSelect;
+
 // Orders
 export const orders = pgTable("orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -113,8 +151,9 @@ export const orders = pgTable("orders", {
   jazzCashScreenshotUrl: text("jazzcash_screenshot_url"), // Optional payment screenshot URL
   items: text("items").notNull(), // JSON string
   subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(), // Order subtotal before delivery/discount
-  discount: decimal("discount", { precision: 10, scale: 2 }).default("0"), // POS: Discount amount
-  discountReason: text("discount_reason"), // POS: Reason for discount
+  promoCodeId: varchar("promo_code_id").references(() => promoCodes.id), // Applied promo code
+  discount: decimal("discount", { precision: 10, scale: 2 }).default("0"), // POS/Promo: Discount amount
+  discountReason: text("discount_reason"), // POS: Reason for discount (or promo code)
   deliveryCharges: decimal("delivery_charges", { precision: 10, scale: 2 }).default("0"), // Delivery charges
   deliveryDistance: decimal("delivery_distance", { precision: 5, scale: 2 }), // Distance in KM
   total: decimal("total", { precision: 10, scale: 2 }).notNull(), // subtotal - discount + deliveryCharges

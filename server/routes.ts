@@ -1908,6 +1908,199 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Promo Codes Management
+
+  // Get all promo codes (admin/staff only)
+  app.get("/api/promo-codes", authenticate, authorize("admin", "staff"), async (req, res) => {
+    try {
+      const promoCodes = await storage.getAllPromoCodes();
+      res.json(promoCodes);
+    } catch (error: any) {
+      console.error("Error fetching promo codes:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get promo code by ID (admin/staff only)
+  app.get("/api/promo-codes/:id", authenticate, authorize("admin", "staff"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const promoCode = await storage.getPromoCode(id);
+      if (!promoCode) {
+        return res.status(404).json({ error: "Promo code not found" });
+      }
+      res.json(promoCode);
+    } catch (error: any) {
+      console.error("Error fetching promo code:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Validate and apply promo code (authenticated users)
+  app.post("/api/promo-codes/validate", authenticate, async (req, res) => {
+    try {
+      const { code, orderAmount, branchId } = req.body;
+
+      if (!code || !orderAmount) {
+        return res.status(400).json({ error: "Code and order amount are required" });
+      }
+
+      if (!branchId) {
+        return res.status(400).json({ error: "Branch ID is required" });
+      }
+
+      // Use authenticated user's ID from session
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      // Get promo code
+      const promoCode = await storage.getPromoCodeByCode(code.toUpperCase());
+      if (!promoCode) {
+        return res.status(404).json({ error: "Invalid promo code" });
+      }
+
+      // Check if promo code is active
+      if (!promoCode.isActive) {
+        return res.status(400).json({ error: "Promo code is not active" });
+      }
+
+      // Check if promo code is expired
+      const now = new Date();
+      if (promoCode.validUntil && new Date(promoCode.validUntil) < now) {
+        return res.status(400).json({ error: "Promo code has expired" });
+      }
+
+      // Check if promo code is valid yet
+      if (new Date(promoCode.validFrom) > now) {
+        return res.status(400).json({ error: "Promo code is not valid yet" });
+      }
+
+      // Check if usage limit is reached
+      if (promoCode.usageLimit && promoCode.usageCount >= promoCode.usageLimit) {
+        return res.status(400).json({ error: "Promo code usage limit reached" });
+      }
+
+      // Check per-user usage limit (always check when perUserLimit is set)
+      if (promoCode.perUserLimit) {
+        const userUsageCount = await storage.getUserPromoCodeUsageCount(promoCode.id, userId);
+        if (userUsageCount >= promoCode.perUserLimit) {
+          return res.status(400).json({ error: "You have reached the usage limit for this promo code" });
+        }
+      }
+
+      // Check branch restriction (always enforce if promo code has a branch restriction)
+      if (promoCode.branchId && promoCode.branchId !== branchId) {
+        return res.status(400).json({ error: "Promo code is not valid for this branch" });
+      }
+
+      // Check minimum order amount
+      if (parseFloat(promoCode.minOrderAmount || "0") > orderAmount) {
+        return res.status(400).json({ 
+          error: `Minimum order amount of ₨${promoCode.minOrderAmount} required` 
+        });
+      }
+
+      // Calculate discount
+      let discountAmount = 0;
+      if (promoCode.discountType === "percentage") {
+        discountAmount = (orderAmount * parseFloat(promoCode.discountValue)) / 100;
+        // Apply max discount cap if set
+        if (promoCode.maxDiscountAmount) {
+          discountAmount = Math.min(discountAmount, parseFloat(promoCode.maxDiscountAmount));
+        }
+      } else {
+        discountAmount = parseFloat(promoCode.discountValue);
+      }
+
+      // Ensure discount doesn't exceed order amount
+      discountAmount = Math.min(discountAmount, orderAmount);
+
+      res.json({
+        valid: true,
+        promoCode: promoCode,
+        discountAmount: discountAmount.toFixed(2),
+        finalAmount: (orderAmount - discountAmount).toFixed(2),
+      });
+    } catch (error: any) {
+      console.error("Error validating promo code:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Create promo code (admin only)
+  app.post("/api/promo-codes", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      // Ensure code is uppercase
+      const promoData = {
+        ...req.body,
+        code: req.body.code.toUpperCase(),
+        createdBy: req.user?.id,
+      };
+
+      // Check if code already exists
+      const existing = await storage.getPromoCodeByCode(promoData.code);
+      if (existing) {
+        return res.status(400).json({ error: "Promo code already exists" });
+      }
+
+      const promoCode = await storage.createPromoCode(promoData);
+      res.status(201).json(promoCode);
+    } catch (error: any) {
+      console.error("Error creating promo code:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Update promo code (admin only)
+  app.patch("/api/promo-codes/:id", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Ensure code is uppercase if provided
+      const updateData = req.body.code 
+        ? { ...req.body, code: req.body.code.toUpperCase() }
+        : req.body;
+
+      const promoCode = await storage.updatePromoCode(id, updateData);
+      if (!promoCode) {
+        return res.status(404).json({ error: "Promo code not found" });
+      }
+      res.json(promoCode);
+    } catch (error: any) {
+      console.error("Error updating promo code:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Delete promo code (admin only)
+  app.delete("/api/promo-codes/:id", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deletePromoCode(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Promo code not found" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting promo code:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get promo code usage history (admin/staff only)
+  app.get("/api/promo-codes/:id/usage", authenticate, authorize("admin", "staff"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const usage = await storage.getPromoCodeUsage(id);
+      res.json(usage);
+    } catch (error: any) {
+      console.error("Error fetching promo code usage:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

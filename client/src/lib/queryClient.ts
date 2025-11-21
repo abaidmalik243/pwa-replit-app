@@ -8,6 +8,11 @@ export function setGlobalLogoutHandler(handler: () => void) {
 }
 
 async function throwIfResNotOk(res: Response) {
+  // 304 Not Modified is a success - it means use cached data
+  if (res.status === 304) {
+    return;
+  }
+  
   if (!res.ok) {
     // Handle 401 Unauthorized - trigger logout
     if (res.status === 401 && globalLogoutHandler) {
@@ -45,6 +50,7 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }) => {
     const res = await fetch(queryKey.join("/") as string, {
       credentials: "include", // Send cookies with request
+      cache: "no-store", // Bypass HTTP cache to avoid 304 responses
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {

@@ -54,6 +54,17 @@ A comprehensive Point of Sale system integrates:
 -   **Reporting Dashboard**: Date range filtering for key metrics (sales, orders, AOV), payment breakdown, order status distribution, and top-selling items.
 -   **Branch Switcher & Multi-Location Management**: Admin header dropdown for multi-location oversight, "All Branches" read-only mode for reports, and branch-specific POS operations.
 
+### Menu Item Variant Management System
+A comprehensive variant management system enabling menu item customization (e.g., pizza sizes, crust types, toppings):
+-   **Admin Interface**: Create and manage variant groups at `/admin/variants` with options including name, description, selection type (single/multiple), required flag, and display order.
+-   **Variant Options**: Each group contains options with name, short name, price modifier, default flag, and display order.
+-   **Menu Item Assignment**: Multi-select interface in menu item form allows assigning multiple variant groups to items. Form rehydration via useEffect prevents data loss during edits.
+-   **Runtime Integration**: POS and customer interfaces fetch complete variant data via `/api/menu-items/:menuItemId/variant-groups` endpoint with nested options.
+-   **Pricing Calculation**: ItemCustomizationDialog calculates unit price as basePrice + sum(selected option price modifiers).
+-   **Cart/Order Serialization**: Variant selections stored with human-readable names: `{variants: [{groupName: "Size", optionName: "Large 16in"}]}` for display in orders, tickets, and receipts.
+-   **Critical Bug Fix**: Added `cache: "no-store"` to TanStack Query fetcher to prevent 304 responses from causing silent failures in variant group loading.
+-   **Database Schema**: `variant_groups`, `variant_options`, and `menu_item_variants` junction table with UUID primary keys.
+
 ### Customer Payment System
 Supports **Cash on Delivery (COD)** and **JazzCash**. The JazzCash flow involves customer selection, order creation with pending status, a dialog for payment instructions, transaction ID/payer phone collection, and submission for manual staff verification, updating order status to "awaiting_verification."
 

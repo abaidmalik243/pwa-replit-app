@@ -50,6 +50,20 @@ Complete Socket.IO integration provides instant real-time updates across all ter
 
 **Rider Management System**: Includes CRUD management for riders, automatic user account creation for riders, real-time GPS location tracking with history, automated delivery assignment, rider status management, performance tracking, and live admin dashboard with map visualization. Riders have a dedicated mobile dashboard and role-based authentication.
 
+**JazzCash Admin Monitoring**: Comprehensive admin dashboard at `/admin/jazzcash` for managing and monitoring JazzCash transactions. Features include:
+- **Configuration Management**: View and manage JazzCash credentials (Merchant ID, Password, Integrity Salt) with secure environment variable integration
+- **Transaction History**: Paginated transaction table with filtering capabilities, transaction ID tracking, and payment status monitoring
+- **Statistics Dashboard**: Real-time metrics showing total transactions, success rate, pending verifications, and total revenue from JazzCash payments
+- **Integration Health**: Quick configuration validation and sandbox/production environment status display
+
+**Advanced Analytics Dashboard**: Business intelligence dashboard at `/admin/analytics` providing comprehensive insights across multiple timeframes (7/30/90 days). Features include:
+- **Sales Trends Analysis**: Revenue charts showing daily sales patterns, average order values, and growth trends over time
+- **Customer Behavior Analytics**: Metrics on new vs. returning customers, order frequency patterns, and customer lifetime value calculations
+- **Product Performance**: Top-selling items ranked by revenue and quantity, category performance breakdowns, and product popularity trends
+- **Peak Hours Analysis**: Hourly demand heatmaps showing order volume distribution throughout the day for optimized staffing and inventory
+- **Overview Metrics**: Real-time KPI cards displaying total revenue, order counts, average order value, and customer acquisition statistics
+- **Time Range Filtering**: Dynamic data filtering with proper query parameter handling via structured searchParams for accurate time-based analysis
+
 ## External Dependencies
 
 ### UI Component Libraries

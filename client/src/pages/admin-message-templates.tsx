@@ -62,8 +62,23 @@ export default function AdminMessageTemplates() {
         return await res.json();
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/message-templates"], refetchType: 'all' });
+    onSuccess: async (createdTemplate) => {
+      // Immediately invalidate and refetch queries to force fresh data
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const queryKey = query.queryKey;
+          return Array.isArray(queryKey) && queryKey[0] === "/api/message-templates";
+        }
+      });
+      
+      // Also force refetch to ensure fresh data appears immediately  
+      await queryClient.refetchQueries({ 
+        predicate: (query) => {
+          const queryKey = query.queryKey;
+          return Array.isArray(queryKey) && queryKey[0] === "/api/message-templates";
+        }
+      });
+      
       toast({
         title: "Success",
         description: `Template ${editingTemplate ? "updated" : "created"} successfully`,
@@ -84,7 +99,13 @@ export default function AdminMessageTemplates() {
       await apiRequest(`/api/message-templates/${id}`, "DELETE", {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/message-templates"], refetchType: 'all' });
+      // Invalidate all queries that start with /api/message-templates
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const queryKey = query.queryKey;
+          return Array.isArray(queryKey) && queryKey[0] === "/api/message-templates";
+        }
+      });
       toast({
         title: "Template Deleted",
         description: "Template deleted successfully",

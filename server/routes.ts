@@ -4458,6 +4458,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { category } = req.query;
       
+      console.log(`[GET /api/message-templates] category=${category}, user=${req.user?.email}`);
+      
       let templates;
       if (category) {
         templates = await storage.getMessageTemplatesByCategory(category as string);
@@ -4465,8 +4467,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         templates = await storage.getAllMessageTemplates();
       }
       
+      console.log(`[GET /api/message-templates] Returning ${templates.length} templates:`, templates.map(t => ({ id: t.id, name: t.name })));
+      
       res.json(templates);
     } catch (error: any) {
+      console.error(`[GET /api/message-templates] Error:`, error);
       res.status(500).json({ error: error.message });
     }
   });
@@ -4485,12 +4490,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/message-templates", authenticate, authorize("admin"), async (req, res) => {
     try {
+      console.log(`[POST /api/message-templates] Creating template:`, req.body);
       const template = await storage.createMessageTemplate({
         ...req.body,
         createdBy: req.user!.id,
       });
+      console.log(`[POST /api/message-templates] Created template:`, { id: template.id, name: template.name });
       res.json(template);
     } catch (error: any) {
+      console.error(`[POST /api/message-templates] Error:`, error);
       res.status(500).json({ error: error.message });
     }
   });

@@ -1717,7 +1717,9 @@ export class DbStorage implements IStorage {
 
   // Message Templates
   async getAllMessageTemplates() {
-    return await db.select().from(schema.messageTemplates).orderBy(desc(schema.messageTemplates.createdAt));
+    const result = await db.select().from(schema.messageTemplates).orderBy(desc(schema.messageTemplates.createdAt));
+    console.log(`[storage.getAllMessageTemplates] Fetched ${result.length} templates from database`);
+    return result;
   }
 
   async getMessageTemplate(id: string) {
@@ -1732,7 +1734,9 @@ export class DbStorage implements IStorage {
   }
 
   async createMessageTemplate(template: schema.InsertMessageTemplate) {
+    console.log(`[storage.createMessageTemplate] Inserting template:`, template);
     const result = await db.insert(schema.messageTemplates).values(template).returning();
+    console.log(`[storage.createMessageTemplate] Inserted template:`, result[0]);
     return result[0];
   }
 

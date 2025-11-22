@@ -3349,6 +3349,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Unauthorized" });
       }
 
+      // Verify order is eligible for payment
+      if (order.paymentStatus === "paid") {
+        return res.status(400).json({ error: "Order is already paid" });
+      }
+      
+      if (order.status === "cancelled" || order.status === "refunded") {
+        return res.status(400).json({ error: "Cannot process payment for cancelled or refunded order" });
+      }
+
       const { createJazzCashPayment, isJazzCashConfigured } = await import('./jazzCashService');
       
       if (!isJazzCashConfigured()) {

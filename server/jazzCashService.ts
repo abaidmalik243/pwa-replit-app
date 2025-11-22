@@ -56,24 +56,24 @@ interface JazzCashFormData {
 
 /**
  * Generate HMAC-SHA256 hash for JazzCash transaction
+ * Properly sorts ALL non-empty parameters alphabetically as per JazzCash spec
  */
 function generateSecureHash(data: JazzCashFormData, integritySalt: string): string {
-  // Build sorted string as per JazzCash documentation (alphabetically sorted)
-  const sortedString = 
-    integritySalt + '&' +
-    data.pp_Amount + '&' +
-    data.pp_BillReference + '&' +
-    data.pp_Description + '&' +
-    data.pp_Language + '&' +
-    data.pp_MerchantID + '&' +
-    data.pp_Password + '&' +
-    data.pp_ReturnURL + '&' +
-    data.pp_TxnCurrency + '&' +
-    data.pp_TxnDateTime + '&' +
-    data.pp_TxnExpiryDateTime + '&' +
-    data.pp_TxnRefNo + '&' +
-    data.pp_TxnType + '&' +
-    data.pp_Version;
+  // Collect all non-empty parameters (excluding pp_SecureHash itself)
+  const params: Record<string, string> = {};
+  
+  Object.entries(data).forEach(([key, value]) => {
+    if (key !== 'pp_SecureHash' && value !== undefined && value !== null && value !== '') {
+      params[key] = String(value);
+    }
+  });
+  
+  // Sort parameters alphabetically by key
+  const sortedKeys = Object.keys(params).sort();
+  
+  // Build hash string: IntegritySalt&value1&value2&...
+  const values = sortedKeys.map(key => params[key]);
+  const sortedString = integritySalt + '&' + values.join('&');
 
   return crypto
     .createHmac('sha256', integritySalt)
@@ -83,6 +83,7 @@ function generateSecureHash(data: JazzCashFormData, integritySalt: string): stri
 
 /**
  * Verify response hash from JazzCash callback
+ * Properly sorts ALL non-empty response parameters alphabetically
  */
 function verifyResponseHash(responseData: any, integritySalt: string): boolean {
   const receivedHash = responseData.pp_SecureHash;
@@ -91,22 +92,21 @@ function verifyResponseHash(responseData: any, integritySalt: string): boolean {
     return false;
   }
 
-  // Build string from response parameters (alphabetically sorted per JazzCash spec)
-  const sortedString = 
-    integritySalt + '&' +
-    (responseData.pp_Amount || '') + '&' +
-    (responseData.pp_BillReference || '') + '&' +
-    (responseData.pp_Description || '') + '&' +
-    (responseData.pp_Language || '') + '&' +
-    (responseData.pp_MerchantID || '') + '&' +
-    (responseData.pp_ResponseCode || '') + '&' +
-    (responseData.pp_ResponseMessage || '') + '&' +
-    (responseData.pp_RetreivalReferenceNo || '') + '&' +
-    (responseData.pp_TxnCurrency || '') + '&' +
-    (responseData.pp_TxnDateTime || '') + '&' +
-    (responseData.pp_TxnRefNo || '') + '&' +
-    (responseData.pp_TxnType || '') + '&' +
-    (responseData.pp_Version || '');
+  // Collect all non-empty parameters (excluding pp_SecureHash itself)
+  const params: Record<string, string> = {};
+  
+  Object.entries(responseData).forEach(([key, value]) => {
+    if (key !== 'pp_SecureHash' && value !== undefined && value !== null && value !== '') {
+      params[key] = String(value);
+    }
+  });
+  
+  // Sort parameters alphabetically by key
+  const sortedKeys = Object.keys(params).sort();
+  
+  // Build hash string: IntegritySalt&value1&value2&...
+  const values = sortedKeys.map(key => params[key]);
+  const sortedString = integritySalt + '&' + values.join('&');
 
   const calculatedHash = crypto
     .createHmac('sha256', integritySalt)

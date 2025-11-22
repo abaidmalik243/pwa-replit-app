@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,16 +9,6 @@ export default function PaymentResult() {
   const status = searchParams.get("status");
   const orderId = searchParams.get("orderId");
   const message = searchParams.get("message");
-
-  useEffect(() => {
-    // Auto-redirect after a few seconds if successful
-    if (status === "success" && orderId) {
-      const timer = setTimeout(() => {
-        navigate(`/order-confirmation/${orderId}`);
-      }, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [status, orderId, navigate]);
 
   if (!status) {
     return (
@@ -50,16 +39,16 @@ export default function PaymentResult() {
             </p>
             {orderId && (
               <p className="text-sm text-muted-foreground">
-                Redirecting to order confirmation...
+                Order #{orderId.slice(0, 8)}...
               </p>
             )}
             <div className="flex gap-2">
-              <Button onClick={() => navigate("/")}>
+              <Button data-testid="button-home" onClick={() => navigate("/")}>
                 Back to Home
               </Button>
               {orderId && (
-                <Button variant="outline" onClick={() => navigate(`/order-confirmation/${orderId}`)}>
-                  View Order
+                <Button data-testid="button-view-orders" variant="outline" onClick={() => navigate("/customer/orders")}>
+                  View My Orders
                 </Button>
               )}
             </div>
@@ -74,19 +63,19 @@ export default function PaymentResult() {
       <Card className="max-w-md w-full">
         <CardHeader>
           <div className="flex items-center gap-3">
-            <XCircle className="h-8 w-8 text-destructive" />
-            <CardTitle>Payment Failed</CardTitle>
+            <XCircle className="h-8 w-8 text-destructive" data-testid="icon-error" />
+            <CardTitle data-testid="text-title">Payment Failed</CardTitle>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground" data-testid="text-error-message">
             {message || "We couldn't process your payment. Please try again."}
           </p>
           <div className="flex gap-2">
-            <Button onClick={() => navigate("/")}>
+            <Button data-testid="button-home" onClick={() => navigate("/")}>
               Back to Home
             </Button>
-            <Button variant="outline" onClick={() => window.history.back()}>
+            <Button data-testid="button-try-again" variant="outline" onClick={() => window.history.back()}>
               Try Again
             </Button>
           </div>

@@ -270,6 +270,41 @@ export interface IStorage {
   createOvertimeRecord(record: schema.InsertOvertimeRecord): Promise<schema.OvertimeRecord>;
   updateOvertimeRecord(id: string, record: Partial<schema.InsertOvertimeRecord>): Promise<schema.OvertimeRecord | undefined>;
   markOvertimePaid(ids: string[], paidDate: Date): Promise<void>;
+
+  // Marketing Campaigns
+  getAllMarketingCampaigns(): Promise<schema.MarketingCampaign[]>;
+  getMarketingCampaign(id: string): Promise<schema.MarketingCampaign | undefined>;
+  getMarketingCampaignsByStatus(status: string): Promise<schema.MarketingCampaign[]>;
+  getMarketingCampaignsByBranch(branchId: string): Promise<schema.MarketingCampaign[]>;
+  createMarketingCampaign(campaign: schema.InsertMarketingCampaign): Promise<schema.MarketingCampaign>;
+  updateMarketingCampaign(id: string, campaign: Partial<schema.InsertMarketingCampaign>): Promise<schema.MarketingCampaign | undefined>;
+  deleteMarketingCampaign(id: string): Promise<boolean>;
+  
+  // Campaign Recipients
+  getCampaignRecipients(campaignId: string): Promise<schema.CampaignRecipient[]>;
+  getCampaignRecipient(id: string): Promise<schema.CampaignRecipient | undefined>;
+  getCampaignRecipientsByStatus(campaignId: string, status: string): Promise<schema.CampaignRecipient[]>;
+  createCampaignRecipient(recipient: schema.InsertCampaignRecipient): Promise<schema.CampaignRecipient>;
+  updateCampaignRecipient(id: string, recipient: Partial<schema.InsertCampaignRecipient>): Promise<schema.CampaignRecipient | undefined>;
+  bulkCreateCampaignRecipients(recipients: schema.InsertCampaignRecipient[]): Promise<schema.CampaignRecipient[]>;
+  
+  // Message Templates
+  getAllMessageTemplates(): Promise<schema.MessageTemplate[]>;
+  getMessageTemplate(id: string): Promise<schema.MessageTemplate | undefined>;
+  getMessageTemplatesByCategory(category: string): Promise<schema.MessageTemplate[]>;
+  createMessageTemplate(template: schema.InsertMessageTemplate): Promise<schema.MessageTemplate>;
+  updateMessageTemplate(id: string, template: Partial<schema.InsertMessageTemplate>): Promise<schema.MessageTemplate | undefined>;
+  deleteMessageTemplate(id: string): Promise<boolean>;
+  incrementTemplateUsage(id: string): Promise<void>;
+  
+  // Customer Segments
+  getAllCustomerSegments(): Promise<schema.CustomerSegment[]>;
+  getCustomerSegment(id: string): Promise<schema.CustomerSegment | undefined>;
+  createCustomerSegment(segment: schema.InsertCustomerSegment): Promise<schema.CustomerSegment>;
+  updateCustomerSegment(id: string, segment: Partial<schema.InsertCustomerSegment>): Promise<schema.CustomerSegment | undefined>;
+  deleteCustomerSegment(id: string): Promise<boolean>;
+  calculateSegmentCustomerCount(segmentId: string): Promise<number>;
+  getCustomersForSegment(filters: any): Promise<schema.User[]>;
 }
 
 export class DbStorage implements IStorage {
@@ -1598,6 +1633,219 @@ export class DbStorage implements IStorage {
     await db.update(schema.overtimeRecords)
       .set({ isPaid: true, paidDate })
       .where(drizzleSql`${schema.overtimeRecords.id} = ANY(${ids})`);
+  }
+
+  // Marketing Campaigns
+  async getAllMarketingCampaigns() {
+    return await db.select().from(schema.marketingCampaigns).orderBy(desc(schema.marketingCampaigns.createdAt));
+  }
+
+  async getMarketingCampaign(id: string) {
+    const result = await db.select().from(schema.marketingCampaigns).where(eq(schema.marketingCampaigns.id, id));
+    return result[0];
+  }
+
+  async getMarketingCampaignsByStatus(status: string) {
+    return await db.select().from(schema.marketingCampaigns)
+      .where(eq(schema.marketingCampaigns.status, status))
+      .orderBy(desc(schema.marketingCampaigns.createdAt));
+  }
+
+  async getMarketingCampaignsByBranch(branchId: string) {
+    return await db.select().from(schema.marketingCampaigns)
+      .where(eq(schema.marketingCampaigns.branchId, branchId))
+      .orderBy(desc(schema.marketingCampaigns.createdAt));
+  }
+
+  async createMarketingCampaign(campaign: schema.InsertMarketingCampaign) {
+    const result = await db.insert(schema.marketingCampaigns).values(campaign).returning();
+    return result[0];
+  }
+
+  async updateMarketingCampaign(id: string, campaign: Partial<schema.InsertMarketingCampaign>) {
+    const result = await db.update(schema.marketingCampaigns)
+      .set({ ...campaign, updatedAt: new Date() })
+      .where(eq(schema.marketingCampaigns.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteMarketingCampaign(id: string) {
+    await db.delete(schema.marketingCampaigns).where(eq(schema.marketingCampaigns.id, id));
+    return true;
+  }
+
+  // Campaign Recipients
+  async getCampaignRecipients(campaignId: string) {
+    return await db.select().from(schema.campaignRecipients)
+      .where(eq(schema.campaignRecipients.campaignId, campaignId))
+      .orderBy(schema.campaignRecipients.createdAt);
+  }
+
+  async getCampaignRecipient(id: string) {
+    const result = await db.select().from(schema.campaignRecipients).where(eq(schema.campaignRecipients.id, id));
+    return result[0];
+  }
+
+  async getCampaignRecipientsByStatus(campaignId: string, status: string) {
+    return await db.select().from(schema.campaignRecipients)
+      .where(
+        and(
+          eq(schema.campaignRecipients.campaignId, campaignId),
+          eq(schema.campaignRecipients.status, status)
+        )
+      );
+  }
+
+  async createCampaignRecipient(recipient: schema.InsertCampaignRecipient) {
+    const result = await db.insert(schema.campaignRecipients).values(recipient).returning();
+    return result[0];
+  }
+
+  async updateCampaignRecipient(id: string, recipient: Partial<schema.InsertCampaignRecipient>) {
+    const result = await db.update(schema.campaignRecipients)
+      .set({ ...recipient, updatedAt: new Date() })
+      .where(eq(schema.campaignRecipients.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async bulkCreateCampaignRecipients(recipients: schema.InsertCampaignRecipient[]) {
+    const result = await db.insert(schema.campaignRecipients).values(recipients).returning();
+    return result;
+  }
+
+  // Message Templates
+  async getAllMessageTemplates() {
+    return await db.select().from(schema.messageTemplates).orderBy(desc(schema.messageTemplates.createdAt));
+  }
+
+  async getMessageTemplate(id: string) {
+    const result = await db.select().from(schema.messageTemplates).where(eq(schema.messageTemplates.id, id));
+    return result[0];
+  }
+
+  async getMessageTemplatesByCategory(category: string) {
+    return await db.select().from(schema.messageTemplates)
+      .where(eq(schema.messageTemplates.category, category))
+      .orderBy(desc(schema.messageTemplates.usageCount));
+  }
+
+  async createMessageTemplate(template: schema.InsertMessageTemplate) {
+    const result = await db.insert(schema.messageTemplates).values(template).returning();
+    return result[0];
+  }
+
+  async updateMessageTemplate(id: string, template: Partial<schema.InsertMessageTemplate>) {
+    const result = await db.update(schema.messageTemplates)
+      .set({ ...template, updatedAt: new Date() })
+      .where(eq(schema.messageTemplates.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteMessageTemplate(id: string) {
+    await db.delete(schema.messageTemplates).where(eq(schema.messageTemplates.id, id));
+    return true;
+  }
+
+  async incrementTemplateUsage(id: string) {
+    await db.update(schema.messageTemplates)
+      .set({ usageCount: drizzleSql`${schema.messageTemplates.usageCount} + 1`, updatedAt: new Date() })
+      .where(eq(schema.messageTemplates.id, id));
+  }
+
+  // Customer Segments
+  async getAllCustomerSegments() {
+    return await db.select().from(schema.customerSegments).orderBy(desc(schema.customerSegments.createdAt));
+  }
+
+  async getCustomerSegment(id: string) {
+    const result = await db.select().from(schema.customerSegments).where(eq(schema.customerSegments.id, id));
+    return result[0];
+  }
+
+  async createCustomerSegment(segment: schema.InsertCustomerSegment) {
+    const result = await db.insert(schema.customerSegments).values(segment).returning();
+    return result[0];
+  }
+
+  async updateCustomerSegment(id: string, segment: Partial<schema.InsertCustomerSegment>) {
+    const result = await db.update(schema.customerSegments)
+      .set({ ...segment, updatedAt: new Date() })
+      .where(eq(schema.customerSegments.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteCustomerSegment(id: string) {
+    await db.delete(schema.customerSegments).where(eq(schema.customerSegments.id, id));
+    return true;
+  }
+
+  async calculateSegmentCustomerCount(segmentId: string) {
+    const segment = await this.getCustomerSegment(segmentId);
+    if (!segment) return 0;
+
+    const customers = await this.getCustomersForSegment(segment.filters);
+    const count = customers.length;
+
+    // Update cached count
+    await this.updateCustomerSegment(segmentId, {
+      customerCount: count,
+      lastCalculated: new Date()
+    });
+
+    return count;
+  }
+
+  async getCustomersForSegment(filters: any) {
+    // Build dynamic query based on filters
+    const conditions: any[] = [eq(schema.users.role, "customer"), eq(schema.users.isActive, true)];
+
+    if (filters.city) {
+      // Note: This would need to join with customer_addresses table for accurate city filtering
+      conditions.push(drizzleSql`EXISTS (
+        SELECT 1 FROM customer_addresses 
+        WHERE customer_addresses.customer_id = ${schema.users.id} 
+        AND customer_addresses.city = ${filters.city}
+      )`);
+    }
+
+    if (filters.branchId) {
+      conditions.push(eq(schema.users.branchId, filters.branchId));
+    }
+
+    if (filters.loyaltyTier) {
+      conditions.push(drizzleSql`EXISTS (
+        SELECT 1 FROM loyalty_points 
+        WHERE loyalty_points.customer_id = ${schema.users.id} 
+        AND loyalty_points.tier = ${filters.loyaltyTier}
+      )`);
+    }
+
+    if (filters.minOrders) {
+      conditions.push(drizzleSql`(
+        SELECT COUNT(*) FROM orders 
+        WHERE orders.customer_id = ${schema.users.id}
+      ) >= ${filters.minOrders}`);
+    }
+
+    if (filters.maxOrders) {
+      conditions.push(drizzleSql`(
+        SELECT COUNT(*) FROM orders 
+        WHERE orders.customer_id = ${schema.users.id}
+      ) <= ${filters.maxOrders}`);
+    }
+
+    if (filters.minTotalSpent) {
+      conditions.push(drizzleSql`(
+        SELECT COALESCE(SUM(total_amount), 0) FROM orders 
+        WHERE orders.customer_id = ${schema.users.id}
+      ) >= ${filters.minTotalSpent}`);
+    }
+
+    return await db.select().from(schema.users).where(and(...conditions));
   }
 }
 

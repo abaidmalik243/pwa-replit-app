@@ -2908,6 +2908,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/customers/:customerId/orders/:orderId/reorder", authenticate, async (req, res) => {
+    try {
+      const { customerId, orderId } = req.params;
+      
+      // Verify user owns this customer account
+      if (req.user!.role !== "admin" && req.user!.role !== "staff" && req.user!.id !== customerId) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+      
+      // Get the original order
+      const originalOrder = await storage.getOrder(orderId);
+      if (!originalOrder) {
+        return res.status(404).json({ error: "Original order not found" });
+      }
+      
+      // Security: For non-admin/staff, verify the order belongs to the authenticated user
+      if (req.user!.role !== "admin" && req.user!.role !== "staff") {
+        if (originalOrder.customerId !== req.user!.id) {
+          return res.status(403).json({ error: "You can only reorder your own orders" });
+        }
+      } else {
+        // Admin/staff can reorder for any customer, but verify order belongs to target customer
+        if (originalOrder.customerId !== customerId) {
+          return res.status(403).json({ error: "Order does not belong to this customer" });
+        }
+      }
+      
+      // Validate payload using schema before creating order
+      const newOrderPayload = insertOrderSchema.parse({
+        orderNumber: `ORD-${Date.now()}-${(await storage.getAllOrders()).length + 1}`,
+        customerId: originalOrder.customerId!,
+        branchId: originalOrder.branchId,
+        customerName: originalOrder.customerName,
+        customerPhone: originalOrder.customerPhone,
+        alternativePhone: originalOrder.alternativePhone,
+        customerAddress: originalOrder.customerAddress,
+        deliveryArea: originalOrder.deliveryArea,
+        orderType: originalOrder.orderType,
+        orderSource: "online", // Reorders are always online
+        paymentMethod: originalOrder.paymentMethod,
+        paymentStatus: "pending", // Reset payment status
+        items: originalOrder.items, // Copy same items
+        subtotal: originalOrder.subtotal,
+        discount: "0", // Reset discount for new order
+        discountReason: null,
+        deliveryCharges: originalOrder.deliveryCharges,
+        deliveryDistance: originalOrder.deliveryDistance,
+        total: originalOrder.total,
+        status: "pending", // New order starts as pending
+        notes: originalOrder.notes,
+      });
+      
+      // Create new order with validated payload
+      const newOrder = await storage.createOrder(newOrderPayload);
+      
+      res.json(newOrder);
+    } catch (error: any) {
+      console.error("Reorder error:", error);
+      res.status(500).json({ error: error.message || "Failed to reorder" });
+    }
+  });
+
   // ==================== Refunds ====================
   
   app.get("/api/refunds", authenticate, authorize("admin", "staff"), async (req, res) => {

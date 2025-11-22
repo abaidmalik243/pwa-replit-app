@@ -21,9 +21,10 @@ import { format } from "date-fns";
 
 const refundSchema = z.object({
   orderId: z.string().min(1, "Order is required"),
-  amount: z.string().min(1, "Amount is required"),
+  refundAmount: z.string().min(1, "Amount is required"),
   reason: z.string().min(10, "Reason must be at least 10 characters"),
-  paymentMethod: z.enum(["Cash", "Card", "JazzCash"]),
+  refundMethod: z.enum(["cash", "card", "jazzcash", "loyalty_points"]),
+  notes: z.string().optional(),
 });
 
 type RefundFormData = z.infer<typeof refundSchema>;
@@ -31,10 +32,11 @@ type RefundFormData = z.infer<typeof refundSchema>;
 interface Refund {
   id: string;
   orderId: string;
-  amount: number;
+  refundAmount: number;
   reason: string;
-  paymentMethod: string;
+  refundMethod: string;
   status: string;
+  notes?: string;
   createdAt: string;
   order?: {
     orderNumber: string;
@@ -52,9 +54,11 @@ interface Order {
 
 export default function AdminRefunds() {
   const { toast } = useToast();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  const userBranchId = user?.branchId || "";
 
   const { data: refunds = [], isLoading } = useQuery<Refund[]>({
     queryKey: ["/api/refunds"],
@@ -73,16 +77,16 @@ export default function AdminRefunds() {
     resolver: zodResolver(refundSchema),
     defaultValues: {
       orderId: "",
-      amount: "",
+      refundAmount: "",
       reason: "",
-      paymentMethod: "Cash",
+      refundMethod: "cash",
+      notes: "",
     },
   });
 
   const createRefundMutation = useMutation({
-    mutationFn: (data: { amount: number; reason: string }) => {
-      const orderId = form.getValues("orderId");
-      return apiRequest(`/api/orders/${orderId}/refund`, "POST", data);
+    mutationFn: (data: { orderId: string; refundAmount: number; reason: string; refundMethod: string; branchId: string; notes?: string }) => {
+      return apiRequest("/api/refunds", "POST", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/refunds"] });
@@ -98,8 +102,12 @@ export default function AdminRefunds() {
 
   const onSubmit = (data: RefundFormData) => {
     createRefundMutation.mutate({
-      amount: parseFloat(data.amount),
+      orderId: data.orderId,
+      refundAmount: parseFloat(data.refundAmount),
       reason: data.reason,
+      refundMethod: data.refundMethod,
+      branchId: userBranchId,
+      notes: data.notes || undefined,
     });
   };
 
@@ -107,12 +115,13 @@ export default function AdminRefunds() {
   const handleOrderChange = (orderId: string) => {
     const selectedOrder = orders.find((o) => o.id === orderId);
     if (selectedOrder) {
-      form.setValue("paymentMethod", selectedOrder.paymentMethod as "Cash" | "Card" | "JazzCash");
-      form.setValue("amount", selectedOrder.totalAmount.toString());
+      const method = selectedOrder.paymentMethod.toLowerCase();
+      form.setValue("refundMethod", method as "cash" | "card" | "jazzcash" | "loyalty_points");
+      form.setValue("refundAmount", selectedOrder.totalAmount.toString());
     }
   };
 
-  const totalRefunded = refunds.reduce((sum, refund) => sum + refund.amount, 0);
+  const totalRefunded = refunds.reduce((sum, refund) => sum + refund.refundAmount, 0);
 
   return (
     <div className="flex h-screen bg-background">
@@ -216,8 +225,8 @@ export default function AdminRefunds() {
                         <Badge variant="outline" data-testid={`badge-status-${refund.id}`}>
                           {refund.status}
                         </Badge>
-                        <Badge variant="outline" data-testid={`badge-payment-method-${refund.id}`}>
-                          {refund.paymentMethod}
+                        <Badge variant="outline" data-testid={`badge-refund-method-${refund.id}`}>
+                          {refund.refundMethod}
                         </Badge>
                       </div>
                       <CardDescription className="mt-1" data-testid={`text-date-${refund.id}`}>
@@ -227,7 +236,7 @@ export default function AdminRefunds() {
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">Refund Amount</p>
                       <p className="text-xl font-bold text-red-600" data-testid={`text-amount-${refund.id}`}>
-                        ₨{refund.amount.toFixed(2)}
+                        ₨{refund.refundAmount.toFixed(2)}
                       </p>
                       {refund.order && (
                         <p className="text-xs text-muted-foreground" data-testid={`text-original-amount-${refund.id}`}>
@@ -297,12 +306,12 @@ export default function AdminRefunds() {
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
-                  name="amount"
+                  name="refundAmount"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Refund Amount</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" placeholder="0.00" {...field} data-testid="input-amount" />
+                        <Input type="number" step="0.01" placeholder="0.00" {...field} data-testid="input-refund-amount" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -311,20 +320,21 @@ export default function AdminRefunds() {
 
                 <FormField
                   control={form.control}
-                  name="paymentMethod"
+                  name="refundMethod"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Payment Method</FormLabel>
+                      <FormLabel>Refund Method</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value} disabled>
                         <FormControl>
-                          <SelectTrigger data-testid="select-payment-method">
+                          <SelectTrigger data-testid="select-refund-method">
                             <SelectValue placeholder="Select method" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="Cash">Cash</SelectItem>
-                          <SelectItem value="Card">Card</SelectItem>
-                          <SelectItem value="JazzCash">JazzCash</SelectItem>
+                          <SelectItem value="cash">Cash</SelectItem>
+                          <SelectItem value="card">Card</SelectItem>
+                          <SelectItem value="jazzcash">JazzCash</SelectItem>
+                          <SelectItem value="loyalty_points">Loyalty Points</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -345,6 +355,24 @@ export default function AdminRefunds() {
                         className="min-h-[100px]"
                         {...field} 
                         data-testid="input-reason"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Additional Notes (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Any additional information..." 
+                        {...field} 
+                        data-testid="input-notes"
                       />
                     </FormControl>
                     <FormMessage />

@@ -22,10 +22,10 @@ import { format } from "date-fns";
 const wastageSchema = z.object({
   menuItemId: z.string().min(1, "Menu item is required"),
   quantity: z.string().min(1, "Quantity is required"),
-  unit: z.string().min(1, "Unit is required"),
-  reason: z.enum(["expired", "damaged", "overproduction", "other"]),
+  wastageType: z.enum(["expired", "damaged", "overproduction", "spillage"]),
   estimatedCost: z.string().optional(),
-  notes: z.string().optional(),
+  reason: z.string().min(1, "Reason is required"),
+  wasteDate: z.string().optional(),
 });
 
 type WastageFormData = z.infer<typeof wastageSchema>;
@@ -33,41 +33,50 @@ type WastageFormData = z.infer<typeof wastageSchema>;
 interface Wastage {
   id: string;
   menuItemId: string;
+  branchId: string;
   quantity: number;
-  unit: string;
-  reason: string;
+  wastageType: string;
   estimatedCost?: number | null;
-  notes?: string | null;
+  reason: string;
+  wasteDate: string;
   createdAt: string;
   menuItem?: { name: string };
 }
 
-const reasonLabels: Record<string, string> = {
+const wastageTypeLabels: Record<string, string> = {
   expired: "Expired",
   damaged: "Damaged",
   overproduction: "Overproduction",
-  other: "Other",
+  spillage: "Spillage",
 };
 
-const reasonColors: Record<string, string> = {
+const wastageTypeColors: Record<string, string> = {
   expired: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200",
   damaged: "bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-200",
   overproduction: "bg-yellow-100 text-yellow-800 dark:bg-yellow-950 dark:text-yellow-200",
-  other: "bg-gray-100 text-gray-800 dark:bg-gray-950 dark:text-gray-200",
+  spillage: "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200",
 };
 
 export default function AdminWastage() {
   const { toast } = useToast();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
+  const userBranchId = user?.branchId || "";
+
   const { data: wastage = [], isLoading } = useQuery<Wastage[]>({
-    queryKey: ["/api/inventory/wastage"],
+    queryKey: ["/api/inventory/wastage", userBranchId],
+    queryFn: async () => {
+      const response = await fetch(`/api/inventory/wastage/${userBranchId}`);
+      if (!response.ok) throw new Error("Failed to fetch wastage data");
+      return response.json();
+    },
+    enabled: !!userBranchId,
   });
 
   const { data: inventory = [] } = useQuery<any[]>({
-    queryKey: ["/api/inventory"],
+    queryKey: ["/api/menu-items"],
   });
 
   const form = useForm<WastageFormData>({
@@ -75,22 +84,20 @@ export default function AdminWastage() {
     defaultValues: {
       menuItemId: "",
       quantity: "",
-      unit: "kg",
-      reason: "expired",
+      wastageType: "expired",
       estimatedCost: "",
-      notes: "",
+      reason: "",
+      wasteDate: new Date().toISOString().split('T')[0],
     },
   });
 
   const createWastageMutation = useMutation({
     mutationFn: (data: any) => {
-      const itemId = data.menuItemId;
-      delete data.menuItemId;
-      return apiRequest(`/api/inventory/${itemId}/wastage`, "POST", data);
+      return apiRequest("/api/inventory/wastage", "POST", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/inventory/wastage"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory/wastage", userBranchId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/menu-items"] });
       toast({ title: "Success", description: "Wastage recorded successfully" });
       setIsDialogOpen(false);
       form.reset();
@@ -103,11 +110,12 @@ export default function AdminWastage() {
   const onSubmit = (data: WastageFormData) => {
     const payload = {
       menuItemId: data.menuItemId,
-      quantity: parseFloat(data.quantity),
-      unit: data.unit,
+      branchId: userBranchId,
+      quantity: parseInt(data.quantity, 10),
+      wastageType: data.wastageType,
+      estimatedCost: data.estimatedCost ? parseFloat(data.estimatedCost) : undefined,
       reason: data.reason,
-      estimatedCost: data.estimatedCost ? parseFloat(data.estimatedCost) : null,
-      notes: data.notes || null,
+      wasteDate: data.wasteDate ? new Date(data.wasteDate).toISOString() : new Date().toISOString(),
     };
     createWastageMutation.mutate(payload);
   };
@@ -171,7 +179,7 @@ export default function AdminWastage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold" data-testid="text-common-reason">
-                {wastage.length > 0 ? reasonLabels[wastage[0].reason] : "-"}
+                {wastage.length > 0 ? wastageTypeLabels[wastage[0].wastageType] : "-"}
               </div>
             </CardContent>
           </Card>
@@ -213,18 +221,18 @@ export default function AdminWastage() {
                         <h3 className="text-lg font-semibold" data-testid={`text-item-name-${item.id}`}>
                           {item.menuItem?.name || "Unknown Item"}
                         </h3>
-                        <Badge className={reasonColors[item.reason]} data-testid={`badge-reason-${item.id}`}>
-                          {reasonLabels[item.reason]}
+                        <Badge className={wastageTypeColors[item.wastageType]} data-testid={`badge-wastageType-${item.id}`}>
+                          {wastageTypeLabels[item.wastageType]}
                         </Badge>
                       </div>
                       <p className="text-sm text-muted-foreground mt-1" data-testid={`text-date-${item.id}`}>
-                        {format(new Date(item.createdAt), "PPp")}
+                        Waste Date: {format(new Date(item.wasteDate), "PPp")}
                       </p>
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">Quantity</p>
                       <p className="text-xl font-bold" data-testid={`text-quantity-${item.id}`}>
-                        {item.quantity} {item.unit}
+                        {item.quantity}
                       </p>
                       {item.estimatedCost && (
                         <p className="text-sm text-red-600 mt-1" data-testid={`text-cost-${item.id}`}>
@@ -234,11 +242,11 @@ export default function AdminWastage() {
                     </div>
                   </div>
                 </CardHeader>
-                {item.notes && (
+                {item.reason && (
                   <CardContent>
-                    <p className="text-sm font-medium">Notes:</p>
-                    <p className="text-sm text-muted-foreground mt-1" data-testid={`text-notes-${item.id}`}>
-                      {item.notes}
+                    <p className="text-sm font-medium">Reason:</p>
+                    <p className="text-sm text-muted-foreground mt-1" data-testid={`text-reason-${item.id}`}>
+                      {item.reason}
                     </p>
                   </CardContent>
                 )}
@@ -265,7 +273,7 @@ export default function AdminWastage() {
                 name="menuItemId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Inventory Item</FormLabel>
+                    <FormLabel>Menu Item</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger data-testid="select-menu-item">
@@ -274,8 +282,8 @@ export default function AdminWastage() {
                       </FormControl>
                       <SelectContent>
                         {inventory.map((item) => (
-                          <SelectItem key={item.id} value={item.menuItemId}>
-                            {item.menuItem?.name || "Unknown"} ({item.quantity} {item.unit} available)
+                          <SelectItem key={item.id} value={item.id}>
+                            {item.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -285,66 +293,53 @@ export default function AdminWastage() {
                 )}
               />
 
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="quantity"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Quantity Wasted</FormLabel>
-                      <FormControl>
-                        <Input type="number" step="0.01" placeholder="5" {...field} data-testid="input-quantity" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="unit"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Unit</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-unit">
-                            <SelectValue placeholder="Select unit" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="kg">Kilograms (kg)</SelectItem>
-                          <SelectItem value="g">Grams (g)</SelectItem>
-                          <SelectItem value="l">Liters (l)</SelectItem>
-                          <SelectItem value="ml">Milliliters (ml)</SelectItem>
-                          <SelectItem value="pcs">Pieces (pcs)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+              <FormField
+                control={form.control}
+                name="quantity"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Quantity Wasted</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="1" placeholder="5" {...field} data-testid="input-quantity" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <FormField
                 control={form.control}
-                name="reason"
+                name="wastageType"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Reason</FormLabel>
+                    <FormLabel>Wastage Type</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger data-testid="select-reason">
-                          <SelectValue placeholder="Select reason" />
+                        <SelectTrigger data-testid="select-wastage-type">
+                          <SelectValue placeholder="Select wastage type" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="expired">Expired</SelectItem>
                         <SelectItem value="damaged">Damaged</SelectItem>
                         <SelectItem value="overproduction">Overproduction</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
+                        <SelectItem value="spillage">Spillage</SelectItem>
                       </SelectContent>
                     </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="wasteDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Waste Date</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} data-testid="input-waste-date" />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -366,15 +361,15 @@ export default function AdminWastage() {
 
               <FormField
                 control={form.control}
-                name="notes"
+                name="reason"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Notes (Optional)</FormLabel>
+                    <FormLabel>Reason</FormLabel>
                     <FormControl>
                       <Textarea 
-                        placeholder="Additional details..." 
+                        placeholder="Describe the reason for wastage..." 
                         {...field} 
-                        data-testid="input-notes"
+                        data-testid="input-reason"
                       />
                     </FormControl>
                     <FormMessage />

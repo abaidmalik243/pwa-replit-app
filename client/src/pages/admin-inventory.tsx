@@ -13,130 +13,249 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import AdminSidebar from "@/components/AdminSidebar";
 import AdminHeader from "@/components/AdminHeader";
-import { Package, AlertTriangle, Plus, Edit, TrendingDown } from "lucide-react";
+import { Package, AlertTriangle, Edit, Settings } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/AuthContext";
+import type { MenuItem, ReorderPoint, Supplier } from "@shared/schema";
 
-const inventorySchema = z.object({
-  menuItemId: z.string().min(1, "Menu item is required"),
-  quantity: z.string().min(1, "Quantity is required"),
-  unit: z.string().min(1, "Unit is required"),
-  reorderPoint: z.string().optional(),
-  reorderQuantity: z.string().optional(),
-  supplierId: z.string().optional(),
+// Schema for adjusting stock quantity
+const stockAdjustmentSchema = z.object({
+  stockQuantity: z.string().min(1, "Stock quantity is required").transform(val => parseInt(val, 10)),
+  lowStockThreshold: z.string().optional().transform(val => val ? parseInt(val, 10) : undefined),
 });
 
-type InventoryFormData = z.infer<typeof inventorySchema>;
+// Schema for setting/editing reorder point
+const reorderPointSchema = z.object({
+  reorderLevel: z.string().min(1, "Reorder level is required").transform(val => parseInt(val, 10)),
+  reorderQuantity: z.string().min(1, "Reorder quantity is required").transform(val => parseInt(val, 10)),
+  preferredSupplierId: z.string().optional(),
+  leadTimeDays: z.string().optional().transform(val => val ? parseInt(val, 10) : undefined),
+});
 
-interface InventoryItem {
-  id: string;
-  menuItemId: string;
-  quantity: number;
-  unit: string;
-  reorderPoint?: number | null;
-  reorderQuantity?: number | null;
-  supplierId?: string | null;
-  menuItem?: { name: string };
-  supplier?: { name: string };
+type StockAdjustmentFormData = z.infer<typeof stockAdjustmentSchema>;
+type ReorderPointFormData = z.infer<typeof reorderPointSchema>;
+
+interface MenuItemWithReorderPoint extends MenuItem {
+  reorderPoint?: ReorderPoint;
+  supplier?: Supplier;
 }
 
 export default function AdminInventory() {
   const { toast } = useToast();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const [stockDialogOpen, setStockDialogOpen] = useState(false);
+  const [reorderDialogOpen, setReorderDialogOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<MenuItemWithReorderPoint | null>(null);
 
-  const { data: inventory = [], isLoading } = useQuery<InventoryItem[]>({
-    queryKey: ["/api/inventory"],
-  });
+  const branchId = user?.branchId;
 
-  const { data: menuItems = [] } = useQuery<any[]>({
+  // Fetch menu items
+  const { data: menuItems = [], isLoading: menuItemsLoading } = useQuery<MenuItem[]>({
     queryKey: ["/api/menu-items"],
   });
 
-  const { data: suppliers = [] } = useQuery<any[]>({
+  // Fetch reorder points for this branch
+  const { data: reorderPoints = [], isLoading: reorderPointsLoading } = useQuery<ReorderPoint[]>({
+    queryKey: ["/api/inventory/reorder-points", branchId],
+    queryFn: async () => {
+      if (!branchId) throw new Error("Branch ID is required");
+      const response = await fetch(`/api/inventory/reorder-points/${branchId}`);
+      if (!response.ok) throw new Error("Failed to fetch reorder points");
+      return response.json();
+    },
+    enabled: !!branchId,
+  });
+
+  // Fetch suppliers
+  const { data: suppliers = [] } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers"],
   });
 
-  const form = useForm<InventoryFormData>({
-    resolver: zodResolver(inventorySchema),
+  // Fetch low stock items from API
+  const { data: lowStockItems = [] } = useQuery<MenuItem[]>({
+    queryKey: ["/api/inventory/low-stock", branchId],
+    queryFn: async () => {
+      if (!branchId) throw new Error("Branch ID is required");
+      const response = await fetch(`/api/inventory/low-stock/${branchId}`);
+      if (!response.ok) throw new Error("Failed to fetch low stock items");
+      return response.json();
+    },
+    enabled: !!branchId,
+  });
+
+  const stockForm = useForm<StockAdjustmentFormData>({
+    resolver: zodResolver(stockAdjustmentSchema),
     defaultValues: {
-      menuItemId: "",
-      quantity: "",
-      unit: "kg",
-      reorderPoint: "",
+      stockQuantity: "",
+      lowStockThreshold: "",
+    },
+  });
+
+  const reorderForm = useForm<ReorderPointFormData>({
+    resolver: zodResolver(reorderPointSchema),
+    defaultValues: {
+      reorderLevel: "",
       reorderQuantity: "",
-      supplierId: "",
+      preferredSupplierId: "",
+      leadTimeDays: "",
     },
   });
 
-  const createMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("/api/inventory", "POST", data),
+  // Mutation to update menu item stock
+  const updateStockMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<MenuItem> }) =>
+      apiRequest(`/api/menu-items/${id}`, "PUT", data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
-      toast({ title: "Success", description: "Inventory item added" });
-      setIsDialogOpen(false);
-      form.reset();
+      queryClient.invalidateQueries({ queryKey: ["/api/menu-items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory/low-stock", branchId] });
+      toast({ title: "Success", description: "Stock quantity updated" });
+      setStockDialogOpen(false);
+      stockForm.reset();
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
-  const updateMutation = useMutation({
+  // Mutation to create reorder point
+  const createReorderPointMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("/api/inventory/reorder-points", "POST", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory/reorder-points", branchId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory/low-stock", branchId] });
+      toast({ title: "Success", description: "Reorder point created" });
+      setReorderDialogOpen(false);
+      reorderForm.reset();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Mutation to update reorder point
+  const updateReorderPointMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) =>
-      apiRequest(`/api/inventory/${id}`, "PATCH", data),
+      apiRequest(`/api/inventory/reorder-points/${id}`, "PATCH", data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
-      toast({ title: "Success", description: "Inventory updated" });
-      setIsDialogOpen(false);
-      setEditingItem(null);
-      form.reset();
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory/reorder-points", branchId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory/low-stock", branchId] });
+      toast({ title: "Success", description: "Reorder point updated" });
+      setReorderDialogOpen(false);
+      reorderForm.reset();
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
-  const handleOpenDialog = (item?: InventoryItem) => {
-    if (item) {
-      setEditingItem(item);
-      form.reset({
-        menuItemId: item.menuItemId,
-        quantity: item.quantity.toString(),
-        unit: item.unit,
-        reorderPoint: item.reorderPoint?.toString() || "",
-        reorderQuantity: item.reorderQuantity?.toString() || "",
-        supplierId: item.supplierId || "",
+  // Mutation to delete reorder point
+  const deleteReorderPointMutation = useMutation({
+    mutationFn: (id: string) => apiRequest(`/api/inventory/reorder-points/${id}`, "DELETE"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory/reorder-points", branchId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory/low-stock", branchId] });
+      toast({ title: "Success", description: "Reorder point deleted" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Join menu items with reorder points and suppliers
+  const menuItemsWithReorderPoints: MenuItemWithReorderPoint[] = menuItems.map(item => {
+    const reorderPoint = reorderPoints.find(
+      rp => rp.menuItemId === item.id && rp.branchId === branchId
+    );
+    const supplier = reorderPoint
+      ? suppliers.find(s => s.id === reorderPoint.preferredSupplierId)
+      : undefined;
+    return { ...item, reorderPoint, supplier };
+  });
+
+  // Filter to only show items with stock tracking
+  const inventoryItems = menuItemsWithReorderPoints.filter(
+    item => item.stockQuantity !== null && item.stockQuantity !== undefined
+  );
+
+  // Calculate low stock alerts
+  const lowStockAlerts = inventoryItems.filter(item => {
+    if (item.reorderPoint) {
+      return (item.stockQuantity || 0) <= item.reorderPoint.reorderLevel;
+    }
+    return (item.stockQuantity || 0) <= (item.lowStockThreshold || 0);
+  });
+
+  const handleOpenStockDialog = (item: MenuItemWithReorderPoint) => {
+    setSelectedItem(item);
+    stockForm.reset({
+      stockQuantity: item.stockQuantity?.toString() || "0",
+      lowStockThreshold: item.lowStockThreshold?.toString() || "",
+    });
+    setStockDialogOpen(true);
+  };
+
+  const handleOpenReorderDialog = (item: MenuItemWithReorderPoint) => {
+    setSelectedItem(item);
+    if (item.reorderPoint) {
+      reorderForm.reset({
+        reorderLevel: item.reorderPoint.reorderLevel.toString(),
+        reorderQuantity: item.reorderPoint.reorderQuantity.toString(),
+        preferredSupplierId: item.reorderPoint.preferredSupplierId || "",
+        leadTimeDays: item.reorderPoint.leadTimeDays?.toString() || "",
       });
     } else {
-      setEditingItem(null);
-      form.reset();
+      reorderForm.reset({
+        reorderLevel: "",
+        reorderQuantity: "",
+        preferredSupplierId: "",
+        leadTimeDays: "",
+      });
     }
-    setIsDialogOpen(true);
+    setReorderDialogOpen(true);
   };
 
-  const onSubmit = (data: InventoryFormData) => {
-    const payload = {
-      menuItemId: data.menuItemId,
-      quantity: parseFloat(data.quantity),
-      unit: data.unit,
-      reorderPoint: data.reorderPoint ? parseFloat(data.reorderPoint) : null,
-      reorderQuantity: data.reorderQuantity ? parseFloat(data.reorderQuantity) : null,
-      supplierId: data.supplierId || null,
+  const onStockSubmit = (data: StockAdjustmentFormData) => {
+    if (!selectedItem) return;
+
+    const updateData: Partial<MenuItem> = {
+      stockQuantity: data.stockQuantity,
     };
 
-    if (editingItem) {
-      updateMutation.mutate({ id: editingItem.id, data: payload });
+    if (data.lowStockThreshold !== undefined) {
+      updateData.lowStockThreshold = data.lowStockThreshold;
+    }
+
+    updateStockMutation.mutate({ id: selectedItem.id, data: updateData });
+  };
+
+  const onReorderSubmit = (data: ReorderPointFormData) => {
+    if (!selectedItem || !branchId) return;
+
+    const payload = {
+      menuItemId: selectedItem.id,
+      branchId,
+      reorderLevel: data.reorderLevel,
+      reorderQuantity: data.reorderQuantity,
+      preferredSupplierId: data.preferredSupplierId || null,
+      leadTimeDays: data.leadTimeDays || 7,
+      isActive: true,
+    };
+
+    if (selectedItem.reorderPoint) {
+      updateReorderPointMutation.mutate({ id: selectedItem.reorderPoint.id, data: payload });
     } else {
-      createMutation.mutate(payload);
+      createReorderPointMutation.mutate(payload);
     }
   };
 
-  const lowStockItems = inventory.filter(
-    (item) => item.reorderPoint && item.quantity <= item.reorderPoint
-  );
+  const handleDeleteReorderPoint = (reorderPointId: string) => {
+    if (confirm("Are you sure you want to delete this reorder point?")) {
+      deleteReorderPointMutation.mutate(reorderPointId);
+    }
+  };
+
+  const isLoading = menuItemsLoading || reorderPointsLoading;
 
   return (
     <div className="flex h-screen bg-background">
@@ -158,297 +277,336 @@ export default function AdminInventory() {
         <AdminHeader
           breadcrumbs={["Admin", "Inventory Management"]}
           notificationCount={0}
-          userName="Admin User"
+          userName={user?.fullName || "Admin User"}
           onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
         />
 
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
           <div className="space-y-6">
-        {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Items</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold" data-testid="text-total-items">{inventory.length}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Low Stock Alerts</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-yellow-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-yellow-600" data-testid="text-low-stock-count">
-                {lowStockItems.length}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Value</CardTitle>
-              <TrendingDown className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold" data-testid="text-total-value">₨0.00</div>
-              <p className="text-xs text-muted-foreground">Estimated</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Actions Bar */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold" data-testid="text-inventory-title">Inventory Items</h2>
-            <p className="text-muted-foreground">Manage stock levels and suppliers</p>
-          </div>
-          <Button onClick={() => handleOpenDialog()} data-testid="button-add-inventory">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Item
-          </Button>
-        </div>
-
-        {/* Low Stock Alerts */}
-        {lowStockItems.length > 0 && (
-          <Card className="border-yellow-200 dark:border-yellow-900 bg-yellow-50 dark:bg-yellow-950/20">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-yellow-600" />
-                Low Stock Alerts
-              </CardTitle>
-              <CardDescription>
-                These items need to be reordered soon
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {lowStockItems.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between p-2 bg-background rounded" data-testid={`alert-low-stock-${item.id}`}>
-                    <div>
-                      <p className="font-medium">{item.menuItem?.name || "Unknown Item"}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Current: {item.quantity} {item.unit} • Reorder at: {item.reorderPoint} {item.unit}
-                      </p>
-                    </div>
-                    <Badge variant="outline" className="bg-yellow-100 dark:bg-yellow-950">
-                      Reorder {item.reorderQuantity || 0} {item.unit}
-                    </Badge>
+            {/* Stats Cards */}
+            <div className="grid gap-4 md:grid-cols-3">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Items</CardTitle>
+                  <Package className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold" data-testid="text-total-items">
+                    {inventoryItems.length}
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                  <p className="text-xs text-muted-foreground">With stock tracking</p>
+                </CardContent>
+              </Card>
 
-        {/* Inventory Table */}
-        {isLoading ? (
-          <p data-testid="text-loading">Loading inventory...</p>
-        ) : inventory.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground" data-testid="text-empty-state">No inventory items yet</p>
-              <Button className="mt-4" onClick={() => handleOpenDialog()} data-testid="button-add-first-item">
-                Add First Item
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-muted/50">
-                    <tr>
-                      <th className="text-left p-4 font-medium">Item</th>
-                      <th className="text-left p-4 font-medium">Stock</th>
-                      <th className="text-left p-4 font-medium">Unit</th>
-                      <th className="text-left p-4 font-medium">Reorder Point</th>
-                      <th className="text-left p-4 font-medium">Supplier</th>
-                      <th className="text-left p-4 font-medium">Status</th>
-                      <th className="text-right p-4 font-medium">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {inventory.map((item) => {
-                      const isLowStock = item.reorderPoint && item.quantity <= item.reorderPoint;
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Low Stock Alerts</CardTitle>
+                  <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-yellow-600" data-testid="text-low-stock-count">
+                    {lowStockAlerts.length}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Items need reorder</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Reorder Points Set</CardTitle>
+                  <Settings className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold" data-testid="text-reorder-points-count">
+                    {reorderPoints.length}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Configured items</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Page Header */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold" data-testid="text-inventory-title">Inventory Items</h2>
+                <p className="text-muted-foreground">Manage stock levels and reorder settings</p>
+              </div>
+            </div>
+
+            {/* Low Stock Alerts */}
+            {lowStockAlerts.length > 0 && (
+              <Card className="border-yellow-200 dark:border-yellow-900 bg-yellow-50 dark:bg-yellow-950/20">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-yellow-600" />
+                    Low Stock Alerts
+                  </CardTitle>
+                  <CardDescription>
+                    These items need to be reordered soon
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {lowStockAlerts.map(item => (
+                      <div
+                        key={item.id}
+                        className="flex items-center justify-between p-3 bg-background rounded-lg"
+                        data-testid={`alert-item-${item.id}`}
+                      >
+                        <div>
+                          <p className="font-medium">{item.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Current: {item.stockQuantity} {item.reorderPoint ? `| Reorder at: ${item.reorderPoint.reorderLevel}` : `| Threshold: ${item.lowStockThreshold}`}
+                          </p>
+                        </div>
+                        <Badge variant="destructive" data-testid={`badge-low-stock-${item.id}`}>
+                          Low Stock
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Inventory Items Table */}
+            {isLoading ? (
+              <div className="text-center py-12">Loading inventory...</div>
+            ) : inventoryItems.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-lg font-medium">No inventory items found</p>
+                  <p className="text-sm text-muted-foreground">
+                    Menu items with stock tracking will appear here
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle>All Items</CardTitle>
+                  <CardDescription>
+                    {inventoryItems.length} items with stock tracking
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {inventoryItems.map(item => {
+                      const isLowStock = lowStockAlerts.some(alert => alert.id === item.id);
                       return (
-                        <tr key={item.id} className="border-t" data-testid={`row-inventory-${item.id}`}>
-                          <td className="p-4 font-medium" data-testid={`text-item-name-${item.id}`}>
-                            {item.menuItem?.name || "Unknown"}
-                          </td>
-                          <td className="p-4" data-testid={`text-quantity-${item.id}`}>
-                            {item.quantity}
-                          </td>
-                          <td className="p-4" data-testid={`text-unit-${item.id}`}>{item.unit}</td>
-                          <td className="p-4" data-testid={`text-reorder-point-${item.id}`}>
-                            {item.reorderPoint || "-"}
-                          </td>
-                          <td className="p-4" data-testid={`text-supplier-${item.id}`}>
-                            {item.supplier?.name || "-"}
-                          </td>
-                          <td className="p-4">
-                            {isLowStock ? (
-                              <Badge variant="outline" className="bg-yellow-100 dark:bg-yellow-950" data-testid={`badge-low-stock-${item.id}`}>
-                                Low Stock
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="bg-green-100 dark:bg-green-950" data-testid={`badge-in-stock-${item.id}`}>
-                                In Stock
-                              </Badge>
+                        <div
+                          key={item.id}
+                          className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 border rounded-lg"
+                          data-testid={`inventory-item-${item.id}`}
+                        >
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="font-semibold" data-testid={`text-item-name-${item.id}`}>
+                                {item.name}
+                              </h3>
+                              {isLowStock && (
+                                <Badge variant="destructive" className="text-xs">
+                                  Low Stock
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm text-muted-foreground">
+                              <div>
+                                <span className="font-medium">Stock:</span>{" "}
+                                <span data-testid={`text-stock-${item.id}`}>{item.stockQuantity}</span>
+                              </div>
+                              <div>
+                                <span className="font-medium">Threshold:</span>{" "}
+                                <span data-testid={`text-threshold-${item.id}`}>{item.lowStockThreshold || "N/A"}</span>
+                              </div>
+                              {item.reorderPoint && (
+                                <>
+                                  <div>
+                                    <span className="font-medium">Reorder Level:</span>{" "}
+                                    <span data-testid={`text-reorder-level-${item.id}`}>{item.reorderPoint.reorderLevel}</span>
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Reorder Qty:</span>{" "}
+                                    <span data-testid={`text-reorder-qty-${item.id}`}>{item.reorderPoint.reorderQuantity}</span>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                            {item.supplier && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Supplier: {item.supplier.name}
+                              </p>
                             )}
-                          </td>
-                          <td className="p-4 text-right">
+                          </div>
+                          <div className="flex gap-2">
                             <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleOpenDialog(item)}
-                              data-testid={`button-edit-${item.id}`}
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleOpenStockDialog(item)}
+                              data-testid={`button-adjust-stock-${item.id}`}
                             >
-                              <Edit className="h-4 w-4" />
+                              <Edit className="h-4 w-4 mr-1" />
+                              Adjust Stock
                             </Button>
-                          </td>
-                        </tr>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleOpenReorderDialog(item)}
+                              data-testid={`button-set-reorder-${item.id}`}
+                            >
+                              <Settings className="h-4 w-4 mr-1" />
+                              {item.reorderPoint ? "Edit" : "Set"} Reorder
+                            </Button>
+                          </div>
+                        </div>
                       );
                     })}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+        </main>
       </div>
 
-      {/* Add/Edit Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl" data-testid="dialog-inventory-form">
+      {/* Stock Adjustment Dialog */}
+      <Dialog open={stockDialogOpen} onOpenChange={setStockDialogOpen}>
+        <DialogContent data-testid="dialog-adjust-stock">
           <DialogHeader>
-            <DialogTitle data-testid="text-dialog-title">
-              {editingItem ? "Edit Inventory Item" : "Add Inventory Item"}
-            </DialogTitle>
+            <DialogTitle>Adjust Stock Quantity</DialogTitle>
             <DialogDescription>
-              {editingItem ? "Update inventory details" : "Add a new item to inventory"}
+              Update stock levels for {selectedItem?.name}
             </DialogDescription>
           </DialogHeader>
-
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <Form {...stockForm}>
+            <form onSubmit={stockForm.handleSubmit(onStockSubmit)} className="space-y-4">
               <FormField
-                control={form.control}
-                name="menuItemId"
+                control={stockForm.control}
+                name="stockQuantity"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Menu Item</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-menu-item">
-                          <SelectValue placeholder="Select menu item" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {menuItems.map((item) => (
-                          <SelectItem key={item.id} value={item.id}>
-                            {item.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>Stock Quantity</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder="Enter stock quantity"
+                        {...field}
+                        data-testid="input-stock-quantity"
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="quantity"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Quantity</FormLabel>
-                      <FormControl>
-                        <Input type="number" step="0.01" placeholder="100" {...field} data-testid="input-quantity" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="unit"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Unit</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-unit">
-                            <SelectValue placeholder="Select unit" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="kg">Kilograms (kg)</SelectItem>
-                          <SelectItem value="g">Grams (g)</SelectItem>
-                          <SelectItem value="l">Liters (l)</SelectItem>
-                          <SelectItem value="ml">Milliliters (ml)</SelectItem>
-                          <SelectItem value="pcs">Pieces (pcs)</SelectItem>
-                          <SelectItem value="box">Box</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="reorderPoint"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Reorder Point (Optional)</FormLabel>
-                      <FormControl>
-                        <Input type="number" step="0.01" placeholder="20" {...field} data-testid="input-reorder-point" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="reorderQuantity"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Reorder Quantity (Optional)</FormLabel>
-                      <FormControl>
-                        <Input type="number" step="0.01" placeholder="50" {...field} data-testid="input-reorder-quantity" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
               <FormField
-                control={form.control}
-                name="supplierId"
+                control={stockForm.control}
+                name="lowStockThreshold"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Supplier (Optional)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <FormLabel>Low Stock Threshold (Optional)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder="Enter threshold"
+                        {...field}
+                        data-testid="input-low-stock-threshold"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setStockDialogOpen(false)}
+                  data-testid="button-cancel-stock"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={updateStockMutation.isPending}
+                  data-testid="button-save-stock"
+                >
+                  {updateStockMutation.isPending ? "Saving..." : "Save Changes"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reorder Point Dialog */}
+      <Dialog open={reorderDialogOpen} onOpenChange={setReorderDialogOpen}>
+        <DialogContent data-testid="dialog-reorder-point">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedItem?.reorderPoint ? "Edit" : "Set"} Reorder Point
+            </DialogTitle>
+            <DialogDescription>
+              Configure reorder settings for {selectedItem?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...reorderForm}>
+            <form onSubmit={reorderForm.handleSubmit(onReorderSubmit)} className="space-y-4">
+              <FormField
+                control={reorderForm.control}
+                name="reorderLevel"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Reorder Level</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder="Reorder when stock reaches this level"
+                        {...field}
+                        data-testid="input-reorder-level"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={reorderForm.control}
+                name="reorderQuantity"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Reorder Quantity</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder="How much to order"
+                        {...field}
+                        data-testid="input-reorder-quantity"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={reorderForm.control}
+                name="preferredSupplierId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Preferred Supplier (Optional)</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                    >
                       <FormControl>
                         <SelectTrigger data-testid="select-supplier">
-                          <SelectValue placeholder="Select supplier" />
+                          <SelectValue placeholder="Select a supplier" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">None</SelectItem>
-                        {suppliers.map((supplier) => (
+                        <SelectItem value="">No supplier</SelectItem>
+                        {suppliers.map(supplier => (
                           <SelectItem key={supplier.id} value={supplier.id}>
                             {supplier.name}
                           </SelectItem>
@@ -459,25 +617,59 @@ export default function AdminInventory() {
                   </FormItem>
                 )}
               />
-
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} data-testid="button-cancel">
+              <FormField
+                control={reorderForm.control}
+                name="leadTimeDays"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Lead Time (Days)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder="Expected delivery time (default: 7)"
+                        {...field}
+                        data-testid="input-lead-time"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter className="gap-2">
+                {selectedItem?.reorderPoint && (
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={() => handleDeleteReorderPoint(selectedItem.reorderPoint!.id)}
+                    disabled={deleteReorderPointMutation.isPending}
+                    data-testid="button-delete-reorder"
+                  >
+                    Delete
+                  </Button>
+                )}
+                <div className="flex-1" />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setReorderDialogOpen(false)}
+                  data-testid="button-cancel-reorder"
+                >
                   Cancel
                 </Button>
-                <Button 
-                  type="submit" 
-                  disabled={createMutation.isPending || updateMutation.isPending}
-                  data-testid="button-save-inventory"
+                <Button
+                  type="submit"
+                  disabled={createReorderPointMutation.isPending || updateReorderPointMutation.isPending}
+                  data-testid="button-save-reorder"
                 >
-                  {(createMutation.isPending || updateMutation.isPending) ? "Saving..." : "Save"}
+                  {createReorderPointMutation.isPending || updateReorderPointMutation.isPending
+                    ? "Saving..."
+                    : "Save Changes"}
                 </Button>
               </DialogFooter>
             </form>
           </Form>
         </DialogContent>
       </Dialog>
-        </main>
-      </div>
     </div>
   );
 }

@@ -3330,7 +3330,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Verify JazzCash payment (staff only)
+  // Create JazzCash payment session
+  app.post("/api/payments/jazzcash/create", authenticate, async (req, res) => {
+    try {
+      const { orderId, returnUrl } = req.body;
+      
+      if (!orderId || !returnUrl) {
+        return res.status(400).json({ error: "Order ID and return URL are required" });
+      }
+
+      const order = await storage.getOrder(orderId);
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+
+      // Verify order belongs to user (unless admin/staff)
+      if (req.user!.role === "customer" && order.customerId !== req.user!.id) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+
+      const { createJazzCashPayment, isJazzCashConfigured } = await import('./jazzCashService');
+      
+      if (!isJazzCashConfigured()) {
+        return res.status(500).json({ error: "JazzCash is not configured" });
+      }
+
+      const customer = order.customerId ? await storage.getUser(order.customerId) : null;
+
+      const payment = createJazzCashPayment({
+        orderId: order.id,
+        amount: parseFloat(order.total),
+        billReference: order.orderNumber,
+        description: `Order #${order.orderNumber} - Kebabish Pizza`,
+        returnUrl,
+        customerMobile: customer?.phone || undefined,
+        customerEmail: customer?.email || undefined,
+      });
+
+      res.json(payment);
+    } catch (error: any) {
+      console.error("JazzCash session creation error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Handle JazzCash payment callback/response
+  app.post("/api/payments/jazzcash/callback", async (req, res) => {
+    try {
+      const { validateJazzCashResponse } = await import('./jazzCashService');
+      
+      const validation = validateJazzCashResponse(req.body);
+      
+      if (!validation.success) {
+        console.error("JazzCash payment failed:", validation.responseMessage);
+        return res.redirect(`/checkout?payment=failed&message=${encodeURIComponent(validation.responseMessage)}`);
+      }
+
+      // Get order from custom field
+      const orderId = validation.orderId;
+      if (!orderId) {
+        console.error("No order ID in JazzCash response");
+        return res.redirect('/checkout?payment=failed&message=Invalid+response');
+      }
+
+      const order = await storage.getOrder(orderId);
+      if (!order) {
+        console.error("Order not found:", orderId);
+        return res.redirect('/checkout?payment=failed&message=Order+not+found');
+      }
+
+      // Update order with successful payment
+      await storage.updateOrder(orderId, {
+        ...order,
+        discount: order.discount ?? undefined,
+        deliveryCharges: order.deliveryCharges ?? undefined,
+        deliveryDistance: order.deliveryDistance || undefined,
+        paymentMethod: "jazzcash",
+        paymentStatus: "paid",
+        jazzCashTransactionId: validation.transactionId,
+        notes: `${order.notes || ""}\nJazzCash Payment: ${validation.transactionId} - ${validation.responseMessage}`.trim(),
+      });
+
+      // Redirect to success page
+      res.redirect(`/order-confirmation/${orderId}?payment=success`);
+    } catch (error: any) {
+      console.error("JazzCash callback error:", error);
+      res.redirect(`/checkout?payment=failed&message=${encodeURIComponent(error.message)}`);
+    }
+  });
+
+  // Verify JazzCash payment (staff only - for manual verification)
   app.post("/api/payments/jazzcash/verify", authenticate, authorize("admin", "staff"), async (req, res) => {
     try {
       const { orderId, approved, notes } = req.body;

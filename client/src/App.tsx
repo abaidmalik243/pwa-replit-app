@@ -45,6 +45,8 @@ import AdminSuppliers from "@/pages/admin-suppliers";
 import AdminRefunds from "@/pages/admin-refunds";
 import AdminWastage from "@/pages/admin-wastage";
 import PaymentResult from "@/pages/payment-result";
+import AdminJazzCash from "@/pages/admin-jazzcash";
+import AdminAnalytics from "@/pages/admin-analytics";
 
 function Router() {
   return (
@@ -186,6 +188,16 @@ function Router() {
       <Route path="/admin/wastage">
         <ProtectedRoute requireRole={["admin", "staff"]}>
           <AdminWastage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/jazzcash">
+        <ProtectedRoute requireRole={["admin"]}>
+          <AdminJazzCash />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/analytics">
+        <ProtectedRoute requireRole={["admin"]}>
+          <AdminAnalytics />
         </ProtectedRoute>
       </Route>
       <Route path="/account">

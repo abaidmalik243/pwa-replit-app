@@ -3435,6 +3435,332 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get JazzCash configuration status (admin only)
+  app.get("/api/payments/jazzcash/config", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      const { isJazzCashConfigured } = await import('./jazzCashService');
+      const configured = isJazzCashConfigured();
+      const environment = process.env.JAZZCASH_BASE_URL?.includes('sandbox') ? 'sandbox' : 'production';
+      
+      res.json({ configured, environment });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get JazzCash transactions (admin only)
+  app.get("/api/payments/jazzcash/transactions", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      const orders = await storage.getAllOrders();
+      const jazzCashOrders = orders
+        .filter(order => order.paymentMethod === "jazzcash" && order.jazzCashTransactionId)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 50); // Last 50 transactions
+      
+      res.json(jazzCashOrders);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get JazzCash statistics (admin only)
+  app.get("/api/payments/jazzcash/stats", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      const orders = await storage.getAllOrders();
+      const jazzCashOrders = orders.filter(order => order.paymentMethod === "jazzcash");
+      
+      const totalTransactions = jazzCashOrders.length;
+      const successfulTransactions = jazzCashOrders.filter(order => order.paymentStatus === "paid").length;
+      const pendingCount = jazzCashOrders.filter(order => order.paymentStatus === "pending").length;
+      const totalAmount = jazzCashOrders
+        .filter(order => order.paymentStatus === "paid")
+        .reduce((sum, order) => sum + parseFloat(order.total), 0);
+      const successRate = totalTransactions > 0 ? Math.round((successfulTransactions / totalTransactions) * 100) : 0;
+      
+      res.json({
+        totalTransactions,
+        successfulTransactions,
+        pendingCount,
+        totalAmount,
+        successRate,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Analytics: Overview
+  app.get("/api/analytics/overview", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      const days = parseInt(req.query.days as string) || 7;
+      const cutoffDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+      
+      const allOrders = await storage.getAllOrders();
+      const orders = allOrders.filter(order => new Date(order.createdAt) >= cutoffDate);
+      const paidOrders = orders.filter(order => order.paymentStatus === "paid");
+      
+      const totalRevenue = paidOrders.reduce((sum, order) => sum + parseFloat(order.total), 0);
+      const totalOrders = orders.length;
+      const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+      
+      const users = await storage.getAllUsers();
+      const newCustomers = users.filter(user => 
+        user.role === "customer" && new Date(user.createdAt) >= cutoffDate
+      ).length;
+      
+      const menuItems = await storage.getAllMenuItems();
+      const orderItems = orders.flatMap(order => order.items || []);
+      const itemCounts = orderItems.reduce((acc, item) => {
+        const id = typeof item === 'string' ? item : (item as any).menuItemId;
+        acc[id] = (acc[id] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      
+      const topProductId = Object.entries(itemCounts).sort((a, b) => b[1] - a[1])[0];
+      const topProduct = topProductId ? menuItems.find(m => m.id === topProductId[0]) : null;
+      
+      res.json({
+        totalRevenue,
+        totalOrders,
+        averageOrderValue,
+        newCustomers,
+        totalCustomers: users.filter(u => u.role === "customer").length,
+        revenueChange: 12, // Placeholder
+        topProduct: topProduct ? { name: topProduct.name, sales: topProductId[1] } : null,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Analytics: Sales Trends
+  app.get("/api/analytics/sales-trends", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      const days = parseInt(req.query.days as string) || 7;
+      const cutoffDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+      
+      const allOrders = await storage.getAllOrders();
+      const orders = allOrders.filter(order => new Date(order.createdAt) >= cutoffDate);
+      
+      // Daily revenue
+      const dailyData: Record<string, number> = {};
+      orders.forEach(order => {
+        if (order.paymentStatus === "paid") {
+          const date = new Date(order.createdAt).toISOString().split('T')[0];
+          dailyData[date] = (dailyData[date] || 0) + parseFloat(order.total);
+        }
+      });
+      
+      const daily = Object.entries(dailyData).map(([date, revenue]) => ({ date, revenue }));
+      
+      // By status
+      const statusCounts = orders.reduce((acc, order) => {
+        acc[order.status] = (acc[order.status] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      
+      const byStatus = Object.entries(statusCounts).map(([name, value]) => ({ name, value }));
+      
+      // By payment method
+      const paymentData = orders.reduce((acc, order) => {
+        if (order.paymentStatus === "paid") {
+          const method = order.paymentMethod || "cash";
+          acc[method] = (acc[method] || 0) + parseFloat(order.total);
+        }
+        return acc;
+      }, {} as Record<string, number>);
+      
+      const byPaymentMethod = Object.entries(paymentData).map(([method, amount]) => ({ method, amount }));
+      
+      res.json({ daily, byStatus, byPaymentMethod });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Analytics: Customer Behavior
+  app.get("/api/analytics/customer-behavior", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      const days = parseInt(req.query.days as string) || 7;
+      const cutoffDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+      
+      const allOrders = await storage.getAllOrders();
+      const orders = allOrders.filter(order => new Date(order.createdAt) >= cutoffDate);
+      
+      // Customer spending
+      const customerSpending: Record<string, { totalSpent: number; orders: number; name: string; email: string; loyaltyPoints: number }> = {};
+      
+      for (const order of orders) {
+        if (order.customerId && order.paymentStatus === "paid") {
+          if (!customerSpending[order.customerId]) {
+            const user = await storage.getUser(order.customerId);
+            customerSpending[order.customerId] = {
+              totalSpent: 0,
+              orders: 0,
+              name: user?.name || "",
+              email: user?.email || "",
+              loyaltyPoints: user?.loyaltyPoints || 0,
+            };
+          }
+          customerSpending[order.customerId].totalSpent += parseFloat(order.total);
+          customerSpending[order.customerId].orders += 1;
+        }
+      }
+      
+      const topCustomers = Object.entries(customerSpending)
+        .map(([id, data]) => ({ id, ...data }))
+        .sort((a, b) => b.totalSpent - a.totalSpent)
+        .slice(0, 10);
+      
+      res.json({
+        topCustomers,
+        retention: [], // Placeholder
+        lifetimeValue: [], // Placeholder
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Analytics: Product Performance
+  app.get("/api/analytics/product-performance", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      const days = parseInt(req.query.days as string) || 7;
+      const cutoffDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+      
+      const allOrders = await storage.getAllOrders();
+      const orders = allOrders.filter(order => 
+        new Date(order.createdAt) >= cutoffDate && order.paymentStatus === "paid"
+      );
+      
+      const menuItems = await storage.getAllMenuItems();
+      const categories = await storage.getAllCategories();
+      
+      // Product sales
+      const productSales: Record<string, { quantity: number; revenue: number }> = {};
+      let totalItems = 0;
+      
+      orders.forEach(order => {
+        const items = order.items || [];
+        totalItems += items.length;
+        items.forEach((item: any) => {
+          const id = typeof item === 'string' ? item : item.menuItemId;
+          const quantity = typeof item === 'string' ? 1 : (item.quantity || 1);
+          const menuItem = menuItems.find(m => m.id === id);
+          const price = menuItem ? parseFloat(menuItem.price) : 0;
+          
+          if (!productSales[id]) {
+            productSales[id] = { quantity: 0, revenue: 0 };
+          }
+          productSales[id].quantity += quantity;
+          productSales[id].revenue += price * quantity;
+        });
+      });
+      
+      const topSelling = Object.entries(productSales)
+        .map(([id, data]) => {
+          const menuItem = menuItems.find(m => m.id === id);
+          return {
+            id,
+            name: menuItem?.name || "Unknown",
+            ...data,
+          };
+        })
+        .sort((a, b) => b.quantity - a.quantity)
+        .slice(0, 10);
+      
+      // Category revenue
+      const categoryRevenue: Record<string, number> = {};
+      Object.entries(productSales).forEach(([id, data]) => {
+        const menuItem = menuItems.find(m => m.id === id);
+        const categoryId = menuItem?.categoryId || "uncategorized";
+        categoryRevenue[categoryId] = (categoryRevenue[categoryId] || 0) + data.revenue;
+      });
+      
+      const totalCategoryRevenue = Object.values(categoryRevenue).reduce((sum, rev) => sum + rev, 0);
+      
+      const byCategory = Object.entries(categoryRevenue).map(([id, revenue]) => {
+        const category = categories.find(c => c.id === id);
+        return {
+          name: category?.name || "Uncategorized",
+          revenue,
+          percentage: totalCategoryRevenue > 0 ? Math.round((revenue / totalCategoryRevenue) * 100) : 0,
+        };
+      });
+      
+      const topCategory = byCategory.sort((a, b) => b.revenue - a.revenue)[0]?.name || "N/A";
+      
+      res.json({
+        topSelling,
+        byCategory,
+        avgItemsPerOrder: orders.length > 0 ? totalItems / orders.length : 0,
+        topCategory,
+        uniqueProducts: Object.keys(productSales).length,
+        bestsellerRevenue: topSelling[0]?.revenue || 0,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Analytics: Peak Hours
+  app.get("/api/analytics/peak-hours", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      const days = parseInt(req.query.days as string) || 7;
+      const cutoffDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+      
+      const allOrders = await storage.getAllOrders();
+      const orders = allOrders.filter(order => new Date(order.createdAt) >= cutoffDate);
+      
+      // By hour
+      const hourCounts: Record<number, number> = {};
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const dayCounts: Record<string, { orders: number; revenue: number }> = {};
+      
+      orders.forEach(order => {
+        const date = new Date(order.createdAt);
+        const hour = date.getHours();
+        const day = dayNames[date.getDay()];
+        
+        hourCounts[hour] = (hourCounts[hour] || 0) + 1;
+        
+        if (!dayCounts[day]) {
+          dayCounts[day] = { orders: 0, revenue: 0 };
+        }
+        dayCounts[day].orders += 1;
+        if (order.paymentStatus === "paid") {
+          dayCounts[day].revenue += parseFloat(order.total);
+        }
+      });
+      
+      const byHour = Array.from({ length: 24 }, (_, i) => ({
+        hour: `${i}:00`,
+        orders: hourCounts[i] || 0,
+      }));
+      
+      const byDay = dayNames.map(day => ({
+        day,
+        orders: dayCounts[day]?.orders || 0,
+        revenue: dayCounts[day]?.revenue || 0,
+      }));
+      
+      const busiestHourEntry = Object.entries(hourCounts).sort((a, b) => b[1] - a[1])[0];
+      const busiestDayEntry = Object.entries(dayCounts).sort((a, b) => b[1].orders - a[1].orders)[0];
+      
+      res.json({
+        byHour,
+        byDay,
+        busiestHour: busiestHourEntry ? `${busiestHourEntry[0]}:00` : "N/A",
+        busiestHourOrders: busiestHourEntry ? busiestHourEntry[1] : 0,
+        busiestDay: busiestDayEntry ? busiestDayEntry[0] : "N/A",
+        busiestDayOrders: busiestDayEntry ? busiestDayEntry[1].orders : 0,
+        avgResponseTime: 25, // Placeholder
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Verify JazzCash payment (staff only - for manual verification)
   app.post("/api/payments/jazzcash/verify", authenticate, authorize("admin", "staff"), async (req, res) => {
     try {

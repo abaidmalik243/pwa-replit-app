@@ -48,7 +48,23 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
+    // Build URL from queryKey
+    let url = queryKey[0] as string;
+    
+    // Handle structured query keys with searchParams
+    if (queryKey.length > 1 && typeof queryKey[1] === 'object' && queryKey[1] !== null) {
+      const options = queryKey[1] as { searchParams?: Record<string, string | number> };
+      if (options.searchParams) {
+        const params = new URLSearchParams();
+        Object.entries(options.searchParams).forEach(([key, value]) => {
+          params.append(key, String(value));
+        });
+        const queryString = params.toString();
+        url = queryString ? `${url}?${queryString}` : url;
+      }
+    }
+    
+    const res = await fetch(url, {
       credentials: "include", // Send cookies with request
       cache: "no-store", // Bypass HTTP cache to avoid 304 responses
     });

@@ -47,6 +47,7 @@ import AdminWastage from "@/pages/admin-wastage";
 import PaymentResult from "@/pages/payment-result";
 import AdminJazzCash from "@/pages/admin-jazzcash";
 import AdminAnalytics from "@/pages/admin-analytics";
+import AdminOrders from "@/pages/admin-orders";
 
 function Router() {
   return (
@@ -97,7 +98,7 @@ function Router() {
       </Route>
       <Route path="/admin/orders">
         <ProtectedRoute requireRole={["admin", "staff"]}>
-          <AdminDashboard />
+          <AdminOrders />
         </ProtectedRoute>
       </Route>
       <Route path="/admin/menu">

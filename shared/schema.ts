@@ -446,3 +446,169 @@ export const riderLocationHistory = pgTable("rider_location_history", {
 export const insertRiderLocationHistorySchema = createInsertSchema(riderLocationHistory).omit({ id: true, timestamp: true });
 export type InsertRiderLocationHistory = z.infer<typeof insertRiderLocationHistorySchema>;
 export type RiderLocationHistory = typeof riderLocationHistory.$inferSelect;
+
+// Customer Saved Addresses
+export const customerAddresses = pgTable("customer_addresses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  label: text("label").notNull(), // Home, Work, Other
+  fullAddress: text("full_address").notNull(),
+  area: text("area"),
+  city: text("city").notNull(),
+  landmark: text("landmark"),
+  latitude: decimal("latitude", { precision: 10, scale: 7 }),
+  longitude: decimal("longitude", { precision: 10, scale: 7 }),
+  phoneNumber: text("phone_number"),
+  isDefault: boolean("is_default").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertCustomerAddressSchema = createInsertSchema(customerAddresses).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertCustomerAddress = z.infer<typeof insertCustomerAddressSchema>;
+export type CustomerAddress = typeof customerAddresses.$inferSelect;
+
+// Customer Favorite Items
+export const customerFavorites = pgTable("customer_favorites", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  menuItemId: varchar("menu_item_id").references(() => menuItems.id, { onDelete: "cascade" }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertCustomerFavoriteSchema = createInsertSchema(customerFavorites).omit({ id: true, createdAt: true });
+export type InsertCustomerFavorite = z.infer<typeof insertCustomerFavoriteSchema>;
+export type CustomerFavorite = typeof customerFavorites.$inferSelect;
+
+// Loyalty Points System
+export const loyaltyPoints = pgTable("loyalty_points", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").references(() => users.id, { onDelete: "cascade" }).notNull().unique(),
+  totalPoints: integer("total_points").notNull().default(0),
+  availablePoints: integer("available_points").notNull().default(0),
+  lifetimeEarned: integer("lifetime_earned").notNull().default(0),
+  lifetimeRedeemed: integer("lifetime_redeemed").notNull().default(0),
+  tier: text("tier").notNull().default("bronze"), // bronze, silver, gold, platinum
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertLoyaltyPointsSchema = createInsertSchema(loyaltyPoints).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertLoyaltyPoints = z.infer<typeof insertLoyaltyPointsSchema>;
+export type LoyaltyPoints = typeof loyaltyPoints.$inferSelect;
+
+// Loyalty Transactions
+export const loyaltyTransactions = pgTable("loyalty_transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerId: varchar("customer_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  orderId: varchar("order_id").references(() => orders.id),
+  transactionType: text("transaction_type").notNull(), // earn, redeem, expire, bonus, adjustment
+  points: integer("points").notNull(), // Positive for earn, negative for redeem/expire
+  balanceAfter: integer("balance_after").notNull(),
+  description: text("description").notNull(),
+  expiresAt: timestamp("expires_at"), // For earned points that expire
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertLoyaltyTransactionSchema = createInsertSchema(loyaltyTransactions).omit({ id: true, createdAt: true });
+export type InsertLoyaltyTransaction = z.infer<typeof insertLoyaltyTransactionSchema>;
+export type LoyaltyTransaction = typeof loyaltyTransactions.$inferSelect;
+
+// Refunds
+export const refunds = pgTable("refunds", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orderId: varchar("order_id").references(() => orders.id).notNull(),
+  paymentId: varchar("payment_id").references(() => payments.id),
+  refundAmount: decimal("refund_amount", { precision: 10, scale: 2 }).notNull(),
+  refundMethod: text("refund_method").notNull(), // cash, card, jazzcash, loyalty_points
+  reason: text("reason").notNull(),
+  status: text("status").notNull().default("pending"), // pending, processing, completed, failed
+  processedBy: varchar("processed_by").references(() => users.id),
+  stripeRefundId: text("stripe_refund_id"), // Stripe refund ID if applicable
+  notes: text("notes"),
+  requestedAt: timestamp("requested_at").notNull().defaultNow(),
+  processedAt: timestamp("processed_at"),
+});
+
+export const insertRefundSchema = createInsertSchema(refunds).omit({ id: true, requestedAt: true });
+export type InsertRefund = z.infer<typeof insertRefundSchema>;
+export type Refund = typeof refunds.$inferSelect;
+
+// Suppliers for Inventory Management
+export const suppliers = pgTable("suppliers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  contactPerson: text("contact_person"),
+  phone: text("phone").notNull(),
+  email: text("email"),
+  address: text("address"),
+  city: text("city"),
+  category: text("category"), // food, beverage, packaging, supplies
+  paymentTerms: text("payment_terms"), // net_30, net_60, cash_on_delivery
+  isActive: boolean("is_active").notNull().default(true),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertSupplierSchema = createInsertSchema(suppliers).omit({ id: true, createdAt: true });
+export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
+export type Supplier = typeof suppliers.$inferSelect;
+
+// Inventory Transactions (Stock movements)
+export const inventoryTransactions = pgTable("inventory_transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  menuItemId: varchar("menu_item_id").references(() => menuItems.id).notNull(),
+  branchId: varchar("branch_id").references(() => branches.id).notNull(),
+  transactionType: text("transaction_type").notNull(), // purchase, sale, adjustment, wastage, return
+  quantity: integer("quantity").notNull(), // Positive for in, negative for out
+  balanceAfter: integer("balance_after").notNull(),
+  unitCost: decimal("unit_cost", { precision: 10, scale: 2 }),
+  totalCost: decimal("total_cost", { precision: 10, scale: 2 }),
+  supplierId: varchar("supplier_id").references(() => suppliers.id),
+  orderId: varchar("order_id").references(() => orders.id), // Link to sale order if applicable
+  reference: text("reference"), // Invoice number, PO number, etc.
+  reason: text("reason"),
+  performedBy: varchar("performed_by").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertInventoryTransactionSchema = createInsertSchema(inventoryTransactions).omit({ id: true, createdAt: true });
+export type InsertInventoryTransaction = z.infer<typeof insertInventoryTransactionSchema>;
+export type InventoryTransaction = typeof inventoryTransactions.$inferSelect;
+
+// Stock Wastage Tracking
+export const stockWastage = pgTable("stock_wastage", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  menuItemId: varchar("menu_item_id").references(() => menuItems.id).notNull(),
+  branchId: varchar("branch_id").references(() => branches.id).notNull(),
+  quantity: integer("quantity").notNull(),
+  wastageType: text("wastage_type").notNull(), // expired, damaged, overproduction, spillage
+  estimatedCost: decimal("estimated_cost", { precision: 10, scale: 2 }),
+  reason: text("reason").notNull(),
+  reportedBy: varchar("reported_by").references(() => users.id),
+  wasteDate: timestamp("waste_date").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertStockWastageSchema = createInsertSchema(stockWastage).omit({ id: true, createdAt: true });
+export type InsertStockWastage = z.infer<typeof insertStockWastageSchema>;
+export type StockWastage = typeof stockWastage.$inferSelect;
+
+// Reorder Points Configuration
+export const reorderPoints = pgTable("reorder_points", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  menuItemId: varchar("menu_item_id").references(() => menuItems.id, { onDelete: "cascade" }).notNull(),
+  branchId: varchar("branch_id").references(() => branches.id).notNull(),
+  reorderLevel: integer("reorder_level").notNull(), // Trigger reorder when stock reaches this level
+  reorderQuantity: integer("reorder_quantity").notNull(), // How much to order
+  preferredSupplierId: varchar("preferred_supplier_id").references(() => suppliers.id),
+  leadTimeDays: integer("lead_time_days").default(7), // Expected delivery time
+  isActive: boolean("is_active").notNull().default(true),
+  lastOrderDate: timestamp("last_order_date"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertReorderPointSchema = createInsertSchema(reorderPoints).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertReorderPoint = z.infer<typeof insertReorderPointSchema>;
+export type ReorderPoint = typeof reorderPoints.$inferSelect;

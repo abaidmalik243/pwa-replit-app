@@ -3001,15 +3001,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Order not found" });
       }
 
+      // Validate refund amount
+      const refundAmountNum = parseFloat(refundAmount);
+      if (isNaN(refundAmountNum) || refundAmountNum <= 0) {
+        return res.status(400).json({ error: "Invalid refund amount" });
+      }
+
+      // Check if order total is sufficient
+      const orderTotal = parseFloat(order.total || "0");
+      if (refundAmountNum > orderTotal) {
+        return res.status(400).json({ error: "Refund amount exceeds order total" });
+      }
+
+      // Get existing refunds for this order to prevent over-refunding
+      const existingRefunds = await storage.getRefundsByOrder(orderId);
+      const totalRefunded = existingRefunds
+        .filter(r => r.status === "completed" || r.status === "pending")
+        .reduce((sum, r) => sum + parseFloat(r.refundAmount || "0"), 0);
+      
+      if (totalRefunded + refundAmountNum > orderTotal) {
+        return res.status(400).json({ 
+          error: `Cannot refund ₨${refundAmountNum.toFixed(2)}. Already refunded ₨${totalRefunded.toFixed(2)} of ₨${orderTotal.toFixed(2)} total.` 
+        });
+      }
+
       let stripeRefundId: string | undefined;
 
       // If order was paid via Stripe, process refund through Stripe
-      if (order.paymentMethod === "stripe" && order.stripePaymentIntentId) {
+      if (refundMethod === "card" || order.paymentMethod === "stripe") {
+        // Validate Stripe payment intent exists
+        if (!order.stripePaymentIntentId) {
+          return res.status(400).json({ 
+            error: "Cannot process card refund: Order does not have a Stripe payment intent ID" 
+          });
+        }
+
         try {
           const { stripeService } = await import('./stripeService');
           const stripeRefund = await stripeService.createRefund({
             paymentIntentId: order.stripePaymentIntentId,
-            amount: parseFloat(refundAmount),
+            amount: refundAmountNum,
             reason: reason || undefined,
           });
           stripeRefundId = stripeRefund.id;
@@ -3021,9 +3052,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Only persist refund after successful Stripe API call (if applicable)
       const refund = await storage.createRefund({
         orderId,
-        refundAmount,
+        refundAmount: refundAmountNum.toString(),
         refundMethod,
         reason,
         branchId,

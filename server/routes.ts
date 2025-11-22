@@ -4256,6 +4256,341 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Marketing Campaigns Routes
+  app.get("/api/marketing-campaigns", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      const { status, branchId } = req.query;
+      
+      let campaigns;
+      if (status) {
+        campaigns = await storage.getMarketingCampaignsByStatus(status as string);
+      } else if (branchId) {
+        campaigns = await storage.getMarketingCampaignsByBranch(branchId as string);
+      } else {
+        campaigns = await storage.getAllMarketingCampaigns();
+      }
+      
+      res.json(campaigns);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/marketing-campaigns/:id", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      const campaign = await storage.getMarketingCampaign(req.params.id);
+      if (!campaign) {
+        return res.status(404).json({ error: "Campaign not found" });
+      }
+      res.json(campaign);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/marketing-campaigns", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      const campaign = await storage.createMarketingCampaign({
+        ...req.body,
+        createdBy: req.user!.id,
+      });
+      res.json(campaign);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.put("/api/marketing-campaigns/:id", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      const campaign = await storage.updateMarketingCampaign(req.params.id, req.body);
+      if (!campaign) {
+        return res.status(404).json({ error: "Campaign not found" });
+      }
+      res.json(campaign);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/marketing-campaigns/:id", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      await storage.deleteMarketingCampaign(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get campaign recipients with filtering
+  app.get("/api/marketing-campaigns/:id/recipients", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      const { status } = req.query;
+      
+      let recipients;
+      if (status) {
+        recipients = await storage.getCampaignRecipientsByStatus(req.params.id, status as string);
+      } else {
+        recipients = await storage.getCampaignRecipients(req.params.id);
+      }
+      
+      res.json(recipients);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Preview campaign audience - get count and sample customers
+  app.post("/api/marketing-campaigns/preview-audience", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      const { targetAudience, customSegmentFilter, branchId } = req.body;
+      
+      let customers: any[] = [];
+      
+      if (targetAudience === "all") {
+        customers = await storage.getCustomersForSegment({ branchId });
+      } else if (targetAudience === "loyal_customers") {
+        customers = await storage.getCustomersForSegment({ 
+          loyaltyTier: "gold",
+          branchId 
+        });
+      } else if (targetAudience === "new_customers") {
+        customers = await storage.getCustomersForSegment({ 
+          maxOrders: 3,
+          branchId 
+        });
+      } else if (targetAudience === "inactive_customers") {
+        // Customers with no orders in last 30 days would need more complex query
+        customers = await storage.getCustomersForSegment({ branchId });
+      } else if (targetAudience === "custom" && customSegmentFilter) {
+        customers = await storage.getCustomersForSegment(customSegmentFilter);
+      }
+      
+      res.json({
+        totalCount: customers.length,
+        sampleCustomers: customers.slice(0, 10).map(c => ({
+          id: c.id,
+          fullName: c.fullName,
+          phone: c.phone,
+          email: c.email,
+        }))
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Launch a campaign - create recipients and start sending
+  app.post("/api/marketing-campaigns/:id/launch", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      const campaign = await storage.getMarketingCampaign(req.params.id);
+      if (!campaign) {
+        return res.status(404).json({ error: "Campaign not found" });
+      }
+      
+      if (campaign.status !== "draft" && campaign.status !== "scheduled") {
+        return res.status(400).json({ error: "Campaign cannot be launched" });
+      }
+      
+      // Get target customers
+      let filters: any = { branchId: campaign.branchId };
+      
+      if (campaign.targetAudience === "loyal_customers") {
+        filters.loyaltyTier = "gold";
+      } else if (campaign.targetAudience === "new_customers") {
+        filters.maxOrders = 3;
+      } else if (campaign.targetAudience === "custom" && campaign.customSegmentFilter) {
+        filters = campaign.customSegmentFilter;
+      }
+      
+      const customers = await storage.getCustomersForSegment(filters);
+      
+      // Create recipients with personalized messages
+      const recipients = customers
+        .filter(c => c.phone) // Only customers with phone numbers
+        .map(customer => {
+          let personalizedMessage = campaign.messageTemplate;
+          
+          // Replace template variables
+          const variables = campaign.templateVariables as any || {};
+          personalizedMessage = personalizedMessage.replace(/\{\{name\}\}/g, customer.fullName || "Valued Customer");
+          personalizedMessage = personalizedMessage.replace(/\{\{phone\}\}/g, customer.phone || "");
+          
+          Object.keys(variables).forEach(key => {
+            const placeholder = `{{${key}}}`;
+            personalizedMessage = personalizedMessage.replace(new RegExp(placeholder, 'g'), variables[key]);
+          });
+          
+          return {
+            campaignId: campaign.id,
+            customerId: customer.id,
+            phoneNumber: customer.phone!,
+            personalizedMessage,
+            status: "pending" as const,
+          };
+        });
+      
+      if (recipients.length === 0) {
+        return res.status(400).json({ error: "No customers found matching campaign criteria" });
+      }
+      
+      // Bulk create recipients
+      await storage.bulkCreateCampaignRecipients(recipients);
+      
+      // Update campaign status and counts
+      await storage.updateMarketingCampaign(campaign.id, {
+        status: campaign.scheduledAt && new Date(campaign.scheduledAt) > new Date() ? "scheduled" : "sending",
+        totalRecipients: recipients.length,
+        startedAt: new Date(),
+      });
+      
+      res.json({ 
+        success: true, 
+        recipientsCreated: recipients.length,
+        message: "Campaign launched successfully. Messages will be sent via WhatsApp API."
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Message Templates Routes
+  app.get("/api/message-templates", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      const { category } = req.query;
+      
+      let templates;
+      if (category) {
+        templates = await storage.getMessageTemplatesByCategory(category as string);
+      } else {
+        templates = await storage.getAllMessageTemplates();
+      }
+      
+      res.json(templates);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/message-templates/:id", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      const template = await storage.getMessageTemplate(req.params.id);
+      if (!template) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      res.json(template);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/message-templates", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      const template = await storage.createMessageTemplate({
+        ...req.body,
+        createdBy: req.user!.id,
+      });
+      res.json(template);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.put("/api/message-templates/:id", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      const template = await storage.updateMessageTemplate(req.params.id, req.body);
+      if (!template) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      res.json(template);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/message-templates/:id", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      await storage.deleteMessageTemplate(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Customer Segments Routes
+  app.get("/api/customer-segments", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      const segments = await storage.getAllCustomerSegments();
+      res.json(segments);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/customer-segments/:id", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      const segment = await storage.getCustomerSegment(req.params.id);
+      if (!segment) {
+        return res.status(404).json({ error: "Segment not found" });
+      }
+      res.json(segment);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/customer-segments", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      const segment = await storage.createCustomerSegment({
+        ...req.body,
+        createdBy: req.user!.id,
+      });
+      
+      // Calculate initial count
+      await storage.calculateSegmentCustomerCount(segment.id);
+      
+      res.json(segment);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.put("/api/customer-segments/:id", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      const segment = await storage.updateCustomerSegment(req.params.id, req.body);
+      if (!segment) {
+        return res.status(404).json({ error: "Segment not found" });
+      }
+      
+      // Recalculate count if filters changed
+      if (req.body.filters) {
+        await storage.calculateSegmentCustomerCount(req.params.id);
+      }
+      
+      res.json(segment);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/customer-segments/:id", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      await storage.deleteCustomerSegment(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Recalculate segment customer count
+  app.post("/api/customer-segments/:id/recalculate", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      const count = await storage.calculateSegmentCustomerCount(req.params.id);
+      res.json({ count });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

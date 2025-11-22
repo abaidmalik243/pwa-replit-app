@@ -2993,10 +2993,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/refunds", authenticate, authorize("admin", "staff"), async (req, res) => {
     try {
+      const { orderId, refundAmount, refundMethod, reason, branchId, notes } = req.body;
+      
+      // Get the order to check payment method
+      const order = await storage.getOrder(orderId);
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+
+      let stripeRefundId: string | undefined;
+
+      // If order was paid via Stripe, process refund through Stripe
+      if (order.paymentMethod === "stripe" && order.stripePaymentIntentId) {
+        try {
+          const { stripeService } = await import('./stripeService');
+          const stripeRefund = await stripeService.createRefund({
+            paymentIntentId: order.stripePaymentIntentId,
+            amount: parseFloat(refundAmount),
+            reason: reason || undefined,
+          });
+          stripeRefundId = stripeRefund.id;
+        } catch (stripeError: any) {
+          console.error("Stripe refund error:", stripeError);
+          return res.status(500).json({ 
+            error: "Failed to process Stripe refund: " + stripeError.message 
+          });
+        }
+      }
+
       const refund = await storage.createRefund({
-        ...req.body,
+        orderId,
+        refundAmount,
+        refundMethod,
+        reason,
+        branchId,
+        notes,
+        stripeRefundId,
         processedBy: req.user!.id
       });
+      
       res.status(201).json(refund);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -3146,6 +3181,171 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       await storage.deleteReorderPoint(id);
       res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ==================== Payment Processing ====================
+  
+  // Create Stripe payment intent for an order
+  app.post("/api/payments/stripe/create-intent", authenticate, async (req, res) => {
+    try {
+      const { orderId } = req.body;
+      
+      if (!orderId) {
+        return res.status(400).json({ error: "Order ID is required" });
+      }
+
+      const order = await storage.getOrder(orderId);
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+
+      // Verify ownership for customers
+      if (req.user!.role === "customer" && order.customerId !== req.user!.id) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+
+      const { stripeService } = await import('./stripeService');
+      const user = req.user!.email ? req.user! : await storage.getUserByEmail(order.customerName);
+      
+      const paymentIntent = await stripeService.createPaymentIntent({
+        amount: parseFloat(order.total),
+        customerEmail: user?.email || order.customerName,
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        description: `Kebabish Pizza Order ${order.orderNumber}`,
+      });
+
+      // Update order with Stripe payment intent ID
+      await storage.updateOrder(orderId, {
+        ...order,
+        discount: order.discount ?? undefined,
+        deliveryCharges: order.deliveryCharges ?? undefined,
+        deliveryDistance: order.deliveryDistance || undefined,
+        paymentMethod: "stripe",
+        stripePaymentIntentId: paymentIntent.id,
+      });
+
+      res.json({ 
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
+      });
+    } catch (error: any) {
+      console.error("Stripe payment intent error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Verify Stripe payment status
+  app.post("/api/payments/stripe/verify", authenticate, async (req, res) => {
+    try {
+      const { paymentIntentId } = req.body;
+      
+      if (!paymentIntentId) {
+        return res.status(400).json({ error: "Payment intent ID is required" });
+      }
+
+      const { stripeService } = await import('./stripeService');
+      const paymentIntent = await stripeService.retrievePaymentIntent(paymentIntentId);
+
+      // Find order by payment intent ID
+      const orders = await storage.getAllOrders();
+      const order = orders.find(o => o.stripePaymentIntentId === paymentIntentId);
+
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+
+      // Update order payment status based on Stripe status
+      let paymentStatus = "pending";
+      if (paymentIntent.status === "succeeded") {
+        paymentStatus = "paid";
+      } else if (paymentIntent.status === "processing") {
+        paymentStatus = "awaiting_verification";
+      } else if (paymentIntent.status === "requires_payment_method" || paymentIntent.status === "canceled") {
+        paymentStatus = "failed";
+      }
+
+      await storage.updateOrder(order.id, {
+        ...order,
+        discount: order.discount ?? undefined,
+        deliveryCharges: order.deliveryCharges ?? undefined,
+        deliveryDistance: order.deliveryDistance || undefined,
+        paymentStatus,
+      });
+
+      res.json({ 
+        status: paymentIntent.status,
+        paymentStatus,
+      });
+    } catch (error: any) {
+      console.error("Stripe verification error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get Stripe publishable key for frontend
+  app.get("/api/payments/stripe/config", async (_req, res) => {
+    try {
+      const { getStripePublishableKey } = await import('./stripeClient');
+      const publishableKey = await getStripePublishableKey();
+      res.json({ publishableKey });
+    } catch (error: any) {
+      console.error("Stripe config error:", error);
+      res.status(500).json({ error: "Stripe not configured" });
+    }
+  });
+
+  // Verify JazzCash payment (staff only)
+  app.post("/api/payments/jazzcash/verify", authenticate, authorize("admin", "staff"), async (req, res) => {
+    try {
+      const { orderId, approved, notes } = req.body;
+      
+      if (!orderId || approved === undefined) {
+        return res.status(400).json({ error: "Order ID and approval status are required" });
+      }
+
+      const order = await storage.getOrder(orderId);
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+
+      if (order.paymentMethod !== "jazzcash") {
+        return res.status(400).json({ error: "Order is not a JazzCash payment" });
+      }
+
+      const paymentStatus = approved ? "paid" : "failed";
+      const verificationNotes = notes ? `\nJazzCash Verification by ${req.user!.username}: ${notes}` : "";
+
+      await storage.updateOrder(orderId, {
+        ...order,
+        discount: order.discount ?? undefined,
+        deliveryCharges: order.deliveryCharges ?? undefined,
+        deliveryDistance: order.deliveryDistance || undefined,
+        paymentStatus,
+        notes: `${order.notes || ""}${verificationNotes}`.trim(),
+      });
+
+      res.json({ 
+        success: true,
+        paymentStatus,
+      });
+    } catch (error: any) {
+      console.error("JazzCash verification error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get pending JazzCash payments for verification
+  app.get("/api/payments/jazzcash/pending", authenticate, authorize("admin", "staff"), async (req, res) => {
+    try {
+      const orders = await storage.getAllOrders();
+      const pendingJazzCash = orders.filter(
+        o => o.paymentMethod === "jazzcash" && o.paymentStatus === "awaiting_verification"
+      );
+      res.json(pendingJazzCash);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

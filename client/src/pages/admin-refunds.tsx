@@ -236,11 +236,11 @@ export default function AdminRefunds() {
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">Refund Amount</p>
                       <p className="text-xl font-bold text-red-600" data-testid={`text-amount-${refund.id}`}>
-                        ₨{refund.refundAmount.toFixed(2)}
+                        ₨{parseFloat(refund.refundAmount || "0").toFixed(2)}
                       </p>
                       {refund.order && (
                         <p className="text-xs text-muted-foreground" data-testid={`text-original-amount-${refund.id}`}>
-                          Original: ₨{refund.order.totalAmount.toFixed(2)}
+                          Original: ₨{parseFloat(refund.order.total || "0").toFixed(2)}
                         </p>
                       )}
                     </div>

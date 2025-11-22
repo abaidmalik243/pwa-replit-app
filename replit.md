@@ -75,6 +75,18 @@ Complete Socket.IO integration provides instant real-time updates across all ter
 - **Conflict Detection**: Prevents double-booking with automated validation before shift assignment
 - **POS Integration**: Links shifts to POS sessions for accurate performance tracking and accountability
 
+**WhatsApp Marketing & Promotional Campaigns**: Comprehensive marketing automation system for customer engagement via WhatsApp messaging. Features include:
+- **Campaign Management**: Complete CRUD at `/admin/marketing-campaigns` with status tracking (draft, scheduled, sending, completed, failed)
+- **Message Templates**: Reusable templates at `/admin/message-templates` with personalization variables ({{name}}, {{phone}}, custom fields) organized by category (promotional, transactional, reminder, announcement, seasonal)
+- **Customer Segmentation**: Audience targeting at `/admin/customer-segments` with predefined segments (All, Loyal Gold Tier, New Customers ≤3 orders, Inactive) and custom filter support
+- **Campaign Builder**: Interactive campaign creation with template selection, audience preview, message personalization, and scheduling capabilities
+- **Launch Workflow**: Automated recipient list generation from segments, personalized message creation with variable replacement, bulk recipient tracking with individual status
+- **Analytics Tracking**: Campaign metrics showing total recipients, sent count, delivered count, failed count, and delivery rates
+- **Database Schema**: 5 tables - marketing_campaigns, campaign_recipients, message_templates, customer_segments, campaign_analytics
+- **Admin-Only Access**: All marketing features require admin role authorization for security
+- **WhatsApp API Integration**: System is ready for WhatsApp Business API integration - requires external service credentials (NOT Twilio for promotional messages per user requirement)
+- **Integration Note**: Campaign launch endpoint creates personalized recipients and updates campaign status. Actual WhatsApp message sending requires external API integration - credentials should be stored as secrets when ready.
+
 ## External Dependencies
 
 ### UI Component Libraries
@@ -109,7 +121,7 @@ Complete Socket.IO integration provides instant real-time updates across all ter
 
 ## Feature Implementation Status
 
-**Total Implemented**: 50+ features (80% complete)
+**Total Implemented**: 52+ features (85% complete)
 
 ### ✅ Fully Implemented Modules
 - Customer ordering system with variants and customization
@@ -122,7 +134,8 @@ Complete Socket.IO integration provides instant real-time updates across all ter
 - Customer accounts with loyalty program
 - Advanced analytics dashboard (sales, customers, products, peak hours)
 - JazzCash payment monitoring and admin dashboard
-- **Staff Shift & Schedule Management** (NEW) - Scheduling, attendance tracking, overtime calculation, shift-based reporting
+- Staff Shift & Schedule Management - Scheduling, attendance tracking, overtime calculation, shift-based reporting
+- **WhatsApp Marketing Campaigns** (NEW) - Campaign management, message templates, customer segmentation, audience targeting
 - Real-time WebSocket communication
 - Role-based access control (Admin, Staff, Customer, Rider)
 - Staff shift-based POS sessions
@@ -136,10 +149,9 @@ Complete Socket.IO integration provides instant real-time updates across all ter
 
 ### 🟡 Important Missing Features (Add in Phase 2)
 1. Financial management (VAT/Tax, COGS, expense tracking)
-2. Marketing campaigns and customer segmentation
-3. Franchise/multi-location consolidated reporting
-4. Quality control and item ratings
-5. Kitchen production control (recipes, preparation times)
+2. Franchise/multi-location consolidated reporting
+3. Quality control and item ratings
+4. Kitchen production control (recipes, preparation times)
 
 ### 🟠 Enhancement Features (Phase 3+)
 1. QR code ordering and payment

@@ -6,6 +6,7 @@ import AdminHeader from "@/components/AdminHeader";
 import OrderCard, { Order } from "@/components/OrderCard";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
+import { useSocketEvent } from "@/hooks/useSocket";
 import { playNotificationSound } from "@/lib/notificationSound";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,10 +22,18 @@ export default function AdminDashboard() {
   const previousPendingCount = useRef(0);
   const hasInitialized = useRef(false);
 
-  // Fetch orders from API
+  // Fetch orders from API (WebSocket real-time updates)
   const { data: dbOrders = [], isLoading } = useQuery<DBOrder[]>({
     queryKey: ["/api/orders"],
-    refetchInterval: 30000, // Refetch every 30 seconds for new orders
+  });
+
+  // Real-time order updates via WebSocket
+  useSocketEvent<DBOrder>("order:created", (order) => {
+    queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+  });
+
+  useSocketEvent<DBOrder>("order:statusUpdated", (order) => {
+    queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
   });
 
   // Transform DB orders to match OrderCard format

@@ -8,6 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useSocketEvent } from "@/hooks/useSocket";
 import type { Order } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
 
@@ -31,7 +32,7 @@ export default function KitchenDisplay() {
   })();
   const userBranchId = user.branchId;
 
-  // Fetch orders for kitchen display
+  // Fetch orders for kitchen display (WebSocket real-time updates)
   const { data: orders = [] } = useQuery<Order[]>({
     queryKey: ["/api/orders", userBranchId],
     queryFn: () => {
@@ -41,7 +42,15 @@ export default function KitchenDisplay() {
       return fetch(url).then(res => res.json());
     },
     enabled: !!userBranchId,
-    refetchInterval: 5000, // Poll every 5 seconds
+  });
+
+  // Real-time order updates via WebSocket
+  useSocketEvent<Order>("order:created", (order) => {
+    queryClient.invalidateQueries({ queryKey: ["/api/orders", userBranchId] });
+  });
+
+  useSocketEvent<Order>("order:statusUpdated", (order) => {
+    queryClient.invalidateQueries({ queryKey: ["/api/orders", userBranchId] });
   });
 
   // Filter orders for kitchen (exclude delivered/cancelled)

@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useSocketEvent } from "@/hooks/useSocket";
 import { MapPin, Navigation, Package, CheckCircle, Clock, Phone, User, Star, Bike, TrendingUp } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useEffect, useState } from "react";
@@ -65,8 +66,12 @@ export default function RiderDashboard() {
 
   const { data: deliveries = [], isLoading: deliveriesLoading } = useQuery<Delivery[]>({
     queryKey: ["/api/deliveries"],
-    refetchInterval: 10000, // Refresh every 10 seconds
     enabled: !!riderId,
+  });
+
+  // Real-time delivery updates via WebSocket
+  useSocketEvent<any>("delivery:statusUpdated", () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/deliveries"] });
   });
 
   // Filter deliveries for this rider

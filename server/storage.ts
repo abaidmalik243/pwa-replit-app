@@ -1,6 +1,7 @@
 import * as schema from "@shared/schema";
 import { eq, like, and, desc, lt } from "drizzle-orm";
 import { db } from "./db";
+import { emitEvent } from "./websocket";
 
 // Storage interface with all CRUD operations
 export interface IStorage {
@@ -311,12 +312,18 @@ export class DbStorage implements IStorage {
 
   async createOrder(order: schema.InsertOrder) {
     const result = await db.insert(schema.orders).values(order).returning();
-    return result[0];
+    const createdOrder = result[0];
+    emitEvent.orderCreated(createdOrder);
+    return createdOrder;
   }
 
   async updateOrder(id: string, order: Partial<schema.InsertOrder>) {
     const result = await db.update(schema.orders).set({ ...order, updatedAt: new Date() }).where(eq(schema.orders.id, id)).returning();
-    return result[0];
+    const updatedOrder = result[0];
+    if (updatedOrder) {
+      emitEvent.orderStatusUpdated(updatedOrder);
+    }
+    return updatedOrder;
   }
 
   async deleteOrder(id: string) {
@@ -412,7 +419,11 @@ export class DbStorage implements IStorage {
 
   async updatePosTable(id: string, table: Partial<schema.InsertPosTable>) {
     const result = await db.update(schema.posTables).set(table).where(eq(schema.posTables.id, id)).returning();
-    return result[0];
+    const updatedTable = result[0];
+    if (updatedTable) {
+      emitEvent.tableStatusUpdated(updatedTable);
+    }
+    return updatedTable;
   }
 
   async deletePosTable(id: string) {
@@ -447,12 +458,18 @@ export class DbStorage implements IStorage {
 
   async createPosSession(session: schema.InsertPosSession) {
     const result = await db.insert(schema.posSessions).values(session).returning();
-    return result[0];
+    const createdSession = result[0];
+    emitEvent.posSessionUpdated(createdSession);
+    return createdSession;
   }
 
   async updatePosSession(id: string, session: Partial<schema.InsertPosSession>) {
     const result = await db.update(schema.posSessions).set(session).where(eq(schema.posSessions.id, id)).returning();
-    return result[0];
+    const updatedSession = result[0];
+    if (updatedSession) {
+      emitEvent.posSessionUpdated(updatedSession);
+    }
+    return updatedSession;
   }
 
   // Kitchen Tickets
@@ -475,12 +492,18 @@ export class DbStorage implements IStorage {
 
   async createKitchenTicket(ticket: schema.InsertKitchenTicket) {
     const result = await db.insert(schema.kitchenTickets).values(ticket).returning();
-    return result[0];
+    const createdTicket = result[0];
+    emitEvent.kitchenTicketCreated(createdTicket);
+    return createdTicket;
   }
 
   async updateKitchenTicket(id: string, ticket: Partial<schema.InsertKitchenTicket>) {
     const result = await db.update(schema.kitchenTickets).set(ticket).where(eq(schema.kitchenTickets.id, id)).returning();
-    return result[0];
+    const updatedTicket = result[0];
+    if (updatedTicket) {
+      emitEvent.kitchenTicketUpdated(updatedTicket);
+    }
+    return updatedTicket;
   }
 
   // Payments
@@ -600,6 +623,11 @@ export class DbStorage implements IStorage {
       currentLongitude: longitude,
       lastLocationUpdate: new Date()
     }).where(eq(schema.riders.id, id)).returning();
+    
+    if (result[0]) {
+      emitEvent.riderLocationUpdated(id, { latitude, longitude });
+    }
+    
     return result[0];
   }
 
@@ -643,7 +671,11 @@ export class DbStorage implements IStorage {
 
   async updateDelivery(id: string, delivery: Partial<schema.InsertDelivery>) {
     const result = await db.update(schema.deliveries).set(delivery).where(eq(schema.deliveries.id, id)).returning();
-    return result[0];
+    const updatedDelivery = result[0];
+    if (updatedDelivery) {
+      emitEvent.deliveryStatusUpdated(updatedDelivery);
+    }
+    return updatedDelivery;
   }
 
   // Rider Location History

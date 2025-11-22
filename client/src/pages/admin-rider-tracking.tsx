@@ -5,6 +5,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { MapPin, Navigation, Bike, Clock, Activity } from "lucide-react";
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
+import { useSocketEvent } from "@/hooks/useSocket";
+import { queryClient } from "@/lib/queryClient";
 
 type Rider = {
   id: string;
@@ -49,12 +51,20 @@ export default function AdminRiderTracking() {
 
   const { data: riders = [], isLoading: ridersLoading } = useQuery<Rider[]>({
     queryKey: ["/api/riders"],
-    refetchInterval: 5000, // Refresh every 5 seconds for real-time updates
   });
 
   const { data: deliveries = [] } = useQuery<Delivery[]>({
     queryKey: ["/api/deliveries"],
-    refetchInterval: 5000,
+  });
+
+  // Real-time rider location updates via WebSocket
+  useSocketEvent<{ riderId: string; latitude: string; longitude: string }>("rider:locationUpdated", () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/riders"] });
+  });
+
+  // Real-time delivery status updates via WebSocket
+  useSocketEvent<any>("delivery:statusUpdated", () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/deliveries"] });
   });
 
   const { data: branches = [] } = useQuery<Branch[]>({

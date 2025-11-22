@@ -11,6 +11,7 @@ import ItemCustomizationDialog, { VariantGroup, CustomizationSelection } from "@
 import OrderTypeDialog from "@/components/OrderTypeDialog";
 import OrderConfirmationDialog, { OrderDetails } from "@/components/OrderConfirmationDialog";
 import { CustomerJazzCashDialog } from "@/components/CustomerJazzCashDialog";
+import { JazzCashPaymentGateway } from "@/components/JazzCashPaymentGateway";
 import ScrollToTop from "@/components/ScrollToTop";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
@@ -49,6 +50,7 @@ export default function CustomerHome() {
   const [selectedBranchId, setSelectedBranchId] = useState<string>("");
   const [selectedArea, setSelectedArea] = useState<string>("");
   const [showJazzCashDialog, setShowJazzCashDialog] = useState(false);
+  const [showJazzCashGateway, setShowJazzCashGateway] = useState(false);
   const [pendingJazzCashOrder, setPendingJazzCashOrder] = useState<{
     id: string;
     orderNumber: string;
@@ -305,17 +307,17 @@ export default function CustomerHome() {
       
       // Check payment method
       if (data.paymentMethod === "jazzcash") {
-        // Open JazzCash payment dialog
+        // Open JazzCash payment gateway (automated)
         setPendingJazzCashOrder({
           id: data.id,
           orderNumber: data.orderNumber,
           total: parseFloat(data.total),
         });
-        setShowJazzCashDialog(true);
+        setShowJazzCashGateway(true);
         
         toast({
           title: "Order Created!",
-          description: "Please complete your JazzCash payment to confirm your order.",
+          description: "Redirecting to JazzCash payment gateway...",
         });
       } else {
         // Cash on Delivery - no payment needed
@@ -554,7 +556,21 @@ export default function CustomerHome() {
         isSubmitting={createOrderMutation.isPending}
       />
 
-      {/* JazzCash Payment Dialog */}
+      {/* JazzCash Payment Gateway (Automated) */}
+      {pendingJazzCashOrder && (
+        <JazzCashPaymentGateway
+          open={showJazzCashGateway}
+          onClose={() => {
+            setShowJazzCashGateway(false);
+            setPendingJazzCashOrder(null);
+          }}
+          orderId={pendingJazzCashOrder.id}
+          orderNumber={pendingJazzCashOrder.orderNumber}
+          totalAmount={pendingJazzCashOrder.total}
+        />
+      )}
+
+      {/* JazzCash Manual Payment Dialog (Fallback) */}
       {pendingJazzCashOrder && (
         <CustomerJazzCashDialog
           open={showJazzCashDialog}

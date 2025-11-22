@@ -2,8 +2,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +11,16 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Plus, Edit, Trash2, Users, RefreshCw, Filter } from "lucide-react";
 import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { format } from "date-fns";
+
+const segmentSchema = z.object({
+  name: z.string().min(1, "Segment name is required"),
+  description: z.string().optional(),
+});
+
+type SegmentFormData = z.infer<typeof segmentSchema>;
 
 export default function AdminCustomerSegments() {
   const { toast } = useToast();
@@ -22,20 +31,24 @@ export default function AdminCustomerSegments() {
     queryKey: ["/api/customer-segments"],
   });
 
-  const form = useForm({
+  const form = useForm<SegmentFormData>({
+    resolver: zodResolver(segmentSchema),
     defaultValues: {
       name: "",
       description: "",
-      filters: {},
     },
   });
 
   const saveMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: SegmentFormData) => {
+      const payload = {
+        ...data,
+        filters: {},
+      };
       if (editingSegment) {
-        return await apiRequest("PUT", `/api/customer-segments/${editingSegment.id}`, data);
+        return await apiRequest("PUT", `/api/customer-segments/${editingSegment.id}`, payload);
       } else {
-        return await apiRequest("POST", "/api/customer-segments", data);
+        return await apiRequest("POST", "/api/customer-segments", payload);
       }
     },
     onSuccess: () => {
@@ -101,14 +114,12 @@ export default function AdminCustomerSegments() {
       form.reset({
         name: segment.name,
         description: segment.description || "",
-        filters: segment.filters || {},
       });
     } else {
       setEditingSegment(null);
       form.reset({
         name: "",
         description: "",
-        filters: {},
       });
     }
     setIsDialogOpen(true);
@@ -120,9 +131,8 @@ export default function AdminCustomerSegments() {
     form.reset();
   };
 
-  const handleSave = () => {
-    const values = form.getValues();
-    saveMutation.mutate(values);
+  const handleSave = (data: SegmentFormData) => {
+    saveMutation.mutate(data);
   };
 
   const handleDelete = (id: string) => {
@@ -249,43 +259,61 @@ export default function AdminCustomerSegments() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Segment Name</Label>
-              <Input
-                id="name"
-                {...form.register("name")}
-                placeholder="High-value Customers"
-                data-testid="input-segment-name"
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSave)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Segment Name</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        placeholder="High-value Customers"
+                        data-testid="input-segment-name"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="description">Description (Optional)</Label>
-              <Textarea
-                id="description"
-                {...form.register("description")}
-                placeholder="Customers with lifetime value > $500"
-                data-testid="input-segment-description"
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        {...field}
+                        placeholder="Customers with lifetime value > $500"
+                        data-testid="input-segment-description"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
 
-            <div className="bg-muted/50 rounded p-4">
-              <p className="text-sm text-muted-foreground">
-                Custom filter configuration is available through API.
-                Use predefined segments (All, Loyal, New, Inactive) in campaigns or contact support for advanced segmentation.
-              </p>
-            </div>
-          </div>
+              <div className="bg-muted/50 rounded p-4">
+                <p className="text-sm text-muted-foreground">
+                  Custom filter configuration is available through API.
+                  Use predefined segments (All, Loyal, New, Inactive) in campaigns or contact support for advanced segmentation.
+                </p>
+              </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={handleCloseDialog} data-testid="button-cancel">
-              Cancel
-            </Button>
-            <Button onClick={handleSave} disabled={saveMutation.isPending} data-testid="button-save-segment">
-              {editingSegment ? "Update" : "Create"} Segment
-            </Button>
-          </DialogFooter>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={handleCloseDialog} data-testid="button-cancel">
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={saveMutation.isPending} data-testid="button-save-segment">
+                  {editingSegment ? "Update" : "Create"} Segment
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
     </div>

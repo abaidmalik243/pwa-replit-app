@@ -2,8 +2,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -12,6 +12,16 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Plus, Edit, Trash2, Copy, MessageSquare } from "lucide-react";
 import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+
+const templateSchema = z.object({
+  name: z.string().min(1, "Template name is required"),
+  category: z.string().min(1, "Category is required"),
+  content: z.string().min(1, "Content is required"),
+});
+
+type TemplateFormData = z.infer<typeof templateSchema>;
 
 export default function AdminMessageTemplates() {
   const { toast } = useToast();
@@ -23,21 +33,25 @@ export default function AdminMessageTemplates() {
     queryKey: ["/api/message-templates", { searchParams: { category: categoryFilter !== "all" ? categoryFilter : undefined } }],
   });
 
-  const form = useForm({
+  const form = useForm<TemplateFormData>({
+    resolver: zodResolver(templateSchema),
     defaultValues: {
       name: "",
       category: "promotional",
       content: "",
-      variables: {},
     },
   });
 
   const saveMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: TemplateFormData) => {
+      const payload = {
+        ...data,
+        variables: {},
+      };
       if (editingTemplate) {
-        return await apiRequest("PUT", `/api/message-templates/${editingTemplate.id}`, data);
+        return await apiRequest("PUT", `/api/message-templates/${editingTemplate.id}`, payload);
       } else {
-        return await apiRequest("POST", "/api/message-templates", data);
+        return await apiRequest("POST", "/api/message-templates", payload);
       }
     },
     onSuccess: () => {
@@ -84,7 +98,6 @@ export default function AdminMessageTemplates() {
         name: template.name,
         category: template.category,
         content: template.content,
-        variables: template.variables || {},
       });
     } else {
       setEditingTemplate(null);
@@ -92,7 +105,6 @@ export default function AdminMessageTemplates() {
         name: "",
         category: "promotional",
         content: "",
-        variables: {},
       });
     }
     setIsDialogOpen(true);
@@ -104,9 +116,8 @@ export default function AdminMessageTemplates() {
     form.reset();
   };
 
-  const handleSave = () => {
-    const values = form.getValues();
-    saveMutation.mutate(values);
+  const handleSave = (data: TemplateFormData) => {
+    saveMutation.mutate(data);
   };
 
   const handleDelete = (id: string) => {
@@ -116,13 +127,12 @@ export default function AdminMessageTemplates() {
   };
 
   const handleDuplicate = (template: any) => {
+    setEditingTemplate(null);
     form.reset({
       name: `${template.name} (Copy)`,
       category: template.category,
       content: template.content,
-      variables: template.variables || {},
     });
-    setEditingTemplate(null);
     setIsDialogOpen(true);
   };
 
@@ -288,59 +298,86 @@ export default function AdminMessageTemplates() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Template Name</Label>
-              <Input
-                id="name"
-                {...form.register("name")}
-                placeholder="Summer Sale Announcement"
-                data-testid="input-template-name"
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSave)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Template Name</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        placeholder="Summer Sale Announcement"
+                        data-testid="input-template-name"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="category">Category</Label>
-              <Select
-                value={form.watch("category")}
-                onValueChange={(value) => form.setValue("category", value)}
-              >
-                <SelectTrigger data-testid="select-category">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="promotional">Promotional</SelectItem>
-                  <SelectItem value="transactional">Transactional</SelectItem>
-                  <SelectItem value="reminder">Reminder</SelectItem>
-                  <SelectItem value="announcement">Announcement</SelectItem>
-                  <SelectItem value="seasonal">Seasonal</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="content">Message Content</Label>
-              <Textarea
-                id="content"
-                {...form.register("content")}
-                placeholder="Hi {{name}}, we have exciting news for you..."
-                rows={6}
-                data-testid="input-template-content"
+              <FormField
+                control={form.control}
+                name="category"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category</FormLabel>
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid="select-category">
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="promotional">Promotional</SelectItem>
+                        <SelectItem value="transactional">Transactional</SelectItem>
+                        <SelectItem value="reminder">Reminder</SelectItem>
+                        <SelectItem value="announcement">Announcement</SelectItem>
+                        <SelectItem value="seasonal">Seasonal</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-              <p className="text-xs text-muted-foreground">
-                Use &#123;&#123;name&#125;&#125;, &#123;&#123;phone&#125;&#125; or custom variables
-              </p>
-            </div>
-          </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={handleCloseDialog} data-testid="button-cancel">
-              Cancel
-            </Button>
-            <Button onClick={handleSave} disabled={saveMutation.isPending} data-testid="button-save-template">
-              {editingTemplate ? "Update" : "Create"} Template
-            </Button>
-          </DialogFooter>
+              <FormField
+                control={form.control}
+                name="content"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Message Content</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        {...field}
+                        placeholder="Hi {{name}}, we have exciting news for you..."
+                        rows={6}
+                        data-testid="input-template-content"
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Use &#123;&#123;name&#125;&#125;, &#123;&#123;phone&#125;&#125; or custom variables
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={handleCloseDialog} data-testid="button-cancel">
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={saveMutation.isPending} data-testid="button-save-template">
+                  {editingTemplate ? "Update" : "Create"} Template
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
     </div>

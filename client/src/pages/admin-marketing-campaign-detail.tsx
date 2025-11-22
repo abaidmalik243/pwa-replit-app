@@ -1,19 +1,32 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { ArrowLeft, Send, Save, Users, Eye, Trash2, Calendar as CalendarIcon, Target } from "lucide-react";
+import { ArrowLeft, Send, Save, Users, Eye, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+
+const campaignSchema = z.object({
+  name: z.string().min(1, "Campaign name is required"),
+  description: z.string().optional(),
+  branchId: z.string().optional(),
+  targetAudience: z.string().default("all"),
+  messageTemplate: z.string().min(1, "Message template is required"),
+  scheduledAt: z.string().optional(),
+});
+
+type CampaignFormData = z.infer<typeof campaignSchema>;
 
 export default function AdminMarketingCampaignDetail() {
   const { id } = useParams<{ id: string }>();
@@ -22,7 +35,6 @@ export default function AdminMarketingCampaignDetail() {
   const isNew = id === "new";
 
   const [previewAudience, setPreviewAudience] = useState<any>(null);
-  const [isPreviewingAudience, setIsPreviewingAudience] = useState(false);
 
   const { data: campaign, isLoading } = useQuery({
     queryKey: [`/api/marketing-campaigns/${id}`],
@@ -37,35 +49,51 @@ export default function AdminMarketingCampaignDetail() {
     queryKey: ["/api/message-templates"],
   });
 
-  const form = useForm({
+  const form = useForm<CampaignFormData>({
+    resolver: zodResolver(campaignSchema),
     defaultValues: {
-      name: campaign?.name || "",
-      description: campaign?.description || "",
-      branchId: campaign?.branchId || "",
-      targetAudience: campaign?.targetAudience || "all",
-      messageTemplate: campaign?.messageTemplate || "",
-      scheduledAt: campaign?.scheduledAt ? format(new Date(campaign.scheduledAt), "yyyy-MM-dd'T'HH:mm") : "",
-      templateVariables: campaign?.templateVariables || {},
+      name: "",
+      description: "",
+      branchId: "",
+      targetAudience: "all",
+      messageTemplate: "",
+      scheduledAt: "",
     },
-    values: campaign,
   });
 
+  useEffect(() => {
+    if (campaign && !isNew) {
+      form.reset({
+        name: campaign.name || "",
+        description: campaign.description || "",
+        branchId: campaign.branchId || "",
+        targetAudience: campaign.targetAudience || "all",
+        messageTemplate: campaign.messageTemplate || "",
+        scheduledAt: campaign.scheduledAt ? format(new Date(campaign.scheduledAt), "yyyy-MM-dd'T'HH:mm") : "",
+      });
+    }
+  }, [campaign, isNew, form]);
+
   const saveMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: CampaignFormData) => {
+      const payload = {
+        ...data,
+        templateVariables: {},
+      };
       if (isNew) {
-        return await apiRequest("POST", "/api/marketing-campaigns", data);
+        return await apiRequest("POST", "/api/marketing-campaigns", payload);
       } else {
-        return await apiRequest("PUT", `/api/marketing-campaigns/${id}`, data);
+        return await apiRequest("PUT", `/api/marketing-campaigns/${id}`, payload);
       }
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/marketing-campaigns"] });
       toast({
         title: "Success",
         description: `Campaign ${isNew ? "created" : "updated"} successfully`,
       });
-      if (isNew) {
-        setLocation("/admin/marketing-campaigns");
+      if (isNew && data?.id) {
+        setLocation(`/admin/marketing-campaigns/${data.id}`);
       }
     },
     onError: (error: any) => {
@@ -125,7 +153,6 @@ export default function AdminMarketingCampaignDetail() {
     },
     onSuccess: (data: any) => {
       setPreviewAudience(data);
-      setIsPreviewingAudience(false);
     },
     onError: (error: any) => {
       toast({
@@ -133,16 +160,11 @@ export default function AdminMarketingCampaignDetail() {
         description: error.message,
         variant: "destructive",
       });
-      setIsPreviewingAudience(false);
     },
   });
 
-  const handleSave = (status?: string) => {
-    const values = form.getValues();
-    saveMutation.mutate({
-      ...values,
-      status: status || campaign?.status || "draft",
-    });
+  const handleSave = (data: CampaignFormData) => {
+    saveMutation.mutate(data);
   };
 
   const handleLaunch = () => {
@@ -159,7 +181,6 @@ export default function AdminMarketingCampaignDetail() {
 
   const handlePreviewAudience = () => {
     const values = form.getValues();
-    setIsPreviewingAudience(true);
     previewAudienceMutation.mutate({
       targetAudience: values.targetAudience,
       branchId: values.branchId,
@@ -171,7 +192,6 @@ export default function AdminMarketingCampaignDetail() {
     const template = templates?.find((t) => t.id === templateId);
     if (template) {
       form.setValue("messageTemplate", template.content);
-      form.setValue("templateVariables", template.variables || {});
     }
   };
 
@@ -209,12 +229,6 @@ export default function AdminMarketingCampaignDetail() {
             <Button variant="destructive" onClick={handleDelete} disabled={deleteMutation.isPending} data-testid="button-delete">
               <Trash2 className="h-4 w-4 mr-2" />
               Delete
-            </Button>
-          )}
-          {canEdit && (
-            <Button onClick={() => handleSave()} disabled={saveMutation.isPending} data-testid="button-save">
-              <Save className="h-4 w-4 mr-2" />
-              Save Draft
             </Button>
           )}
           {!isNew && canLaunch && (
@@ -268,162 +282,228 @@ export default function AdminMarketingCampaignDetail() {
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Campaign Details</CardTitle>
-            <CardDescription>Basic information about your campaign</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Campaign Name</Label>
-              <Input
-                id="name"
-                {...form.register("name")}
-                placeholder="Summer Sale 2024"
-                disabled={!canEdit}
-                data-testid="input-campaign-name"
-              />
-            </div>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(handleSave)} className="space-y-6">
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Campaign Details</CardTitle>
+                <CardDescription>Basic information about your campaign</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Campaign Name</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          placeholder="Summer Sale 2024"
+                          disabled={!canEdit}
+                          data-testid="input-campaign-name"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            <div className="space-y-2">
-              <Label htmlFor="description">Description (Optional)</Label>
-              <Textarea
-                id="description"
-                {...form.register("description")}
-                placeholder="Describe the campaign purpose..."
-                disabled={!canEdit}
-                data-testid="input-campaign-description"
-              />
-            </div>
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description (Optional)</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          {...field}
+                          placeholder="Describe the campaign purpose..."
+                          disabled={!canEdit}
+                          data-testid="input-campaign-description"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            <div className="space-y-2">
-              <Label htmlFor="branch">Branch</Label>
-              <Select
-                value={form.watch("branchId")}
-                onValueChange={(value) => form.setValue("branchId", value)}
-                disabled={!canEdit}
-              >
-                <SelectTrigger data-testid="select-branch">
-                  <SelectValue placeholder="Select branch" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Branches</SelectItem>
-                  {branches?.map((branch) => (
-                    <SelectItem key={branch.id} value={branch.id}>
-                      {branch.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                <FormField
+                  control={form.control}
+                  name="branchId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Branch</FormLabel>
+                      <Select
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        disabled={!canEdit}
+                      >
+                        <FormControl>
+                          <SelectTrigger data-testid="select-branch">
+                            <SelectValue placeholder="Select branch" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="">All Branches</SelectItem>
+                          {branches?.map((branch) => (
+                            <SelectItem key={branch.id} value={branch.id}>
+                              {branch.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            <div className="space-y-2">
-              <Label htmlFor="scheduledAt">Schedule (Optional)</Label>
-              <Input
-                id="scheduledAt"
-                type="datetime-local"
-                {...form.register("scheduledAt")}
-                disabled={!canEdit}
-                data-testid="input-scheduled-at"
-              />
-              <p className="text-xs text-muted-foreground">Leave empty to send immediately when launched</p>
-            </div>
-          </CardContent>
-        </Card>
+                <FormField
+                  control={form.control}
+                  name="scheduledAt"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Schedule (Optional)</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          type="datetime-local"
+                          disabled={!canEdit}
+                          data-testid="input-scheduled-at"
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Leave empty to send immediately when launched
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Target Audience</CardTitle>
-            <CardDescription>Select who will receive this campaign</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="targetAudience">Audience Segment</Label>
-              <Select
-                value={form.watch("targetAudience")}
-                onValueChange={(value) => form.setValue("targetAudience", value)}
-                disabled={!canEdit}
-              >
-                <SelectTrigger data-testid="select-target-audience">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Customers</SelectItem>
-                  <SelectItem value="loyal_customers">Loyal Customers (Gold Tier)</SelectItem>
-                  <SelectItem value="new_customers">New Customers (≤3 orders)</SelectItem>
-                  <SelectItem value="inactive_customers">Inactive Customers</SelectItem>
-                  <SelectItem value="custom">Custom Segment</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <Card>
+              <CardHeader>
+                <CardTitle>Target Audience</CardTitle>
+                <CardDescription>Select who will receive this campaign</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="targetAudience"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Audience Segment</FormLabel>
+                      <Select
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        disabled={!canEdit}
+                      >
+                        <FormControl>
+                          <SelectTrigger data-testid="select-target-audience">
+                            <SelectValue />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="all">All Customers</SelectItem>
+                          <SelectItem value="loyal_customers">Loyal Customers (Gold Tier)</SelectItem>
+                          <SelectItem value="new_customers">New Customers (≤3 orders)</SelectItem>
+                          <SelectItem value="inactive_customers">Inactive Customers</SelectItem>
+                          <SelectItem value="custom">Custom Segment</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            <Button
-              variant="outline"
-              onClick={handlePreviewAudience}
-              disabled={isPreviewingAudience || previewAudienceMutation.isPending}
-              className="w-full"
-              data-testid="button-preview-audience"
-            >
-              <Eye className="h-4 w-4 mr-2" />
-              Preview Audience
-            </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handlePreviewAudience}
+                  disabled={previewAudienceMutation.isPending}
+                  className="w-full"
+                  data-testid="button-preview-audience"
+                >
+                  <Eye className="h-4 w-4 mr-2" />
+                  Preview Audience
+                </Button>
 
-            {previewAudience && (
-              <div className="border rounded-lg p-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Total Customers</span>
-                  <Badge variant="secondary" data-testid="text-preview-count">{previewAudience.totalCount}</Badge>
-                </div>
-                <Separator />
-                <div className="text-xs text-muted-foreground">
-                  Sample customers: {previewAudience.sampleCustomers?.slice(0, 3).map((c: any) => c.fullName).join(", ")}
-                  {previewAudience.sampleCustomers?.length > 3 && "..."}
-                </div>
+                {previewAudience && (
+                  <div className="border rounded-lg p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">Total Customers</span>
+                      <Badge variant="secondary" data-testid="text-preview-count">{previewAudience.totalCount}</Badge>
+                    </div>
+                    <Separator />
+                    <div className="text-xs text-muted-foreground">
+                      Sample customers: {previewAudience.sampleCustomers?.slice(0, 3).map((c: any) => c.fullName).join(", ")}
+                      {previewAudience.sampleCustomers?.length > 3 && "..."}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Message Content</CardTitle>
+              <CardDescription>Compose your WhatsApp message</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <FormLabel>Use Template (Optional)</FormLabel>
+                <Select onValueChange={handleTemplateSelect} disabled={!canEdit}>
+                  <SelectTrigger data-testid="select-template">
+                    <SelectValue placeholder="Choose a template..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {templates?.map((template) => (
+                      <SelectItem key={template.id} value={template.id}>
+                        {template.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Message Content</CardTitle>
-          <CardDescription>Compose your WhatsApp message</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="template">Use Template (Optional)</Label>
-            <Select onValueChange={handleTemplateSelect} disabled={!canEdit}>
-              <SelectTrigger data-testid="select-template">
-                <SelectValue placeholder="Choose a template..." />
-              </SelectTrigger>
-              <SelectContent>
-                {templates?.map((template) => (
-                  <SelectItem key={template.id} value={template.id}>
-                    {template.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+              <FormField
+                control={form.control}
+                name="messageTemplate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Message</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        {...field}
+                        placeholder="Hi {{name}}, check out our amazing deals..."
+                        rows={6}
+                        disabled={!canEdit}
+                        data-testid="input-message-template"
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Use &#123;&#123;name&#125;&#125; to personalize messages. Other variables can be defined in templates.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </CardContent>
+          </Card>
 
-          <div className="space-y-2">
-            <Label htmlFor="messageTemplate">Message</Label>
-            <Textarea
-              id="messageTemplate"
-              {...form.register("messageTemplate")}
-              placeholder="Hi {{name}}, check out our amazing deals..."
-              rows={6}
-              disabled={!canEdit}
-              data-testid="input-message-template"
-            />
-            <p className="text-xs text-muted-foreground">
-              Use &#123;&#123;name&#125;&#125; to personalize messages. Other variables can be defined in templates.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+          {canEdit && (
+            <div className="flex justify-end">
+              <Button type="submit" disabled={saveMutation.isPending} data-testid="button-save">
+                <Save className="h-4 w-4 mr-2" />
+                Save Draft
+              </Button>
+            </div>
+          )}
+        </form>
+      </Form>
     </div>
   );
 }

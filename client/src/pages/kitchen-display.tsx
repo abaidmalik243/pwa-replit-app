@@ -8,7 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useSocketEvent } from "@/hooks/useSocket";
+import { useSocketEvent } from "@/context/SocketContext";
 import type { Order } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
 

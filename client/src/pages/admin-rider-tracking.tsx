@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { MapPin, Navigation, Bike, Clock, Activity } from "lucide-react";
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { useSocketEvent } from "@/hooks/useSocket";
+import { useSocketEvent } from "@/context/SocketContext";
 import { queryClient } from "@/lib/queryClient";
 
 type Rider = {

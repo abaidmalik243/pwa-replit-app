@@ -41,7 +41,13 @@ Includes a web app manifest for standalone display and a service worker for offl
 All pages are fully responsive using a mobile-first approach with Tailwind CSS breakpoints. This includes adaptive layouts for the POS system (sidebar, menu grids, session history, table displays) and the customer interface (hero slider, category filters, menu grid, cart).
 
 ### Real-Time Features
-The admin dashboard uses the Web Audio API for new order notifications with custom sound patterns and toggle control.
+**WebSocket Integration**: Complete Socket.IO implementation providing instant real-time updates across all terminals:
+-   **Server**: WebSocket server with cookie-based JWT authentication, room management (branch/role/user rooms), and automatic event broadcasting on database mutations.
+-   **Client**: Singleton SocketContext provider with auto-reconnection, event subscriptions, and proper cleanup.
+-   **Real-time Events**: order:created, order:statusUpdated, kitchen:ticketCreated, kitchen:ticketUpdated, rider:locationUpdated, delivery:statusUpdated, pos:sessionUpdated, table:statusUpdated.
+-   **Eliminated Polling**: All 5-second HTTP polling replaced with instant WebSocket push notifications (<100ms latency).
+-   **Pages Updated**: Kitchen Display, Admin Dashboard, Rider Tracking, Rider Dashboard all use WebSocket subscriptions.
+-   **Sound Notifications**: Web Audio API for new order alerts with custom sound patterns and toggle control.
 
 ### POS Module
 A comprehensive Point of Sale system integrates:

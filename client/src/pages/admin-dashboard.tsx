@@ -6,7 +6,7 @@ import AdminHeader from "@/components/AdminHeader";
 import OrderCard, { Order } from "@/components/OrderCard";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
-import { useSocketEvent } from "@/hooks/useSocket";
+import { useSocketEvent } from "@/context/SocketContext";
 import { playNotificationSound } from "@/lib/notificationSound";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

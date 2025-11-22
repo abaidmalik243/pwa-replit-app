@@ -63,7 +63,7 @@ export default function AdminMessageTemplates() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/message-templates"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/message-templates"], refetchType: 'all' });
       toast({
         title: "Success",
         description: `Template ${editingTemplate ? "updated" : "created"} successfully`,
@@ -84,7 +84,7 @@ export default function AdminMessageTemplates() {
       await apiRequest(`/api/message-templates/${id}`, "DELETE", {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/message-templates"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/message-templates"], refetchType: 'all' });
       toast({
         title: "Template Deleted",
         description: "Template deleted successfully",
@@ -125,6 +125,8 @@ export default function AdminMessageTemplates() {
   };
 
   const handleSave = (data: TemplateFormData) => {
+    console.log("Form submitted with data:", data);
+    console.log("Form errors:", form.formState.errors);
     saveMutation.mutate(data);
   };
 

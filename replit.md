@@ -40,7 +40,13 @@ Complete Socket.IO integration provides instant real-time updates across all ter
 
 **Inventory Management System**: Features real-time stock tracking with automatic deduction on order completion, low stock alerts, supplier management, inventory transaction history, and wastage tracking.
 
-**Payment Processing System**: Manages full or partial refunds for various payment methods and generates professional receipts. The backend is prepared for Stripe and JazzCash API integrations.
+**Payment Processing System**: Complete payment integration supporting multiple payment methods with automated processing. Stripe integration uses the Replit connector with `stripe-replit-sync` for automatic data synchronization. Features include:
+- **Stripe Card Payments**: Full checkout session creation, payment intent management, automated webhook handling for payment confirmation
+- **JazzCash Mobile Wallet**: Manual verification workflow where staff review transaction IDs and payment screenshots
+- **Automated Refunds**: Stripe refunds processed automatically via API; JazzCash refunds marked for manual processing
+- **Payment Tracking**: Orders store Stripe payment intent IDs, checkout session IDs, customer IDs, and refund IDs
+- **Webhook Security**: UUID-based webhook endpoint for secure Stripe event processing
+- **Data Sync**: Automatic bidirectional sync between Stripe and PostgreSQL for products, prices, customers, and payment records
 
 **Rider Management System**: Includes CRUD management for riders, automatic user account creation for riders, real-time GPS location tracking with history, automated delivery assignment, rider status management, performance tracking, and live admin dashboard with map visualization. Riders have a dedicated mobile dashboard and role-based authentication.
 

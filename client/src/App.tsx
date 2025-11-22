@@ -44,6 +44,7 @@ import AdminInventory from "@/pages/admin-inventory";
 import AdminSuppliers from "@/pages/admin-suppliers";
 import AdminRefunds from "@/pages/admin-refunds";
 import AdminWastage from "@/pages/admin-wastage";
+import PaymentResult from "@/pages/payment-result";
 
 function Router() {
   return (
@@ -56,6 +57,7 @@ function Router() {
       <Route path="/reset-password" component={ResetPassword} />
       <Route path="/terms-conditions" component={TermsConditions} />
       <Route path="/privacy-policy" component={PrivacyPolicy} />
+      <Route path="/payment-result" component={PaymentResult} />
       <Route path="/admin/pos">
         <ProtectedRoute requireRole={["admin", "staff"]}>
           <PosMain />

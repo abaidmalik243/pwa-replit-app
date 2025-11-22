@@ -3383,20 +3383,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!validation.success) {
         console.error("JazzCash payment failed:", validation.responseMessage);
-        return res.redirect(`/checkout?payment=failed&message=${encodeURIComponent(validation.responseMessage)}`);
+        return res.redirect(`/payment-result?status=failed&message=${encodeURIComponent(validation.responseMessage)}`);
       }
 
       // Get order from custom field
       const orderId = validation.orderId;
       if (!orderId) {
         console.error("No order ID in JazzCash response");
-        return res.redirect('/checkout?payment=failed&message=Invalid+response');
+        return res.redirect('/payment-result?status=failed&message=Invalid+response');
       }
 
       const order = await storage.getOrder(orderId);
       if (!order) {
         console.error("Order not found:", orderId);
-        return res.redirect('/checkout?payment=failed&message=Order+not+found');
+        return res.redirect('/payment-result?status=failed&message=Order+not+found');
+      }
+
+      // Validate payment amount matches order total
+      const orderTotal = parseFloat(order.total);
+      if (validation.amount && Math.abs(validation.amount - orderTotal) > 0.01) {
+        console.error("Amount mismatch:", validation.amount, "vs", orderTotal);
+        return res.redirect(`/payment-result?status=failed&message=Payment+amount+mismatch`);
       }
 
       // Update order with successful payment
@@ -3412,10 +3419,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Redirect to success page
-      res.redirect(`/order-confirmation/${orderId}?payment=success`);
+      res.redirect(`/payment-result?status=success&orderId=${orderId}`);
     } catch (error: any) {
       console.error("JazzCash callback error:", error);
-      res.redirect(`/checkout?payment=failed&message=${encodeURIComponent(error.message)}`);
+      res.redirect(`/payment-result?status=failed&message=${encodeURIComponent(error.message)}`);
     }
   });
 

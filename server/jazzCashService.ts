@@ -1,12 +1,23 @@
 import crypto from 'crypto';
 
-const JAZZCASH_MERCHANT_ID = process.env.JAZZCASH_MERCHANT_ID!;
-const JAZZCASH_PASSWORD = process.env.JAZZCASH_PASSWORD!;
-const JAZZCASH_INTEGRITY_SALT = process.env.JAZZCASH_INTEGRITY_SALT!;
-
 // Use sandbox URLs for now - can be configured via env var
 const JAZZCASH_BASE_URL = process.env.JAZZCASH_BASE_URL || 'https://sandbox.jazzcash.com.pk';
 const JAZZCASH_PAYMENT_URL = `${JAZZCASH_BASE_URL}/CustomerPortal/transactionmanagement/merchantform/`;
+
+/**
+ * Get JazzCash credentials with validation
+ */
+function getJazzCashCredentials() {
+  const merchantId = process.env.JAZZCASH_MERCHANT_ID;
+  const password = process.env.JAZZCASH_PASSWORD;
+  const integritySalt = process.env.JAZZCASH_INTEGRITY_SALT;
+
+  if (!merchantId || !password || !integritySalt) {
+    throw new Error('JazzCash credentials not configured. Please set JAZZCASH_MERCHANT_ID, JAZZCASH_PASSWORD, and JAZZCASH_INTEGRITY_SALT environment variables.');
+  }
+
+  return { merchantId, password, integritySalt };
+}
 
 interface JazzCashPaymentData {
   orderId: string;
@@ -46,10 +57,10 @@ interface JazzCashFormData {
 /**
  * Generate HMAC-SHA256 hash for JazzCash transaction
  */
-function generateSecureHash(data: JazzCashFormData): string {
-  // Build sorted string as per JazzCash documentation
+function generateSecureHash(data: JazzCashFormData, integritySalt: string): string {
+  // Build sorted string as per JazzCash documentation (alphabetically sorted)
   const sortedString = 
-    JAZZCASH_INTEGRITY_SALT + '&' +
+    integritySalt + '&' +
     data.pp_Amount + '&' +
     data.pp_BillReference + '&' +
     data.pp_Description + '&' +
@@ -65,7 +76,7 @@ function generateSecureHash(data: JazzCashFormData): string {
     data.pp_Version;
 
   return crypto
-    .createHmac('sha256', JAZZCASH_INTEGRITY_SALT)
+    .createHmac('sha256', integritySalt)
     .update(sortedString)
     .digest('hex');
 }
@@ -73,28 +84,32 @@ function generateSecureHash(data: JazzCashFormData): string {
 /**
  * Verify response hash from JazzCash callback
  */
-function verifyResponseHash(responseData: any): boolean {
+function verifyResponseHash(responseData: any, integritySalt: string): boolean {
   const receivedHash = responseData.pp_SecureHash;
   
-  // Build string from response parameters (alphabetically sorted)
+  if (!receivedHash) {
+    return false;
+  }
+
+  // Build string from response parameters (alphabetically sorted per JazzCash spec)
   const sortedString = 
-    JAZZCASH_INTEGRITY_SALT + '&' +
-    responseData.pp_Amount + '&' +
-    responseData.pp_BillReference + '&' +
-    responseData.pp_Description + '&' +
-    responseData.pp_Language + '&' +
-    responseData.pp_MerchantID + '&' +
-    responseData.pp_ResponseCode + '&' +
-    responseData.pp_ResponseMessage + '&' +
-    responseData.pp_RetreivalReferenceNo + '&' +
-    responseData.pp_TxnCurrency + '&' +
-    responseData.pp_TxnDateTime + '&' +
-    responseData.pp_TxnRefNo + '&' +
-    responseData.pp_TxnType + '&' +
-    responseData.pp_Version;
+    integritySalt + '&' +
+    (responseData.pp_Amount || '') + '&' +
+    (responseData.pp_BillReference || '') + '&' +
+    (responseData.pp_Description || '') + '&' +
+    (responseData.pp_Language || '') + '&' +
+    (responseData.pp_MerchantID || '') + '&' +
+    (responseData.pp_ResponseCode || '') + '&' +
+    (responseData.pp_ResponseMessage || '') + '&' +
+    (responseData.pp_RetreivalReferenceNo || '') + '&' +
+    (responseData.pp_TxnCurrency || '') + '&' +
+    (responseData.pp_TxnDateTime || '') + '&' +
+    (responseData.pp_TxnRefNo || '') + '&' +
+    (responseData.pp_TxnType || '') + '&' +
+    (responseData.pp_Version || '');
 
   const calculatedHash = crypto
-    .createHmac('sha256', JAZZCASH_INTEGRITY_SALT)
+    .createHmac('sha256', integritySalt)
     .update(sortedString)
     .digest('hex');
 
@@ -108,6 +123,9 @@ export function createJazzCashPayment(paymentData: JazzCashPaymentData): {
   formData: JazzCashFormData;
   paymentUrl: string;
 } {
+  // Validate credentials first
+  const credentials = getJazzCashCredentials();
+  
   // Generate transaction reference with timestamp
   const txnDateTime = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
   const txnRefNo = `T${txnDateTime}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
@@ -124,9 +142,9 @@ export function createJazzCashPayment(paymentData: JazzCashPaymentData): {
     pp_Version: '1.1',
     pp_TxnType: 'MWALLET', // Mobile Wallet
     pp_Language: 'EN',
-    pp_MerchantID: JAZZCASH_MERCHANT_ID,
+    pp_MerchantID: credentials.merchantId,
     pp_SubMerchantID: '',
-    pp_Password: JAZZCASH_PASSWORD,
+    pp_Password: credentials.password,
     pp_TxnRefNo: txnRefNo,
     pp_Amount: amountInPaisas.toString(),
     pp_TxnCurrency: 'PKR',
@@ -149,7 +167,7 @@ export function createJazzCashPayment(paymentData: JazzCashPaymentData): {
   }
 
   // Generate and set secure hash
-  formData.pp_SecureHash = generateSecureHash(formData);
+  formData.pp_SecureHash = generateSecureHash(formData, credentials.integritySalt);
 
   return {
     formData,
@@ -168,8 +186,11 @@ export function validateJazzCashResponse(responseData: any): {
   amount?: number;
   orderId?: string;
 } {
+  // Get credentials for hash verification
+  const credentials = getJazzCashCredentials();
+  
   // Verify hash first
-  const isHashValid = verifyResponseHash(responseData);
+  const isHashValid = verifyResponseHash(responseData, credentials.integritySalt);
   
   if (!isHashValid) {
     return {
@@ -196,5 +217,10 @@ export function validateJazzCashResponse(responseData: any): {
  * Check if JazzCash is properly configured
  */
 export function isJazzCashConfigured(): boolean {
-  return !!(JAZZCASH_MERCHANT_ID && JAZZCASH_PASSWORD && JAZZCASH_INTEGRITY_SALT);
+  try {
+    getJazzCashCredentials();
+    return true;
+  } catch {
+    return false;
+  }
 }

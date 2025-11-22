@@ -189,11 +189,13 @@ export const orders = pgTable("orders", {
   deliveryArea: text("delivery_area"), // Selected delivery area
   orderType: text("order_type").notNull().default("takeaway"), // takeaway, delivery, or dine-in
   orderSource: text("order_source").notNull().default("online"), // online, pos, phone
-  paymentMethod: text("payment_method").notNull().default("cash"), // cash, card, or jazzcash
+  paymentMethod: text("payment_method").notNull().default("cash"), // cash, card, jazzcash, stripe
   paymentStatus: text("payment_status").notNull().default("pending"), // pending, awaiting_verification, paid, failed, partial
   jazzCashTransactionId: text("jazzcash_transaction_id"), // JazzCash transaction ID provided by customer
   jazzCashPayerPhone: text("jazzcash_payer_phone"), // Phone number used for JazzCash payment
   jazzCashScreenshotUrl: text("jazzcash_screenshot_url"), // Optional payment screenshot URL
+  stripeCheckoutSessionId: text("stripe_checkout_session_id"), // Stripe checkout session ID
+  stripePaymentIntentId: text("stripe_payment_intent_id"), // Stripe payment intent ID for refunds
   items: text("items").notNull(), // JSON string
   subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(), // Order subtotal before delivery/discount
   promoCodeId: varchar("promo_code_id").references(() => promoCodes.id), // Applied promo code

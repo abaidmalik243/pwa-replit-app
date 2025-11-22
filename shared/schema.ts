@@ -614,3 +614,113 @@ export const reorderPoints = pgTable("reorder_points", {
 export const insertReorderPointSchema = createInsertSchema(reorderPoints).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertReorderPoint = z.infer<typeof insertReorderPointSchema>;
 export type ReorderPoint = typeof reorderPoints.$inferSelect;
+
+// Staff Shifts - Define shift templates and schedules
+export const staffShifts = pgTable("staff_shifts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  branchId: varchar("branch_id").references(() => branches.id).notNull(),
+  shiftName: text("shift_name").notNull(), // Morning, Evening, Night, etc.
+  shiftType: text("shift_type").notNull().default("regular"), // regular, split, on_call, flexible
+  startTime: text("start_time").notNull(), // HH:MM format (e.g., "09:00")
+  endTime: text("end_time").notNull(), // HH:MM format (e.g., "17:00")
+  durationMinutes: integer("duration_minutes").notNull(), // Total shift duration in minutes
+  breakDurationMinutes: integer("break_duration_minutes").default(30), // Paid/unpaid break duration
+  standardHours: decimal("standard_hours", { precision: 5, scale: 2 }).notNull(), // Standard hours before overtime
+  overtimeMultiplier: decimal("overtime_multiplier", { precision: 3, scale: 2 }).default("1.5"), // Overtime pay multiplier
+  daysOfWeek: text("days_of_week").array(), // ["monday", "tuesday", ...] or null for all days
+  description: text("description"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertStaffShiftSchema = createInsertSchema(staffShifts).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertStaffShift = z.infer<typeof insertStaffShiftSchema>;
+export type StaffShift = typeof staffShifts.$inferSelect;
+
+// Shift Assignments - Assign specific shifts to staff members
+export const shiftAssignments = pgTable("shift_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  shiftId: varchar("shift_id").references(() => staffShifts.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(), // Staff member assigned
+  assignmentDate: timestamp("assignment_date").notNull(), // Specific date for this assignment
+  startDateTime: timestamp("start_date_time").notNull(), // Actual start date/time
+  endDateTime: timestamp("end_date_time").notNull(), // Actual end date/time
+  status: text("status").notNull().default("scheduled"), // scheduled, in_progress, completed, cancelled, no_show
+  posSessionId: varchar("pos_session_id").references(() => posSessions.id), // Link to POS session if opened
+  notes: text("notes"),
+  assignedBy: varchar("assigned_by").references(() => users.id), // Who created the assignment
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertShiftAssignmentSchema = createInsertSchema(shiftAssignments).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertShiftAssignment = z.infer<typeof insertShiftAssignmentSchema>;
+export type ShiftAssignment = typeof shiftAssignments.$inferSelect;
+
+// Shift Attendance - Track clock in/out times
+export const shiftAttendance = pgTable("shift_attendance", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  assignmentId: varchar("assignment_id").references(() => shiftAssignments.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  clockInTime: timestamp("clock_in_time").notNull(),
+  clockInLatitude: decimal("clock_in_latitude", { precision: 10, scale: 7 }), // GPS location at clock in
+  clockInLongitude: decimal("clock_in_longitude", { precision: 10, scale: 7 }),
+  clockOutTime: timestamp("clock_out_time"),
+  clockOutLatitude: decimal("clock_out_latitude", { precision: 10, scale: 7 }), // GPS location at clock out
+  clockOutLongitude: decimal("clock_out_longitude", { precision: 10, scale: 7 }),
+  totalMinutesWorked: integer("total_minutes_worked"), // Calculated when clocked out
+  regularMinutes: integer("regular_minutes"), // Minutes within standard hours
+  overtimeMinutes: integer("overtime_minutes"), // Minutes beyond standard hours
+  breakMinutes: integer("break_minutes").default(0), // Total break time taken
+  status: text("status").notNull().default("clocked_in"), // clocked_in, clocked_out, on_break
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertShiftAttendanceSchema = createInsertSchema(shiftAttendance).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertShiftAttendance = z.infer<typeof insertShiftAttendanceSchema>;
+export type ShiftAttendance = typeof shiftAttendance.$inferSelect;
+
+// Staff Availability - Track when staff are available for scheduling
+export const staffAvailability = pgTable("staff_availability", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  dayOfWeek: text("day_of_week").notNull(), // monday, tuesday, wednesday, etc.
+  availableFrom: text("available_from").notNull(), // HH:MM format
+  availableTo: text("available_to").notNull(), // HH:MM format
+  isRecurring: boolean("is_recurring").notNull().default(true), // Applies to all weeks or just once
+  effectiveDate: timestamp("effective_date"), // For non-recurring availability
+  expiryDate: timestamp("expiry_date"), // Optional expiry for time-limited availability
+  notes: text("notes"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertStaffAvailabilitySchema = createInsertSchema(staffAvailability).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertStaffAvailability = z.infer<typeof insertStaffAvailabilitySchema>;
+export type StaffAvailability = typeof staffAvailability.$inferSelect;
+
+// Overtime Records - Track calculated overtime for payroll
+export const overtimeRecords = pgTable("overtime_records", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  attendanceId: varchar("attendance_id").references(() => shiftAttendance.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  overtimeMinutes: integer("overtime_minutes").notNull(),
+  overtimeHours: decimal("overtime_hours", { precision: 5, scale: 2 }).notNull(), // Decimal hours for payroll
+  multiplier: decimal("multiplier", { precision: 3, scale: 2 }).notNull().default("1.5"), // Overtime rate multiplier
+  calculationDate: timestamp("calculation_date").notNull().defaultNow(),
+  payPeriodStart: timestamp("pay_period_start").notNull(), // Start of pay period
+  payPeriodEnd: timestamp("pay_period_end").notNull(), // End of pay period
+  isPaid: boolean("is_paid").notNull().default(false), // Track if overtime has been paid
+  paidDate: timestamp("paid_date"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertOvertimeRecordSchema = createInsertSchema(overtimeRecords).omit({ id: true, createdAt: true });
+export type InsertOvertimeRecord = z.infer<typeof insertOvertimeRecordSchema>;
+export type OvertimeRecord = typeof overtimeRecords.$inferSelect;

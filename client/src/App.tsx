@@ -48,6 +48,9 @@ import PaymentResult from "@/pages/payment-result";
 import AdminJazzCash from "@/pages/admin-jazzcash";
 import AdminAnalytics from "@/pages/admin-analytics";
 import AdminOrders from "@/pages/admin-orders";
+import AdminShifts from "@/pages/admin-shifts";
+import StaffAttendance from "@/pages/staff-attendance";
+import AdminShiftReports from "@/pages/admin-shift-reports";
 
 function Router() {
   return (
@@ -199,6 +202,21 @@ function Router() {
       <Route path="/admin/analytics">
         <ProtectedRoute requireRole={["admin"]}>
           <AdminAnalytics />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/shifts">
+        <ProtectedRoute requireRole={["admin", "staff"]}>
+          <AdminShifts />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/attendance">
+        <ProtectedRoute requireRole={["admin", "staff"]}>
+          <StaffAttendance />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/shift-reports">
+        <ProtectedRoute requireRole={["admin", "staff"]}>
+          <AdminShiftReports />
         </ProtectedRoute>
       </Route>
       <Route path="/account">

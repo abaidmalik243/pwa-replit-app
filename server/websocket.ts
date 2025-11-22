@@ -162,4 +162,64 @@ export const emitEvent = {
       io.to(`branch:${table.branchId}`).emit("table:statusUpdated", table);
     }
   },
+
+  shiftAssigned: (assignment: any) => {
+    if (!io) return;
+    
+    // Notify the assigned user
+    if (assignment.userId) {
+      io.to(`user:${assignment.userId}`).emit("shift:assigned", assignment);
+    }
+    
+    // Notify admins and staff
+    io.to("role:admin").emit("shift:assigned", assignment);
+    io.to("role:staff").emit("shift:assigned", assignment);
+  },
+
+  shiftUpdated: (assignment: any) => {
+    if (!io) return;
+    
+    // Notify the assigned user
+    if (assignment.userId) {
+      io.to(`user:${assignment.userId}`).emit("shift:updated", assignment);
+    }
+    
+    // Notify admins and staff
+    io.to("role:admin").emit("shift:updated", assignment);
+    io.to("role:staff").emit("shift:updated", assignment);
+  },
+
+  shiftDeleted: (data: any) => {
+    if (!io) return;
+    
+    // Notify admins and staff
+    io.to("role:admin").emit("shift:deleted", data);
+    io.to("role:staff").emit("shift:deleted", data);
+  },
+
+  attendanceClockIn: (attendance: any) => {
+    if (!io) return;
+    
+    // Notify the user who clocked in
+    if (attendance.userId) {
+      io.to(`user:${attendance.userId}`).emit("attendance:clockIn", attendance);
+    }
+    
+    // Notify admins and staff
+    io.to("role:admin").emit("attendance:clockIn", attendance);
+    io.to("role:staff").emit("attendance:clockIn", attendance);
+  },
+
+  attendanceClockOut: (attendance: any) => {
+    if (!io) return;
+    
+    // Notify the user who clocked out
+    if (attendance.userId) {
+      io.to(`user:${attendance.userId}`).emit("attendance:clockOut", attendance);
+    }
+    
+    // Notify admins and staff
+    io.to("role:admin").emit("attendance:clockOut", attendance);
+    io.to("role:staff").emit("attendance:clockOut", attendance);
+  },
 };

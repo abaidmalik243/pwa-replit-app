@@ -3814,6 +3814,448 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================
+  // STAFF SHIFT MANAGEMENT ROUTES
+  // ============================================
+
+  // Staff Shifts - CRUD operations for shift templates
+  app.get("/api/shifts", authenticate, authorize("admin", "staff"), async (req, res) => {
+    try {
+      const { branchId } = req.query;
+      const shifts = branchId 
+        ? await storage.getStaffShiftsByBranch(branchId as string)
+        : await storage.getAllStaffShifts();
+      res.json(shifts);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/shifts/:id", authenticate, authorize("admin", "staff"), async (req, res) => {
+    try {
+      const shift = await storage.getStaffShift(req.params.id);
+      if (!shift) {
+        return res.status(404).json({ error: "Shift not found" });
+      }
+      res.json(shift);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/shifts", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      const shift = await storage.createStaffShift({
+        ...req.body,
+        createdBy: req.user!.id,
+      });
+      res.json(shift);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.put("/api/shifts/:id", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      const shift = await storage.updateStaffShift(req.params.id, req.body);
+      if (!shift) {
+        return res.status(404).json({ error: "Shift not found" });
+      }
+      res.json(shift);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/shifts/:id", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      await storage.deleteStaffShift(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Shift Assignments - Assign shifts to staff members
+  app.get("/api/shift-assignments", authenticate, authorize("admin", "staff"), async (req, res) => {
+    try {
+      const { userId, shiftId, startDate, endDate, branchId } = req.query;
+      
+      // Staff can only view their own assignments, admins can view all
+      const effectiveUserId = req.user!.role === "admin" ? (userId as string | undefined) : req.user!.id;
+      
+      let assignments;
+      if (effectiveUserId) {
+        assignments = await storage.getShiftAssignmentsByUser(effectiveUserId);
+      } else if (shiftId) {
+        assignments = await storage.getShiftAssignmentsByShift(shiftId as string);
+      } else if (startDate && endDate) {
+        assignments = await storage.getShiftAssignmentsByDateRange(
+          new Date(startDate as string),
+          new Date(endDate as string),
+          branchId as string
+        );
+      } else {
+        assignments = await storage.getAllShiftAssignments();
+      }
+      
+      res.json(assignments);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/shift-assignments/:id", authenticate, authorize("admin", "staff"), async (req, res) => {
+    try {
+      const assignment = await storage.getShiftAssignment(req.params.id);
+      if (!assignment) {
+        return res.status(404).json({ error: "Assignment not found" });
+      }
+      
+      // Staff can only view their own assignments
+      if (req.user!.role !== "admin" && assignment.userId !== req.user!.id) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      
+      res.json(assignment);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/shift-assignments", authenticate, authorize("admin", "staff"), async (req, res) => {
+    try {
+      const { userId, startDateTime, endDateTime } = req.body;
+      
+      // Only admins can assign shifts to other users
+      if (req.user!.role !== "admin" && userId !== req.user!.id) {
+        return res.status(403).json({ error: "Staff members can only create assignments for themselves. Contact an admin to assign shifts to others." });
+      }
+      
+      // Check for scheduling conflicts
+      const hasConflict = await storage.checkShiftConflict(
+        userId,
+        new Date(startDateTime),
+        new Date(endDateTime)
+      );
+      
+      if (hasConflict) {
+        return res.status(409).json({ error: "Shift conflict detected. This user already has a shift during this time." });
+      }
+      
+      const assignment = await storage.createShiftAssignment({
+        ...req.body,
+        assignedBy: req.user!.id,
+      });
+      
+      res.json(assignment);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.put("/api/shift-assignments/:id", authenticate, authorize("admin", "staff"), async (req, res) => {
+    try {
+      const { userId, startDateTime, endDateTime } = req.body;
+      
+      // Get existing assignment to check ownership
+      const existingAssignment = await storage.getShiftAssignment(req.params.id);
+      if (!existingAssignment) {
+        return res.status(404).json({ error: "Assignment not found" });
+      }
+      
+      // Only admins can update assignments for other users
+      if (req.user!.role !== "admin" && existingAssignment.userId !== req.user!.id) {
+        return res.status(403).json({ error: "Staff members can only update their own assignments" });
+      }
+      
+      // Staff cannot change the userId field
+      if (req.user!.role !== "admin" && userId && userId !== existingAssignment.userId) {
+        return res.status(403).json({ error: "Staff members cannot reassign shifts to other users" });
+      }
+      
+      // Check for conflicts if times are being updated
+      if (userId && startDateTime && endDateTime) {
+        const hasConflict = await storage.checkShiftConflict(
+          userId,
+          new Date(startDateTime),
+          new Date(endDateTime),
+          req.params.id
+        );
+        
+        if (hasConflict) {
+          return res.status(409).json({ error: "Shift conflict detected. This user already has a shift during this time." });
+        }
+      }
+      
+      const assignment = await storage.updateShiftAssignment(req.params.id, req.body);
+      res.json(assignment);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/shift-assignments/:id", authenticate, authorize("admin", "staff"), async (req, res) => {
+    try {
+      // Get existing assignment to check ownership
+      const existingAssignment = await storage.getShiftAssignment(req.params.id);
+      if (!existingAssignment) {
+        return res.status(404).json({ error: "Assignment not found" });
+      }
+      
+      // Only admins can delete assignments for other users
+      if (req.user!.role !== "admin" && existingAssignment.userId !== req.user!.id) {
+        return res.status(403).json({ error: "Staff members can only delete their own assignments" });
+      }
+      
+      await storage.deleteShiftAssignment(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Check shift conflict before scheduling
+  app.post("/api/shift-assignments/check-conflict", authenticate, authorize("admin", "staff"), async (req, res) => {
+    try {
+      const { userId, startDateTime, endDateTime, excludeAssignmentId } = req.body;
+      
+      const hasConflict = await storage.checkShiftConflict(
+        userId,
+        new Date(startDateTime),
+        new Date(endDateTime),
+        excludeAssignmentId
+      );
+      
+      res.json({ hasConflict });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Shift Attendance - Clock in/out functionality
+  app.get("/api/attendance", authenticate, async (req, res) => {
+    try {
+      const { userId, assignmentId } = req.query;
+      
+      let attendance;
+      if (assignmentId) {
+        attendance = await storage.getShiftAttendanceByAssignment(assignmentId as string);
+        res.json(attendance || null);
+      } else if (userId) {
+        attendance = await storage.getShiftAttendanceByUser(userId as string);
+        res.json(attendance);
+      } else if (req.user?.role === "admin" || req.user?.role === "staff") {
+        attendance = await storage.getAllShiftAttendance();
+        res.json(attendance);
+      } else {
+        // Regular users can only see their own attendance
+        attendance = await storage.getShiftAttendanceByUser(req.user!.id);
+        res.json(attendance);
+      }
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/attendance/active", authenticate, async (req, res) => {
+    try {
+      const userId = req.query.userId as string || req.user!.id;
+      
+      // Non-admin users can only check their own active attendance
+      if (userId !== req.user!.id && req.user!.role !== "admin" && req.user!.role !== "staff") {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      
+      const active = await storage.getActiveAttendance(userId);
+      res.json(active || null);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/attendance/clock-in", authenticate, async (req, res) => {
+    try {
+      const { assignmentId, clockInLatitude, clockInLongitude } = req.body;
+      
+      // Check if user already has an active attendance
+      const active = await storage.getActiveAttendance(req.user!.id);
+      if (active) {
+        return res.status(400).json({ error: "You are already clocked in. Please clock out first." });
+      }
+      
+      const attendance = await storage.clockIn({
+        assignmentId,
+        userId: req.user!.id,
+        clockInTime: new Date(),
+        clockInLatitude,
+        clockInLongitude,
+      });
+      
+      res.json(attendance);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/attendance/clock-out/:id", authenticate, async (req, res) => {
+    try {
+      const { clockOutLatitude, clockOutLongitude } = req.body;
+      
+      // Verify the attendance belongs to the user or user is admin/staff
+      const attendance = await storage.getShiftAttendance(req.params.id);
+      if (!attendance) {
+        return res.status(404).json({ error: "Attendance record not found" });
+      }
+      
+      if (attendance.userId !== req.user!.id && req.user!.role !== "admin" && req.user!.role !== "staff") {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      
+      const updated = await storage.clockOut(req.params.id, {
+        clockOutTime: new Date(),
+        clockOutLatitude,
+        clockOutLongitude,
+      });
+      
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Staff Availability - Manage when staff are available
+  app.get("/api/staff-availability", authenticate, async (req, res) => {
+    try {
+      const { userId } = req.query;
+      
+      if (userId) {
+        const availability = await storage.getStaffAvailabilityByUser(userId as string);
+        res.json(availability);
+      } else if (req.user?.role === "admin" || req.user?.role === "staff") {
+        const availability = await storage.getAllStaffAvailability();
+        res.json(availability);
+      } else {
+        // Regular users can only see their own availability
+        const availability = await storage.getStaffAvailabilityByUser(req.user!.id);
+        res.json(availability);
+      }
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/staff-availability/check", authenticate, authorize("admin", "staff"), async (req, res) => {
+    try {
+      const { userId, dayOfWeek, time } = req.body;
+      const isAvailable = await storage.checkStaffAvailable(userId, dayOfWeek, time);
+      res.json({ isAvailable });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/staff-availability", authenticate, async (req, res) => {
+    try {
+      // Staff can only create their own availability, admin can create for anyone
+      const userId = req.user!.role === "admin" ? req.body.userId : req.user!.id;
+      
+      const availability = await storage.createStaffAvailability({
+        ...req.body,
+        userId,
+      });
+      
+      res.json(availability);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.put("/api/staff-availability/:id", authenticate, async (req, res) => {
+    try {
+      const existing = await storage.getStaffAvailability(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Availability not found" });
+      }
+      
+      // Users can only update their own availability, admin can update anyone's
+      if (existing.userId !== req.user!.id && req.user!.role !== "admin") {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      
+      const availability = await storage.updateStaffAvailability(req.params.id, req.body);
+      res.json(availability);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/staff-availability/:id", authenticate, async (req, res) => {
+    try {
+      const existing = await storage.getStaffAvailability(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Availability not found" });
+      }
+      
+      // Users can only delete their own availability, admin can delete anyone's
+      if (existing.userId !== req.user!.id && req.user!.role !== "admin") {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      
+      await storage.deleteStaffAvailability(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Overtime Records - Track and manage overtime
+  app.get("/api/overtime", authenticate, async (req, res) => {
+    try {
+      const { userId, startDate, endDate } = req.query;
+      
+      let records;
+      if (userId && startDate && endDate) {
+        records = await storage.getOvertimeRecordsByPayPeriod(
+          new Date(startDate as string),
+          new Date(endDate as string),
+          userId as string
+        );
+      } else if (startDate && endDate) {
+        records = await storage.getOvertimeRecordsByPayPeriod(
+          new Date(startDate as string),
+          new Date(endDate as string)
+        );
+      } else if (userId) {
+        records = await storage.getOvertimeRecordsByUser(userId as string);
+      } else if (req.user?.role === "admin" || req.user?.role === "staff") {
+        records = await storage.getAllOvertimeRecords();
+      } else {
+        // Regular users can only see their own overtime
+        records = await storage.getOvertimeRecordsByUser(req.user!.id);
+      }
+      
+      res.json(records);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/overtime/mark-paid", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      const { overtimeIds, paidDate } = req.body;
+      
+      if (!Array.isArray(overtimeIds) || overtimeIds.length === 0) {
+        return res.status(400).json({ error: "Invalid overtime IDs" });
+      }
+      
+      await storage.markOvertimePaid(overtimeIds, new Date(paidDate || Date.now()));
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

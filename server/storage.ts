@@ -1,5 +1,5 @@
 import * as schema from "@shared/schema";
-import { eq, like, and, desc, lt } from "drizzle-orm";
+import { eq, like, and, desc, lt, gte, lte, or, sql as drizzleSql } from "drizzle-orm";
 import { db } from "./db";
 import { emitEvent } from "./websocket";
 
@@ -223,6 +223,53 @@ export interface IStorage {
   updateReorderPoint(id: string, point: Partial<schema.InsertReorderPoint>): Promise<schema.ReorderPoint | undefined>;
   deleteReorderPoint(id: string): Promise<boolean>;
   checkLowStock(branchId: string): Promise<Array<{menuItem: schema.MenuItem, currentStock: number, reorderLevel: number}>>;
+
+  // Staff Shifts
+  getAllStaffShifts(): Promise<schema.StaffShift[]>;
+  getStaffShift(id: string): Promise<schema.StaffShift | undefined>;
+  getStaffShiftsByBranch(branchId: string): Promise<schema.StaffShift[]>;
+  createStaffShift(shift: schema.InsertStaffShift): Promise<schema.StaffShift>;
+  updateStaffShift(id: string, shift: Partial<schema.InsertStaffShift>): Promise<schema.StaffShift | undefined>;
+  deleteStaffShift(id: string): Promise<boolean>;
+
+  // Shift Assignments
+  getAllShiftAssignments(): Promise<schema.ShiftAssignment[]>;
+  getShiftAssignment(id: string): Promise<schema.ShiftAssignment | undefined>;
+  getShiftAssignmentsByUser(userId: string): Promise<schema.ShiftAssignment[]>;
+  getShiftAssignmentsByShift(shiftId: string): Promise<schema.ShiftAssignment[]>;
+  getShiftAssignmentsByDateRange(startDate: Date, endDate: Date, branchId?: string): Promise<schema.ShiftAssignment[]>;
+  checkShiftConflict(userId: string, startDateTime: Date, endDateTime: Date, excludeAssignmentId?: string): Promise<boolean>;
+  createShiftAssignment(assignment: schema.InsertShiftAssignment): Promise<schema.ShiftAssignment>;
+  updateShiftAssignment(id: string, assignment: Partial<schema.InsertShiftAssignment>): Promise<schema.ShiftAssignment | undefined>;
+  deleteShiftAssignment(id: string): Promise<boolean>;
+
+  // Shift Attendance
+  getAllShiftAttendance(): Promise<schema.ShiftAttendance[]>;
+  getShiftAttendance(id: string): Promise<schema.ShiftAttendance | undefined>;
+  getShiftAttendanceByAssignment(assignmentId: string): Promise<schema.ShiftAttendance | undefined>;
+  getShiftAttendanceByUser(userId: string): Promise<schema.ShiftAttendance[]>;
+  getActiveAttendance(userId: string): Promise<schema.ShiftAttendance | undefined>;
+  clockIn(attendance: schema.InsertShiftAttendance): Promise<schema.ShiftAttendance>;
+  clockOut(id: string, clockOutData: { clockOutTime: Date; clockOutLatitude?: string; clockOutLongitude?: string }): Promise<schema.ShiftAttendance | undefined>;
+  updateShiftAttendance(id: string, attendance: Partial<schema.InsertShiftAttendance>): Promise<schema.ShiftAttendance | undefined>;
+
+  // Staff Availability
+  getAllStaffAvailability(): Promise<schema.StaffAvailability[]>;
+  getStaffAvailability(id: string): Promise<schema.StaffAvailability | undefined>;
+  getStaffAvailabilityByUser(userId: string): Promise<schema.StaffAvailability[]>;
+  checkStaffAvailable(userId: string, dayOfWeek: string, time: string): Promise<boolean>;
+  createStaffAvailability(availability: schema.InsertStaffAvailability): Promise<schema.StaffAvailability>;
+  updateStaffAvailability(id: string, availability: Partial<schema.InsertStaffAvailability>): Promise<schema.StaffAvailability | undefined>;
+  deleteStaffAvailability(id: string): Promise<boolean>;
+
+  // Overtime Records
+  getAllOvertimeRecords(): Promise<schema.OvertimeRecord[]>;
+  getOvertimeRecord(id: string): Promise<schema.OvertimeRecord | undefined>;
+  getOvertimeRecordsByUser(userId: string): Promise<schema.OvertimeRecord[]>;
+  getOvertimeRecordsByPayPeriod(startDate: Date, endDate: Date, userId?: string): Promise<schema.OvertimeRecord[]>;
+  createOvertimeRecord(record: schema.InsertOvertimeRecord): Promise<schema.OvertimeRecord>;
+  updateOvertimeRecord(id: string, record: Partial<schema.InsertOvertimeRecord>): Promise<schema.OvertimeRecord | undefined>;
+  markOvertimePaid(ids: string[], paidDate: Date): Promise<void>;
 }
 
 export class DbStorage implements IStorage {
@@ -1191,6 +1238,366 @@ export class DbStorage implements IStorage {
     }
     
     return lowStockItems;
+  }
+
+  // Staff Shifts
+  async getAllStaffShifts() {
+    return await db.select().from(schema.staffShifts).orderBy(schema.staffShifts.branchId, schema.staffShifts.startTime);
+  }
+
+  async getStaffShift(id: string) {
+    const result = await db.select().from(schema.staffShifts).where(eq(schema.staffShifts.id, id));
+    return result[0];
+  }
+
+  async getStaffShiftsByBranch(branchId: string) {
+    return await db.select().from(schema.staffShifts)
+      .where(eq(schema.staffShifts.branchId, branchId))
+      .orderBy(schema.staffShifts.startTime);
+  }
+
+  async createStaffShift(shift: schema.InsertStaffShift) {
+    const result = await db.insert(schema.staffShifts).values(shift).returning();
+    return result[0];
+  }
+
+  async updateStaffShift(id: string, shift: Partial<schema.InsertStaffShift>) {
+    const result = await db.update(schema.staffShifts)
+      .set({ ...shift, updatedAt: new Date() })
+      .where(eq(schema.staffShifts.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteStaffShift(id: string) {
+    await db.delete(schema.staffShifts).where(eq(schema.staffShifts.id, id));
+    return true;
+  }
+
+  // Shift Assignments
+  async getAllShiftAssignments() {
+    return await db.select().from(schema.shiftAssignments).orderBy(desc(schema.shiftAssignments.startDateTime));
+  }
+
+  async getShiftAssignment(id: string) {
+    const result = await db.select().from(schema.shiftAssignments).where(eq(schema.shiftAssignments.id, id));
+    return result[0];
+  }
+
+  async getShiftAssignmentsByUser(userId: string) {
+    return await db.select().from(schema.shiftAssignments)
+      .where(eq(schema.shiftAssignments.userId, userId))
+      .orderBy(desc(schema.shiftAssignments.startDateTime));
+  }
+
+  async getShiftAssignmentsByShift(shiftId: string) {
+    return await db.select().from(schema.shiftAssignments)
+      .where(eq(schema.shiftAssignments.shiftId, shiftId))
+      .orderBy(desc(schema.shiftAssignments.assignmentDate));
+  }
+
+  async getShiftAssignmentsByDateRange(startDate: Date, endDate: Date, branchId?: string) {
+    let query = db.select().from(schema.shiftAssignments)
+      .where(
+        and(
+          gte(schema.shiftAssignments.startDateTime, startDate),
+          lte(schema.shiftAssignments.endDateTime, endDate)
+        )
+      );
+    
+    if (branchId) {
+      // Join with staffShifts to filter by branch
+      query = db.select().from(schema.shiftAssignments)
+        .innerJoin(schema.staffShifts, eq(schema.shiftAssignments.shiftId, schema.staffShifts.id))
+        .where(
+          and(
+            gte(schema.shiftAssignments.startDateTime, startDate),
+            lte(schema.shiftAssignments.endDateTime, endDate),
+            eq(schema.staffShifts.branchId, branchId)
+          )
+        );
+    }
+    
+    return await query.orderBy(schema.shiftAssignments.startDateTime) as any;
+  }
+
+  async checkShiftConflict(userId: string, startDateTime: Date, endDateTime: Date, excludeAssignmentId?: string): Promise<boolean> {
+    let conditions = and(
+      eq(schema.shiftAssignments.userId, userId),
+      or(
+        // Overlapping conditions
+        and(
+          lte(schema.shiftAssignments.startDateTime, startDateTime),
+          gte(schema.shiftAssignments.endDateTime, startDateTime)
+        ),
+        and(
+          lte(schema.shiftAssignments.startDateTime, endDateTime),
+          gte(schema.shiftAssignments.endDateTime, endDateTime)
+        ),
+        and(
+          gte(schema.shiftAssignments.startDateTime, startDateTime),
+          lte(schema.shiftAssignments.endDateTime, endDateTime)
+        )
+      )
+    );
+
+    if (excludeAssignmentId) {
+      conditions = and(
+        conditions,
+        drizzleSql`${schema.shiftAssignments.id} != ${excludeAssignmentId}`
+      );
+    }
+
+    const conflicts = await db.select().from(schema.shiftAssignments).where(conditions);
+    return conflicts.length > 0;
+  }
+
+  async createShiftAssignment(assignment: schema.InsertShiftAssignment) {
+    const result = await db.insert(schema.shiftAssignments).values(assignment).returning();
+    
+    // Emit WebSocket event for real-time updates
+    emitEvent.shiftAssigned(result[0]);
+    
+    return result[0];
+  }
+
+  async updateShiftAssignment(id: string, assignment: Partial<schema.InsertShiftAssignment>) {
+    const result = await db.update(schema.shiftAssignments)
+      .set({ ...assignment, updatedAt: new Date() })
+      .where(eq(schema.shiftAssignments.id, id))
+      .returning();
+    
+    if (result[0]) {
+      emitEvent.shiftUpdated(result[0]);
+    }
+    
+    return result[0];
+  }
+
+  async deleteShiftAssignment(id: string) {
+    await db.delete(schema.shiftAssignments).where(eq(schema.shiftAssignments.id, id));
+    emitEvent.shiftDeleted({ id });
+    return true;
+  }
+
+  // Shift Attendance
+  async getAllShiftAttendance() {
+    return await db.select().from(schema.shiftAttendance).orderBy(desc(schema.shiftAttendance.clockInTime));
+  }
+
+  async getShiftAttendance(id: string) {
+    const result = await db.select().from(schema.shiftAttendance).where(eq(schema.shiftAttendance.id, id));
+    return result[0];
+  }
+
+  async getShiftAttendanceByAssignment(assignmentId: string) {
+    const result = await db.select().from(schema.shiftAttendance)
+      .where(eq(schema.shiftAttendance.assignmentId, assignmentId));
+    return result[0];
+  }
+
+  async getShiftAttendanceByUser(userId: string) {
+    return await db.select().from(schema.shiftAttendance)
+      .where(eq(schema.shiftAttendance.userId, userId))
+      .orderBy(desc(schema.shiftAttendance.clockInTime));
+  }
+
+  async getActiveAttendance(userId: string) {
+    const result = await db.select().from(schema.shiftAttendance)
+      .where(
+        and(
+          eq(schema.shiftAttendance.userId, userId),
+          eq(schema.shiftAttendance.status, 'clocked_in')
+        )
+      )
+      .orderBy(desc(schema.shiftAttendance.clockInTime))
+      .limit(1);
+    return result[0];
+  }
+
+  async clockIn(attendance: schema.InsertShiftAttendance) {
+    const result = await db.insert(schema.shiftAttendance).values(attendance).returning();
+    
+    // Update assignment status to in_progress
+    if (attendance.assignmentId) {
+      await this.updateShiftAssignment(attendance.assignmentId, { status: 'in_progress' });
+    }
+    
+    emitEvent.attendanceClockIn(result[0]);
+    return result[0];
+  }
+
+  async clockOut(id: string, clockOutData: { clockOutTime: Date; clockOutLatitude?: string; clockOutLongitude?: string }) {
+    const attendance = await this.getShiftAttendance(id);
+    if (!attendance) return undefined;
+
+    // Calculate total minutes worked
+    const clockInTime = new Date(attendance.clockInTime);
+    const clockOutTime = clockOutData.clockOutTime;
+    const totalMinutesWorked = Math.floor((clockOutTime.getTime() - clockInTime.getTime()) / (1000 * 60));
+
+    // Get shift details to calculate overtime
+    const assignment = await this.getShiftAssignment(attendance.assignmentId);
+    let regularMinutes = totalMinutesWorked;
+    let overtimeMinutes = 0;
+
+    if (assignment) {
+      const shift = await this.getStaffShift(assignment.shiftId);
+      if (shift) {
+        const standardMinutes = shift.durationMinutes - (shift.breakDurationMinutes || 0);
+        if (totalMinutesWorked > standardMinutes) {
+          regularMinutes = standardMinutes;
+          overtimeMinutes = totalMinutesWorked - standardMinutes;
+        }
+      }
+    }
+
+    const result = await db.update(schema.shiftAttendance)
+      .set({
+        clockOutTime: clockOutData.clockOutTime,
+        clockOutLatitude: clockOutData.clockOutLatitude,
+        clockOutLongitude: clockOutData.clockOutLongitude,
+        totalMinutesWorked,
+        regularMinutes,
+        overtimeMinutes,
+        status: 'clocked_out',
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.shiftAttendance.id, id))
+      .returning();
+
+    // Create overtime record if applicable
+    if (overtimeMinutes > 0 && assignment) {
+      const shift = await this.getStaffShift(assignment.shiftId);
+      const overtimeHours = overtimeMinutes / 60;
+      
+      await this.createOvertimeRecord({
+        attendanceId: id,
+        userId: attendance.userId,
+        overtimeMinutes,
+        overtimeHours: overtimeHours.toString(),
+        multiplier: shift?.overtimeMultiplier || "1.5",
+        payPeriodStart: new Date(assignment.assignmentDate),
+        payPeriodEnd: new Date(assignment.assignmentDate),
+      });
+    }
+
+    // Update assignment status to completed
+    if (attendance.assignmentId) {
+      await this.updateShiftAssignment(attendance.assignmentId, { status: 'completed' });
+    }
+
+    if (result[0]) {
+      emitEvent.attendanceClockOut(result[0]);
+    }
+
+    return result[0];
+  }
+
+  async updateShiftAttendance(id: string, attendance: Partial<schema.InsertShiftAttendance>) {
+    const result = await db.update(schema.shiftAttendance)
+      .set({ ...attendance, updatedAt: new Date() })
+      .where(eq(schema.shiftAttendance.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Staff Availability
+  async getAllStaffAvailability() {
+    return await db.select().from(schema.staffAvailability).orderBy(schema.staffAvailability.userId, schema.staffAvailability.dayOfWeek);
+  }
+
+  async getStaffAvailability(id: string) {
+    const result = await db.select().from(schema.staffAvailability).where(eq(schema.staffAvailability.id, id));
+    return result[0];
+  }
+
+  async getStaffAvailabilityByUser(userId: string) {
+    return await db.select().from(schema.staffAvailability)
+      .where(eq(schema.staffAvailability.userId, userId))
+      .orderBy(schema.staffAvailability.dayOfWeek, schema.staffAvailability.availableFrom);
+  }
+
+  async checkStaffAvailable(userId: string, dayOfWeek: string, time: string): Promise<boolean> {
+    const availability = await db.select().from(schema.staffAvailability)
+      .where(
+        and(
+          eq(schema.staffAvailability.userId, userId),
+          eq(schema.staffAvailability.dayOfWeek, dayOfWeek.toLowerCase()),
+          eq(schema.staffAvailability.isActive, true),
+          lte(schema.staffAvailability.availableFrom, time),
+          gte(schema.staffAvailability.availableTo, time)
+        )
+      );
+    return availability.length > 0;
+  }
+
+  async createStaffAvailability(availability: schema.InsertStaffAvailability) {
+    const result = await db.insert(schema.staffAvailability).values(availability).returning();
+    return result[0];
+  }
+
+  async updateStaffAvailability(id: string, availability: Partial<schema.InsertStaffAvailability>) {
+    const result = await db.update(schema.staffAvailability)
+      .set({ ...availability, updatedAt: new Date() })
+      .where(eq(schema.staffAvailability.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteStaffAvailability(id: string) {
+    await db.delete(schema.staffAvailability).where(eq(schema.staffAvailability.id, id));
+    return true;
+  }
+
+  // Overtime Records
+  async getAllOvertimeRecords() {
+    return await db.select().from(schema.overtimeRecords).orderBy(desc(schema.overtimeRecords.calculationDate));
+  }
+
+  async getOvertimeRecord(id: string) {
+    const result = await db.select().from(schema.overtimeRecords).where(eq(schema.overtimeRecords.id, id));
+    return result[0];
+  }
+
+  async getOvertimeRecordsByUser(userId: string) {
+    return await db.select().from(schema.overtimeRecords)
+      .where(eq(schema.overtimeRecords.userId, userId))
+      .orderBy(desc(schema.overtimeRecords.calculationDate));
+  }
+
+  async getOvertimeRecordsByPayPeriod(startDate: Date, endDate: Date, userId?: string) {
+    let conditions = and(
+      gte(schema.overtimeRecords.payPeriodStart, startDate),
+      lte(schema.overtimeRecords.payPeriodEnd, endDate)
+    );
+
+    if (userId) {
+      conditions = and(conditions, eq(schema.overtimeRecords.userId, userId));
+    }
+
+    return await db.select().from(schema.overtimeRecords)
+      .where(conditions)
+      .orderBy(schema.overtimeRecords.payPeriodStart);
+  }
+
+  async createOvertimeRecord(record: schema.InsertOvertimeRecord) {
+    const result = await db.insert(schema.overtimeRecords).values(record).returning();
+    return result[0];
+  }
+
+  async updateOvertimeRecord(id: string, record: Partial<schema.InsertOvertimeRecord>) {
+    const result = await db.update(schema.overtimeRecords)
+      .set(record)
+      .where(eq(schema.overtimeRecords.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async markOvertimePaid(ids: string[], paidDate: Date) {
+    await db.update(schema.overtimeRecords)
+      .set({ isPaid: true, paidDate })
+      .where(drizzleSql`${schema.overtimeRecords.id} = ANY(${ids})`);
   }
 }
 

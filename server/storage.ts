@@ -33,6 +33,7 @@ export interface IStorage {
   getMenuItem(id: string): Promise<schema.MenuItem | undefined>;
   getMenuItemsByCategory(categoryId: string): Promise<schema.MenuItem[]>;
   getMenuItemsByBranch(branchId: string): Promise<schema.MenuItem[]>;
+  getBestsellingMenuItems(branchId: string, days?: number, limit?: number): Promise<(schema.MenuItem & { orderCount: number })[]>;
   createMenuItem(item: schema.InsertMenuItem): Promise<schema.MenuItem>;
   updateMenuItem(id: string, item: Partial<schema.InsertMenuItem>): Promise<schema.MenuItem | undefined>;
   deleteMenuItem(id: string): Promise<boolean>;
@@ -424,6 +425,58 @@ export class DbStorage implements IStorage {
   async deleteMenuItem(id: string) {
     await db.delete(schema.menuItems).where(eq(schema.menuItems.id, id));
     return true;
+  }
+
+  async getBestsellingMenuItems(branchId: string, days: number = 30, limit: number = 6) {
+    // Calculate date threshold (last N days)
+    const dateThreshold = new Date();
+    dateThreshold.setDate(dateThreshold.getDate() - days);
+    const dateThresholdISO = dateThreshold.toISOString();
+    
+    // Get completed/ready orders from the branch within the timeframe
+    // Use PostgreSQL cast to compare text createdAt as timestamp
+    const orders = await db.select()
+      .from(schema.orders)
+      .where(
+        and(
+          eq(schema.orders.branchId, branchId),
+          or(
+            eq(schema.orders.status, "completed"),
+            eq(schema.orders.status, "ready")
+          ),
+          drizzleSql`${schema.orders.createdAt}::timestamptz >= ${dateThresholdISO}`
+        )
+      );
+    
+    // Count item occurrences by parsing JSON items
+    const itemCounts = new Map<string, number>();
+    
+    for (const order of orders) {
+      try {
+        const items = JSON.parse(order.items);
+        if (Array.isArray(items)) {
+          for (const item of items) {
+            const count = itemCounts.get(item.itemId) || 0;
+            itemCounts.set(item.itemId, count + (item.quantity || 1));
+          }
+        }
+      } catch (e) {
+        console.error("Error parsing order items:", e);
+      }
+    }
+    
+    // Get all menu items and enrich with counts from the specified timeframe
+    const allMenuItems = await this.getAllMenuItems();
+    const itemsWithCounts = allMenuItems
+      .map(item => ({
+        ...item,
+        orderCount: itemCounts.get(item.id) || 0,
+      }))
+      .filter(item => item.orderCount > 0 && item.isAvailable)
+      .sort((a, b) => b.orderCount - a.orderCount)
+      .slice(0, Math.min(limit, 12)); // Cap at 12 items max
+    
+    return itemsWithCounts;
   }
 
   // Orders

@@ -459,41 +459,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get bestselling menu items (top 5 by order count)
+  // Get bestselling menu items with configurable timeframe and limit
   app.get("/api/menu-items/bestselling/:branchId", async (req, res) => {
     try {
       const { branchId } = req.params;
+      const { days, limit } = req.query;
       
-      // Get all completed orders for the branch
-      const orders = await storage.getOrdersByBranch(branchId);
-      const completedOrders = orders.filter(o => o.status === "completed" || o.status === "ready");
+      // Parse and validate query parameters
+      const daysParam = days ? parseInt(days as string, 10) : 30;
+      const limitParam = limit ? parseInt(limit as string, 10) : 6;
       
-      // Count item occurrences
-      const itemCounts = new Map<string, number>();
+      // Validate parameters (enforce sane caps)
+      if (daysParam < 1 || daysParam > 365) {
+        return res.status(400).json({ error: "Days parameter must be between 1 and 365" });
+      }
+      if (limitParam < 1 || limitParam > 12) {
+        return res.status(400).json({ error: "Limit parameter must be between 1 and 12" });
+      }
       
-      completedOrders.forEach(order => {
-        try {
-          const items = JSON.parse(order.items);
-          items.forEach((item: any) => {
-            const count = itemCounts.get(item.itemId) || 0;
-            itemCounts.set(item.itemId, count + (item.quantity || 1));
-          });
-        } catch (e) {
-          console.error("Error parsing order items:", e);
-        }
-      });
-      
-      // Get menu items with their counts
-      const allMenuItems = await storage.getAllMenuItems();
-      const itemsWithCounts = allMenuItems
-        .map(item => ({
-          ...item,
-          orderCount: itemCounts.get(item.id) || 0,
-        }))
-        .filter(item => item.orderCount > 0 && item.isAvailable)
-        .sort((a, b) => b.orderCount - a.orderCount)
-        .slice(0, 5);
-      
+      const itemsWithCounts = await storage.getBestsellingMenuItems(branchId, daysParam, limitParam);
       res.json(itemsWithCounts);
     } catch (error: any) {
       console.error("Error fetching bestselling items:", error);

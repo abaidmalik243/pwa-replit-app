@@ -73,10 +73,16 @@ export default function CustomerHome() {
     queryKey: ["/api/categories"],
   });
 
-  // Fetch bestselling items from API
+  // Fetch bestselling items from API with configurable timeframe (30 days, top 6 items)
   const { data: bestsellingItems = [] } = useQuery<(DBMenuItem & { orderCount: number })[]>({
-    queryKey: ["/api/menu-items/bestselling", selectedBranchId],
+    queryKey: ["/api/menu-items/bestselling", selectedBranchId, { days: 30, limit: 6 }],
+    queryFn: async () => {
+      const res = await fetch(`/api/menu-items/bestselling/${selectedBranchId}?days=30&limit=6`);
+      if (!res.ok) throw new Error("Failed to fetch bestselling items");
+      return res.json();
+    },
     enabled: !!selectedBranchId && selectedBranchId !== "",
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 
   // Check if user has already selected location
@@ -440,9 +446,9 @@ export default function CustomerHome() {
               <h2 className="text-2xl font-bold" data-testid="text-bestselling-title">
                 Bestselling Items
               </h2>
-              <span className="text-sm text-muted-foreground ml-auto">Top 5 Most Ordered</span>
+              <span className="text-sm text-muted-foreground ml-auto">Last 30 Days</span>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide">
               {bestsellingItems.map((item) => {
                 const categoryName = dbCategories.find((c) => c.id === item.categoryId)?.name || "Other";
                 const menuItem: MenuItem = {
@@ -457,7 +463,7 @@ export default function CustomerHome() {
                 return (
                   <div 
                     key={item.id} 
-                    className="relative"
+                    className="relative min-w-[280px] snap-start"
                     data-testid={`card-bestselling-${item.id}`}
                   >
                     <div className="absolute -top-2 -right-2 bg-primary text-primary-foreground rounded-full w-8 h-8 flex items-center justify-center text-xs font-bold z-10 shadow-lg">

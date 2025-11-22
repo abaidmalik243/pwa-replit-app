@@ -293,7 +293,7 @@ export default function AdminRefunds() {
                       <SelectContent>
                         {refundableOrders.map((order) => (
                           <SelectItem key={order.id} value={order.id}>
-                            #{order.orderNumber} - ₨{order.totalAmount.toFixed(2)} ({order.paymentMethod})
+                            #{order.orderNumber} - ₨{(order.totalAmount || 0).toFixed(2)} ({order.paymentMethod})
                           </SelectItem>
                         ))}
                       </SelectContent>

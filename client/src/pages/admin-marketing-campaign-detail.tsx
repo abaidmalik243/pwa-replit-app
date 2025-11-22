@@ -81,9 +81,11 @@ export default function AdminMarketingCampaignDetail() {
         templateVariables: {},
       };
       if (isNew) {
-        return await apiRequest("POST", "/api/marketing-campaigns", payload);
+        const res = await apiRequest("/api/marketing-campaigns", "POST", payload);
+        return await res.json();
       } else {
-        return await apiRequest("PUT", `/api/marketing-campaigns/${id}`, payload);
+        const res = await apiRequest(`/api/marketing-campaigns/${id}`, "PUT", payload);
+        return await res.json();
       }
     },
     onSuccess: (data) => {
@@ -107,7 +109,8 @@ export default function AdminMarketingCampaignDetail() {
 
   const launchMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest("POST", `/api/marketing-campaigns/${id}/launch`, {});
+      const res = await apiRequest(`/api/marketing-campaigns/${id}/launch`, "POST", {});
+      return await res.json();
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/marketing-campaigns"] });
@@ -128,7 +131,7 @@ export default function AdminMarketingCampaignDetail() {
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest("DELETE", `/api/marketing-campaigns/${id}`, {});
+      await apiRequest(`/api/marketing-campaigns/${id}`, "DELETE", {});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/marketing-campaigns"] });
@@ -149,7 +152,8 @@ export default function AdminMarketingCampaignDetail() {
 
   const previewAudienceMutation = useMutation({
     mutationFn: async (data: any) => {
-      return await apiRequest("POST", "/api/marketing-campaigns/preview-audience", data);
+      const res = await apiRequest("/api/marketing-campaigns/preview-audience", "POST", data);
+      return await res.json();
     },
     onSuccess: (data: any) => {
       setPreviewAudience(data);
@@ -191,7 +195,7 @@ export default function AdminMarketingCampaignDetail() {
   const handleTemplateSelect = (templateId: string) => {
     const template = templates?.find((t) => t.id === templateId);
     if (template) {
-      form.setValue("messageTemplate", template.content);
+      form.setValue("messageTemplate", template.templateText);
     }
   };
 

@@ -18,7 +18,7 @@ import { z } from "zod";
 const templateSchema = z.object({
   name: z.string().min(1, "Template name is required"),
   category: z.string().min(1, "Category is required"),
-  content: z.string().min(1, "Content is required"),
+  templateText: z.string().min(1, "Content is required"),
 });
 
 type TemplateFormData = z.infer<typeof templateSchema>;
@@ -38,20 +38,28 @@ export default function AdminMessageTemplates() {
     defaultValues: {
       name: "",
       category: "promotional",
-      content: "",
+      templateText: "",
     },
   });
 
   const saveMutation = useMutation({
     mutationFn: async (data: TemplateFormData) => {
+      // Extract variables from templateText (find all {{variable}} patterns)
+      const variableMatches = data.templateText.match(/\{\{(\w+)\}\}/g);
+      const variables = variableMatches 
+        ? variableMatches.map(v => v.replace(/\{\{|\}\}/g, ''))
+        : [];
+      
       const payload = {
         ...data,
-        variables: {},
+        variables,
       };
       if (editingTemplate) {
-        return await apiRequest("PUT", `/api/message-templates/${editingTemplate.id}`, payload);
+        const res = await apiRequest(`/api/message-templates/${editingTemplate.id}`, "PUT", payload);
+        return await res.json();
       } else {
-        return await apiRequest("POST", "/api/message-templates", payload);
+        const res = await apiRequest("/api/message-templates", "POST", payload);
+        return await res.json();
       }
     },
     onSuccess: () => {
@@ -73,7 +81,7 @@ export default function AdminMessageTemplates() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return await apiRequest("DELETE", `/api/message-templates/${id}`, {});
+      await apiRequest(`/api/message-templates/${id}`, "DELETE", {});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/message-templates"] });
@@ -97,14 +105,14 @@ export default function AdminMessageTemplates() {
       form.reset({
         name: template.name,
         category: template.category,
-        content: template.content,
+        templateText: template.templateText,
       });
     } else {
       setEditingTemplate(null);
       form.reset({
         name: "",
         category: "promotional",
-        content: "",
+        templateText: "",
       });
     }
     setIsDialogOpen(true);
@@ -131,7 +139,7 @@ export default function AdminMessageTemplates() {
     form.reset({
       name: `${template.name} (Copy)`,
       category: template.category,
-      content: template.content,
+      templateText: template.templateText,
     });
     setIsDialogOpen(true);
   };
@@ -248,7 +256,7 @@ export default function AdminMessageTemplates() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="bg-muted/50 rounded p-3 text-sm min-h-[80px]">
-                  <p className="line-clamp-3">{template.content}</p>
+                  <p className="line-clamp-3">{template.templateText}</p>
                 </div>
                 
                 <div className="text-xs text-muted-foreground">
@@ -348,7 +356,7 @@ export default function AdminMessageTemplates() {
 
               <FormField
                 control={form.control}
-                name="content"
+                name="templateText"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Message Content</FormLabel>

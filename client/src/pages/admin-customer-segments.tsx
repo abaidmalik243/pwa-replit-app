@@ -46,9 +46,11 @@ export default function AdminCustomerSegments() {
         filters: {},
       };
       if (editingSegment) {
-        return await apiRequest("PUT", `/api/customer-segments/${editingSegment.id}`, payload);
+        const res = await apiRequest(`/api/customer-segments/${editingSegment.id}`, "PUT", payload);
+        return await res.json();
       } else {
-        return await apiRequest("POST", "/api/customer-segments", payload);
+        const res = await apiRequest("/api/customer-segments", "POST", payload);
+        return await res.json();
       }
     },
     onSuccess: () => {
@@ -70,7 +72,7 @@ export default function AdminCustomerSegments() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return await apiRequest("DELETE", `/api/customer-segments/${id}`, {});
+      await apiRequest(`/api/customer-segments/${id}`, "DELETE", {});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/customer-segments"] });
@@ -90,7 +92,8 @@ export default function AdminCustomerSegments() {
 
   const recalculateMutation = useMutation({
     mutationFn: async (id: string) => {
-      return await apiRequest("POST", `/api/customer-segments/${id}/recalculate`, {});
+      const res = await apiRequest(`/api/customer-segments/${id}/recalculate`, "POST", {});
+      return await res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/customer-segments"] });

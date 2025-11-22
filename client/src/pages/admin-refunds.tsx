@@ -12,7 +12,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import AdminLayout from "@/components/AdminLayout";
+import { useAuth } from "@/context/AuthContext";
+import AdminSidebar from "@/components/AdminSidebar";
+import AdminHeader from "@/components/AdminHeader";
 import { DollarSign, RefreshCcw, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
@@ -50,6 +52,8 @@ interface Order {
 
 export default function AdminRefunds() {
   const { toast } = useToast();
+  const { logout } = useAuth();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const { data: refunds = [], isLoading } = useQuery<Refund[]>({
@@ -111,8 +115,31 @@ export default function AdminRefunds() {
   const totalRefunded = refunds.reduce((sum, refund) => sum + refund.amount, 0);
 
   return (
-    <AdminLayout title="Refunds Management">
-      <div className="space-y-6">
+    <div className="flex h-screen bg-background">
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden" 
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      <div className={`fixed md:static inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        <AdminSidebar
+          soundEnabled={false}
+          onToggleSound={() => {}}
+          onLogout={logout}
+        />
+      </div>
+
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <AdminHeader
+          breadcrumbs={["Admin", "Refunds Management"]}
+          notificationCount={0}
+          userName="Admin User"
+          onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
+        />
+
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+          <div className="space-y-6">
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-3">
           <Card>
@@ -341,6 +368,8 @@ export default function AdminRefunds() {
           </Form>
         </DialogContent>
       </Dialog>
-    </AdminLayout>
+        </main>
+      </div>
+    </div>
   );
 }

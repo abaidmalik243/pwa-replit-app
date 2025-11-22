@@ -11,7 +11,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import AdminLayout from "@/components/AdminLayout";
+import { useAuth } from "@/context/AuthContext";
+import AdminSidebar from "@/components/AdminSidebar";
+import AdminHeader from "@/components/AdminHeader";
 import { Building2, Plus, Edit, Trash2, Phone, Mail, MapPin } from "lucide-react";
 
 const supplierSchema = z.object({
@@ -35,6 +37,8 @@ interface Supplier {
 
 export default function AdminSuppliers() {
   const { toast } = useToast();
+  const { logout } = useAuth();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
 
@@ -120,8 +124,31 @@ export default function AdminSuppliers() {
   };
 
   return (
-    <AdminLayout title="Suppliers Management">
-      <div className="space-y-6">
+    <div className="flex h-screen bg-background">
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden" 
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      <div className={`fixed md:static inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        <AdminSidebar
+          soundEnabled={false}
+          onToggleSound={() => {}}
+          onLogout={logout}
+        />
+      </div>
+
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <AdminHeader
+          breadcrumbs={["Admin", "Suppliers Management"]}
+          notificationCount={0}
+          userName="Admin User"
+          onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
+        />
+
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+          <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -326,6 +353,8 @@ export default function AdminSuppliers() {
           </Form>
         </DialogContent>
       </Dialog>
-    </AdminLayout>
+        </main>
+      </div>
+    </div>
   );
 }

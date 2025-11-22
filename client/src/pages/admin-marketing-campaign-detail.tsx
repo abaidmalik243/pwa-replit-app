@@ -1,0 +1,429 @@
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useParams, useLocation } from "wouter";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { ArrowLeft, Send, Save, Users, Eye, Trash2, Calendar as CalendarIcon, Target } from "lucide-react";
+import { format } from "date-fns";
+import { useForm } from "react-hook-form";
+
+export default function AdminMarketingCampaignDetail() {
+  const { id } = useParams<{ id: string }>();
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const isNew = id === "new";
+
+  const [previewAudience, setPreviewAudience] = useState<any>(null);
+  const [isPreviewingAudience, setIsPreviewingAudience] = useState(false);
+
+  const { data: campaign, isLoading } = useQuery({
+    queryKey: [`/api/marketing-campaigns/${id}`],
+    enabled: !isNew,
+  });
+
+  const { data: branches } = useQuery<any[]>({
+    queryKey: ["/api/branches"],
+  });
+
+  const { data: templates } = useQuery<any[]>({
+    queryKey: ["/api/message-templates"],
+  });
+
+  const form = useForm({
+    defaultValues: {
+      name: campaign?.name || "",
+      description: campaign?.description || "",
+      branchId: campaign?.branchId || "",
+      targetAudience: campaign?.targetAudience || "all",
+      messageTemplate: campaign?.messageTemplate || "",
+      scheduledAt: campaign?.scheduledAt ? format(new Date(campaign.scheduledAt), "yyyy-MM-dd'T'HH:mm") : "",
+      templateVariables: campaign?.templateVariables || {},
+    },
+    values: campaign,
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: async (data: any) => {
+      if (isNew) {
+        return await apiRequest("POST", "/api/marketing-campaigns", data);
+      } else {
+        return await apiRequest("PUT", `/api/marketing-campaigns/${id}`, data);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/marketing-campaigns"] });
+      toast({
+        title: "Success",
+        description: `Campaign ${isNew ? "created" : "updated"} successfully`,
+      });
+      if (isNew) {
+        setLocation("/admin/marketing-campaigns");
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const launchMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", `/api/marketing-campaigns/${id}/launch`, {});
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/marketing-campaigns"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/marketing-campaigns/${id}`] });
+      toast({
+        title: "Campaign Launched",
+        description: `Campaign launched successfully. ${data.recipientsCreated} recipients created.`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Launch Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("DELETE", `/api/marketing-campaigns/${id}`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/marketing-campaigns"] });
+      toast({
+        title: "Campaign Deleted",
+        description: "Campaign deleted successfully",
+      });
+      setLocation("/admin/marketing-campaigns");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const previewAudienceMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return await apiRequest("POST", "/api/marketing-campaigns/preview-audience", data);
+    },
+    onSuccess: (data: any) => {
+      setPreviewAudience(data);
+      setIsPreviewingAudience(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Preview Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+      setIsPreviewingAudience(false);
+    },
+  });
+
+  const handleSave = (status?: string) => {
+    const values = form.getValues();
+    saveMutation.mutate({
+      ...values,
+      status: status || campaign?.status || "draft",
+    });
+  };
+
+  const handleLaunch = () => {
+    if (confirm("Are you sure you want to launch this campaign? Messages will be sent to all targeted customers.")) {
+      launchMutation.mutate();
+    }
+  };
+
+  const handleDelete = () => {
+    if (confirm("Are you sure you want to delete this campaign? This action cannot be undone.")) {
+      deleteMutation.mutate();
+    }
+  };
+
+  const handlePreviewAudience = () => {
+    const values = form.getValues();
+    setIsPreviewingAudience(true);
+    previewAudienceMutation.mutate({
+      targetAudience: values.targetAudience,
+      branchId: values.branchId,
+      customSegmentFilter: {},
+    });
+  };
+
+  const handleTemplateSelect = (templateId: string) => {
+    const template = templates?.find((t) => t.id === templateId);
+    if (template) {
+      form.setValue("messageTemplate", template.content);
+      form.setValue("templateVariables", template.variables || {});
+    }
+  };
+
+  if (isLoading && !isNew) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-muted-foreground">Loading campaign...</div>
+      </div>
+    );
+  }
+
+  const canLaunch = campaign && (campaign.status === "draft" || campaign.status === "scheduled");
+  const canEdit = !campaign || campaign.status === "draft" || campaign.status === "scheduled";
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => setLocation("/admin/marketing-campaigns")} data-testid="button-back">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold" data-testid="text-page-title">
+              {isNew ? "New Campaign" : campaign?.name}
+            </h1>
+            {campaign?.status && (
+              <Badge className="mt-2">
+                {campaign.status}
+              </Badge>
+            )}
+          </div>
+        </div>
+        <div className="flex gap-2">
+          {!isNew && canEdit && (
+            <Button variant="destructive" onClick={handleDelete} disabled={deleteMutation.isPending} data-testid="button-delete">
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
+            </Button>
+          )}
+          {canEdit && (
+            <Button onClick={() => handleSave()} disabled={saveMutation.isPending} data-testid="button-save">
+              <Save className="h-4 w-4 mr-2" />
+              Save Draft
+            </Button>
+          )}
+          {!isNew && canLaunch && (
+            <Button onClick={handleLaunch} disabled={launchMutation.isPending} data-testid="button-launch">
+              <Send className="h-4 w-4 mr-2" />
+              Launch Campaign
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {!isNew && campaign && (
+        <div className="grid gap-4 md:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Recipients</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid="text-total-recipients">{campaign.totalRecipients || 0}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Sent</CardTitle>
+              <Send className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid="text-sent-count">{campaign.sentCount || 0}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Delivered</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid="text-delivered-count">{campaign.deliveredCount || 0}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Failed</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-destructive" data-testid="text-failed-count">{campaign.failedCount || 0}</div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Campaign Details</CardTitle>
+            <CardDescription>Basic information about your campaign</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Campaign Name</Label>
+              <Input
+                id="name"
+                {...form.register("name")}
+                placeholder="Summer Sale 2024"
+                disabled={!canEdit}
+                data-testid="input-campaign-name"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Description (Optional)</Label>
+              <Textarea
+                id="description"
+                {...form.register("description")}
+                placeholder="Describe the campaign purpose..."
+                disabled={!canEdit}
+                data-testid="input-campaign-description"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="branch">Branch</Label>
+              <Select
+                value={form.watch("branchId")}
+                onValueChange={(value) => form.setValue("branchId", value)}
+                disabled={!canEdit}
+              >
+                <SelectTrigger data-testid="select-branch">
+                  <SelectValue placeholder="Select branch" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Branches</SelectItem>
+                  {branches?.map((branch) => (
+                    <SelectItem key={branch.id} value={branch.id}>
+                      {branch.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="scheduledAt">Schedule (Optional)</Label>
+              <Input
+                id="scheduledAt"
+                type="datetime-local"
+                {...form.register("scheduledAt")}
+                disabled={!canEdit}
+                data-testid="input-scheduled-at"
+              />
+              <p className="text-xs text-muted-foreground">Leave empty to send immediately when launched</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Target Audience</CardTitle>
+            <CardDescription>Select who will receive this campaign</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="targetAudience">Audience Segment</Label>
+              <Select
+                value={form.watch("targetAudience")}
+                onValueChange={(value) => form.setValue("targetAudience", value)}
+                disabled={!canEdit}
+              >
+                <SelectTrigger data-testid="select-target-audience">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Customers</SelectItem>
+                  <SelectItem value="loyal_customers">Loyal Customers (Gold Tier)</SelectItem>
+                  <SelectItem value="new_customers">New Customers (≤3 orders)</SelectItem>
+                  <SelectItem value="inactive_customers">Inactive Customers</SelectItem>
+                  <SelectItem value="custom">Custom Segment</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Button
+              variant="outline"
+              onClick={handlePreviewAudience}
+              disabled={isPreviewingAudience || previewAudienceMutation.isPending}
+              className="w-full"
+              data-testid="button-preview-audience"
+            >
+              <Eye className="h-4 w-4 mr-2" />
+              Preview Audience
+            </Button>
+
+            {previewAudience && (
+              <div className="border rounded-lg p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Total Customers</span>
+                  <Badge variant="secondary" data-testid="text-preview-count">{previewAudience.totalCount}</Badge>
+                </div>
+                <Separator />
+                <div className="text-xs text-muted-foreground">
+                  Sample customers: {previewAudience.sampleCustomers?.slice(0, 3).map((c: any) => c.fullName).join(", ")}
+                  {previewAudience.sampleCustomers?.length > 3 && "..."}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Message Content</CardTitle>
+          <CardDescription>Compose your WhatsApp message</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="template">Use Template (Optional)</Label>
+            <Select onValueChange={handleTemplateSelect} disabled={!canEdit}>
+              <SelectTrigger data-testid="select-template">
+                <SelectValue placeholder="Choose a template..." />
+              </SelectTrigger>
+              <SelectContent>
+                {templates?.map((template) => (
+                  <SelectItem key={template.id} value={template.id}>
+                    {template.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="messageTemplate">Message</Label>
+            <Textarea
+              id="messageTemplate"
+              {...form.register("messageTemplate")}
+              placeholder="Hi {{name}}, check out our amazing deals..."
+              rows={6}
+              disabled={!canEdit}
+              data-testid="input-message-template"
+            />
+            <p className="text-xs text-muted-foreground">
+              Use &#123;&#123;name&#125;&#125; to personalize messages. Other variables can be defined in templates.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

@@ -724,3 +724,97 @@ export const overtimeRecords = pgTable("overtime_records", {
 export const insertOvertimeRecordSchema = createInsertSchema(overtimeRecords).omit({ id: true, createdAt: true });
 export type InsertOvertimeRecord = z.infer<typeof insertOvertimeRecordSchema>;
 export type OvertimeRecord = typeof overtimeRecords.$inferSelect;
+
+// Marketing Campaigns - WhatsApp promotional campaigns
+export const marketingCampaigns = pgTable("marketing_campaigns", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  campaignType: text("campaign_type").notNull().default("promotional"), // promotional, transactional, reminder
+  targetAudience: text("target_audience").notNull().default("all"), // all, loyal_customers, new_customers, inactive_customers, custom
+  customSegmentFilter: jsonb("custom_segment_filter"), // JSON filters for custom targeting (e.g., {minOrders: 5, city: "Lahore"})
+  messageTemplate: text("message_template").notNull(), // WhatsApp message template
+  mediaUrl: text("media_url"), // Optional image/video URL for rich media
+  templateVariables: jsonb("template_variables"), // Dynamic variables like {{name}}, {{offer}}, etc.
+  scheduledAt: timestamp("scheduled_at"), // When to send (null = send immediately)
+  status: text("status").notNull().default("draft"), // draft, scheduled, sending, completed, cancelled, failed
+  branchId: varchar("branch_id").references(() => branches.id), // null = all branches
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  totalRecipients: integer("total_recipients").default(0), // Total customers targeted
+  sentCount: integer("sent_count").default(0), // Successfully sent
+  deliveredCount: integer("delivered_count").default(0), // Delivered to WhatsApp
+  readCount: integer("read_count").default(0), // Read by recipients
+  failedCount: integer("failed_count").default(0), // Failed to send
+  clickCount: integer("click_count").default(0), // Clicked on links (if any)
+  startedAt: timestamp("started_at"), // When campaign actually started sending
+  completedAt: timestamp("completed_at"), // When campaign finished sending
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertMarketingCampaignSchema = createInsertSchema(marketingCampaigns).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertMarketingCampaign = z.infer<typeof insertMarketingCampaignSchema>;
+export type MarketingCampaign = typeof marketingCampaigns.$inferSelect;
+
+// Campaign Recipients - Track individual message delivery
+export const campaignRecipients = pgTable("campaign_recipients", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").references(() => marketingCampaigns.id, { onDelete: "cascade" }).notNull(),
+  customerId: varchar("customer_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  phoneNumber: text("phone_number").notNull(),
+  personalizedMessage: text("personalized_message").notNull(), // Final message with variables replaced
+  status: text("status").notNull().default("pending"), // pending, sent, delivered, read, failed, clicked
+  externalMessageId: text("external_message_id"), // WhatsApp API message ID
+  sentAt: timestamp("sent_at"),
+  deliveredAt: timestamp("delivered_at"),
+  readAt: timestamp("read_at"),
+  clickedAt: timestamp("clicked_at"),
+  failureReason: text("failure_reason"), // Error message if failed
+  retryCount: integer("retry_count").default(0),
+  metadata: jsonb("metadata"), // Additional tracking data
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertCampaignRecipientSchema = createInsertSchema(campaignRecipients).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertCampaignRecipient = z.infer<typeof insertCampaignRecipientSchema>;
+export type CampaignRecipient = typeof campaignRecipients.$inferSelect;
+
+// Message Templates - Reusable WhatsApp message templates
+export const messageTemplates = pgTable("message_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category").notNull().default("promotional"), // promotional, transactional, order_update, delivery_alert
+  templateText: text("template_text").notNull(), // Message with {{variables}}
+  variables: text("variables").array(), // List of available variables like ["name", "offer", "code"]
+  mediaType: text("media_type"), // none, image, video, document
+  mediaUrl: text("media_url"), // Default media URL (can be overridden in campaign)
+  isActive: boolean("is_active").notNull().default(true),
+  usageCount: integer("usage_count").default(0), // How many times used
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertMessageTemplateSchema = createInsertSchema(messageTemplates).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertMessageTemplate = z.infer<typeof insertMessageTemplateSchema>;
+export type MessageTemplate = typeof messageTemplates.$inferSelect;
+
+// Customer Segments - Predefined customer groups for targeting
+export const customerSegments = pgTable("customer_segments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  filters: jsonb("filters").notNull(), // {minOrders: 5, loyaltyTier: "gold", city: "Lahore", etc.}
+  customerCount: integer("customer_count").default(0), // Cached count
+  lastCalculated: timestamp("last_calculated"), // When count was last calculated
+  isActive: boolean("is_active").notNull().default(true),
+  createdBy: varchar("created_by").references(() => users.id).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertCustomerSegmentSchema = createInsertSchema(customerSegments).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertCustomerSegment = z.infer<typeof insertCustomerSegmentSchema>;
+export type CustomerSegment = typeof customerSegments.$inferSelect;

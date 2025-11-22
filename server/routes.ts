@@ -2279,19 +2279,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   : DEFAULT_DELIVERY_CONFIG.FREE_DELIVERY_THRESHOLD.toString()
       );
 
+      // Delivery time estimation constants
+      const BASE_PREP_TIME = 25; // minutes for food preparation
+      const TRAVEL_TIME_PER_KM = 2.5; // minutes per kilometer
+
+      // Initialize distance (will be calculated later if needed)
+      let deliveryCharges = 0;
+      let calculatedDistance = providedDistance;
+      
+      // Validate and sanitize distance for time estimation
+      const safeDistance = typeof calculatedDistance === "number" 
+        && !isNaN(calculatedDistance) 
+        && calculatedDistance > 0
+          ? calculatedDistance
+          : 5; // Default to 5km if invalid
+
       // Check for free delivery
       if (orderAmount >= freeDeliveryThreshold) {
+        // Calculate estimated delivery time using safe distance
+        const estimatedTime = Math.ceil(BASE_PREP_TIME + (safeDistance * TRAVEL_TIME_PER_KM));
+        
         return res.json({
           deliveryCharges: 0,
           chargeType: chargeType,
           freeDelivery: true,
           message: `Free delivery for orders above ₨${freeDeliveryThreshold}`,
           usingCustomConfig: useConfig,
+          estimatedDeliveryTime: estimatedTime,
         });
       }
-
-      let deliveryCharges = 0;
-      let calculatedDistance = providedDistance;
 
       if (chargeType === "static") {
         // Static pricing
@@ -2312,6 +2328,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.warn('Address validation failed:', validation.error);
             // Fall back to default static charge instead of failing
             const defaultStaticCharge = parseFloat(DEFAULT_DELIVERY_CONFIG.STATIC_CHARGE.toString());
+            const defaultEstimatedTime = Math.ceil(BASE_PREP_TIME + (5 * TRAVEL_TIME_PER_KM));
             return res.json({
               deliveryCharges: defaultStaticCharge,
               chargeType: "static",
@@ -2319,6 +2336,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               distance: null,
               usingCustomConfig: false,
               message: "Using default delivery charge (invalid address)",
+              estimatedDeliveryTime: defaultEstimatedTime,
             });
           }
 
@@ -2328,6 +2346,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.warn('Branch coordinates not available for branch:', branchId);
             // Fall back to default static charge instead of 500 error
             const defaultStaticCharge = parseFloat(DEFAULT_DELIVERY_CONFIG.STATIC_CHARGE.toString());
+            const defaultEstimatedTime = Math.ceil(BASE_PREP_TIME + (5 * TRAVEL_TIME_PER_KM));
             return res.json({
               deliveryCharges: defaultStaticCharge,
               chargeType: "static",
@@ -2335,6 +2354,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               distance: null,
               usingCustomConfig: false,
               message: "Using default delivery charge (branch coordinates unavailable)",
+              estimatedDeliveryTime: defaultEstimatedTime,
             });
           }
 
@@ -2344,6 +2364,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.warn('Geocoding failed for address:', deliveryAddress.substring(0, 30));
             // Fall back to default static charge instead of failing
             const defaultStaticCharge = parseFloat(DEFAULT_DELIVERY_CONFIG.STATIC_CHARGE.toString());
+            const defaultEstimatedTime = Math.ceil(BASE_PREP_TIME + (5 * TRAVEL_TIME_PER_KM));
             return res.json({
               deliveryCharges: defaultStaticCharge,
               chargeType: "static",
@@ -2351,6 +2372,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               distance: null,
               usingCustomConfig: false,
               message: "Using default delivery charge (address not found)",
+              estimatedDeliveryTime: defaultEstimatedTime,
             });
           }
 
@@ -2366,6 +2388,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // If still no distance after attempting geocoding, use default charge
         if (!calculatedDistance) {
           const defaultStaticCharge = parseFloat(DEFAULT_DELIVERY_CONFIG.STATIC_CHARGE.toString());
+          const defaultEstimatedTime = Math.ceil(BASE_PREP_TIME + (5 * TRAVEL_TIME_PER_KM));
           return res.json({
             deliveryCharges: defaultStaticCharge,
             chargeType: "static",
@@ -2373,6 +2396,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             distance: null,
             usingCustomConfig: false,
             message: "Using default delivery charge",
+            estimatedDeliveryTime: defaultEstimatedTime,
           });
         }
 
@@ -2389,14 +2413,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     : DEFAULT_DELIVERY_CONFIG.MAX_DELIVERY_DISTANCE.toString()
         );
 
-        if (calculatedDistance > maxDistance) {
+        // Validate distance is a number
+        const validDistance = typeof calculatedDistance === "number" && !isNaN(calculatedDistance) && calculatedDistance > 0;
+        
+        if (validDistance && calculatedDistance > maxDistance) {
+          const maxDistanceTime = Math.ceil(BASE_PREP_TIME + (maxDistance * TRAVEL_TIME_PER_KM));
           return res.status(400).json({ 
-            error: `Delivery not available for distances over ${maxDistance} KM` 
+            error: `Delivery not available for distances over ${maxDistance} KM`,
+            maxDistance: maxDistance,
+            providedDistance: calculatedDistance,
+            estimatedDeliveryTime: maxDistanceTime
           });
         }
 
-        deliveryCharges = baseCharge + (calculatedDistance * perKmCharge);
+        deliveryCharges = baseCharge + (validDistance ? calculatedDistance * perKmCharge : 0);
       }
+
+      // Calculate estimated delivery time using safe distance (already validated at start)
+      const estimatedTime = Math.ceil(BASE_PREP_TIME + (safeDistance * TRAVEL_TIME_PER_KM));
 
       res.json({
         deliveryCharges: parseFloat(deliveryCharges.toFixed(2)),
@@ -2404,6 +2438,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         freeDelivery: false,
         distance: calculatedDistance || null,
         usingCustomConfig: useConfig,
+        estimatedDeliveryTime: estimatedTime,
       });
     } catch (error: any) {
       console.error("Error calculating delivery charges:", error);

@@ -724,15 +724,106 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/orders", async (req, res) => {
+    let createdOrder = null;
+    
     try {
       // Validate order data
       const validatedData = insertOrderSchema.parse(req.body);
       
       const order = await storage.createOrder(validatedData);
+      createdOrder = order;
+      
+      // Return order immediately - side effects run asynchronously
       res.json(order);
+      
     } catch (error: any) {
       console.error("Order creation error:", error);
-      res.status(400).json({ error: error.message || "Failed to create order" });
+      return res.status(400).json({ error: error.message || "Failed to create order" });
+    }
+    
+    // SIDE EFFECTS: Run after response is sent (truly fire-and-forget)
+    if (createdOrder) {
+      // Wrap everything in Promise.resolve().then() to ensure truly async execution
+      Promise.resolve().then(async () => {
+        const order = createdOrder!;
+        
+        // Safely parse items
+        let orderItems: any[] = [];
+        try {
+          if (typeof order.items === "string") {
+            orderItems = JSON.parse(order.items);
+          } else if (Array.isArray(order.items)) {
+            orderItems = order.items;
+          }
+        } catch (parseError) {
+          console.error(`Failed to parse items for order ${order.id}:`, parseError);
+          return;
+        }
+        
+        // AUTO-AWARD LOYALTY POINTS
+        try {
+          if (order.customerId && order.status !== "cancelled") {
+            const orderTotal = parseFloat(order.total);
+            const pointsEarned = Math.floor(orderTotal / 100);
+            
+            if (pointsEarned > 0) {
+              const loyaltyPoints = await storage.getLoyaltyPoints(order.customerId);
+              const currentAvailable = loyaltyPoints?.availablePoints || 0;
+              const currentLifetimeEarned = loyaltyPoints?.lifetimeEarned || 0;
+              
+              await storage.createOrUpdateLoyaltyPoints(order.customerId, {
+                availablePoints: currentAvailable + pointsEarned,
+                lifetimeEarned: currentLifetimeEarned + pointsEarned
+              });
+              
+              await storage.createLoyaltyTransaction({
+                customerId: order.customerId,
+                orderId: order.id,
+                transactionType: "earn",
+                points: pointsEarned,
+                balanceAfter: currentAvailable + pointsEarned,
+                description: `Earned ${pointsEarned} points from order #${order.orderNumber}`
+              });
+            }
+          }
+        } catch (loyaltyError) {
+          console.error(`Failed to award loyalty points for order ${order.id}:`, loyaltyError);
+        }
+        
+        // AUTO-DEDUCT STOCK FROM INVENTORY
+        try {
+          if (Array.isArray(orderItems) && orderItems.length > 0 && order.branchId) {
+            for (const item of orderItems) {
+              // Support both menuItemId and itemId field names
+              const menuItemId = item.menuItemId || item.itemId;
+              const quantity = item.quantity;
+              
+              if (!menuItemId || typeof quantity !== "number" || quantity <= 0) {
+                console.warn(`Skipping stock deduction for invalid item in order ${order.id}:`, item);
+                continue;
+              }
+              
+              try {
+                await storage.createInventoryTransaction({
+                  branchId: order.branchId,
+                  menuItemId: menuItemId,
+                  transactionType: "sale",
+                  quantity: -quantity,
+                  performedBy: order.createdBy || "system",
+                  notes: `Stock deducted for order #${order.orderNumber}`
+                });
+              } catch (inventoryError) {
+                console.error(`Failed to deduct stock for item ${menuItemId} in order ${order.id}:`, inventoryError);
+              }
+            }
+          }
+        } catch (stockError) {
+          console.error(`Failed to process stock deductions for order ${order.id}:`, stockError);
+        }
+      }).catch((err) => {
+        // Catch any unhandled errors in the side effects chain
+        console.error(`Unhandled error in order side effects for order ${createdOrder?.id}:`, err);
+      });
     }
   });
 

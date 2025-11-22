@@ -51,6 +51,10 @@ import AdminOrders from "@/pages/admin-orders";
 import AdminShifts from "@/pages/admin-shifts";
 import StaffAttendance from "@/pages/staff-attendance";
 import AdminShiftReports from "@/pages/admin-shift-reports";
+import AdminMarketingCampaigns from "@/pages/admin-marketing-campaigns";
+import AdminMarketingCampaignDetail from "@/pages/admin-marketing-campaign-detail";
+import AdminMessageTemplates from "@/pages/admin-message-templates";
+import AdminCustomerSegments from "@/pages/admin-customer-segments";
 
 function Router() {
   return (
@@ -217,6 +221,26 @@ function Router() {
       <Route path="/admin/shift-reports">
         <ProtectedRoute requireRole={["admin", "staff"]}>
           <AdminShiftReports />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/marketing-campaigns/:id">
+        <ProtectedRoute requireRole={["admin"]}>
+          <AdminMarketingCampaignDetail />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/marketing-campaigns">
+        <ProtectedRoute requireRole={["admin"]}>
+          <AdminMarketingCampaigns />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/message-templates">
+        <ProtectedRoute requireRole={["admin"]}>
+          <AdminMessageTemplates />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/customer-segments">
+        <ProtectedRoute requireRole={["admin"]}>
+          <AdminCustomerSegments />
         </ProtectedRoute>
       </Route>
       <Route path="/account">

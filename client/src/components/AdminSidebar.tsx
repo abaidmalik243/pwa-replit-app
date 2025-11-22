@@ -1,4 +1,4 @@
-import { LayoutDashboard, ShoppingBag, UtensilsCrossed, Users, Settings, LogOut, Volume2, VolumeX, FolderOpen, Receipt, TrendingUp, Building2, CreditCard, Table2, ChefHat, Calculator, BarChart3, Bike, Truck, MapPin, Tag, DollarSign, Layers, Package, Store, Trash2, RefreshCcw, Calendar, Clock, FileText } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, UtensilsCrossed, Users, Settings, LogOut, Volume2, VolumeX, FolderOpen, Receipt, TrendingUp, Building2, CreditCard, Table2, ChefHat, Calculator, BarChart3, Bike, Truck, MapPin, Tag, DollarSign, Layers, Package, Store, Trash2, RefreshCcw, Calendar, Clock, FileText, MessageSquare, Mail, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Link, useLocation } from "wouter";
@@ -39,6 +39,9 @@ export default function AdminSidebar({ soundEnabled = true, onToggleSound, onLog
     { icon: Calendar, label: "Shift Schedule", path: "/admin/shifts" },
     { icon: Clock, label: "Attendance", path: "/admin/attendance" },
     { icon: FileText, label: "Shift Reports", path: "/admin/shift-reports" },
+    { icon: MessageSquare, label: "Marketing Campaigns", path: "/admin/marketing-campaigns" },
+    { icon: Mail, label: "Message Templates", path: "/admin/message-templates" },
+    { icon: Target, label: "Customer Segments", path: "/admin/customer-segments" },
     { icon: Settings, label: "Settings", path: "/admin/settings" },
   ];
 

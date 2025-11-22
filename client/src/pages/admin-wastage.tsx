@@ -1,0 +1,376 @@
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import AdminLayout from "@/components/AdminLayout";
+import { Trash2, Plus, TrendingDown } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
+
+const wastageSchema = z.object({
+  menuItemId: z.string().min(1, "Menu item is required"),
+  quantity: z.string().min(1, "Quantity is required"),
+  unit: z.string().min(1, "Unit is required"),
+  reason: z.enum(["expired", "damaged", "overproduction", "other"]),
+  estimatedCost: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+type WastageFormData = z.infer<typeof wastageSchema>;
+
+interface Wastage {
+  id: string;
+  menuItemId: string;
+  quantity: number;
+  unit: string;
+  reason: string;
+  estimatedCost?: number | null;
+  notes?: string | null;
+  createdAt: string;
+  menuItem?: { name: string };
+}
+
+const reasonLabels: Record<string, string> = {
+  expired: "Expired",
+  damaged: "Damaged",
+  overproduction: "Overproduction",
+  other: "Other",
+};
+
+const reasonColors: Record<string, string> = {
+  expired: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200",
+  damaged: "bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-200",
+  overproduction: "bg-yellow-100 text-yellow-800 dark:bg-yellow-950 dark:text-yellow-200",
+  other: "bg-gray-100 text-gray-800 dark:bg-gray-950 dark:text-gray-200",
+};
+
+export default function AdminWastage() {
+  const { toast } = useToast();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  const { data: wastage = [], isLoading } = useQuery<Wastage[]>({
+    queryKey: ["/api/inventory/wastage"],
+  });
+
+  const { data: inventory = [] } = useQuery<any[]>({
+    queryKey: ["/api/inventory"],
+  });
+
+  const form = useForm<WastageFormData>({
+    resolver: zodResolver(wastageSchema),
+    defaultValues: {
+      menuItemId: "",
+      quantity: "",
+      unit: "kg",
+      reason: "expired",
+      estimatedCost: "",
+      notes: "",
+    },
+  });
+
+  const createWastageMutation = useMutation({
+    mutationFn: (data: any) => {
+      const itemId = data.menuItemId;
+      delete data.menuItemId;
+      return apiRequest(`/api/inventory/${itemId}/wastage`, "POST", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory/wastage"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      toast({ title: "Success", description: "Wastage recorded successfully" });
+      setIsDialogOpen(false);
+      form.reset();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const onSubmit = (data: WastageFormData) => {
+    const payload = {
+      menuItemId: data.menuItemId,
+      quantity: parseFloat(data.quantity),
+      unit: data.unit,
+      reason: data.reason,
+      estimatedCost: data.estimatedCost ? parseFloat(data.estimatedCost) : null,
+      notes: data.notes || null,
+    };
+    createWastageMutation.mutate(payload);
+  };
+
+  const totalWastageCost = wastage.reduce((sum, item) => sum + (item.estimatedCost || 0), 0);
+
+  return (
+    <AdminLayout title="Wastage Tracking">
+      <div className="space-y-6">
+        {/* Stats Cards */}
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Wastage Incidents</CardTitle>
+              <Trash2 className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid="text-total-wastage">{wastage.length}</div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Estimated Total Cost</CardTitle>
+              <TrendingDown className="h-4 w-4 text-red-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600" data-testid="text-total-cost">
+                ₨{totalWastageCost.toFixed(2)}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Most Common Reason</CardTitle>
+              <Trash2 className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid="text-common-reason">
+                {wastage.length > 0 ? reasonLabels[wastage[0].reason] : "-"}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold" data-testid="text-wastage-title">Wastage Records</h2>
+            <p className="text-muted-foreground">Track food wastage and losses</p>
+          </div>
+          <Button onClick={() => setIsDialogOpen(true)} data-testid="button-record-wastage">
+            <Plus className="h-4 w-4 mr-2" />
+            Record Wastage
+          </Button>
+        </div>
+
+        {/* Wastage List */}
+        {isLoading ? (
+          <p data-testid="text-loading">Loading wastage records...</p>
+        ) : wastage.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <Trash2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <p className="text-muted-foreground" data-testid="text-empty-state">No wastage recorded yet</p>
+              <Button className="mt-4" onClick={() => setIsDialogOpen(true)} data-testid="button-record-first-wastage">
+                Record First Wastage
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            {wastage.map((item) => (
+              <Card key={item.id} data-testid={`card-wastage-${item.id}`}>
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <h3 className="text-lg font-semibold" data-testid={`text-item-name-${item.id}`}>
+                          {item.menuItem?.name || "Unknown Item"}
+                        </h3>
+                        <Badge className={reasonColors[item.reason]} data-testid={`badge-reason-${item.id}`}>
+                          {reasonLabels[item.reason]}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1" data-testid={`text-date-${item.id}`}>
+                        {format(new Date(item.createdAt), "PPp")}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-muted-foreground">Quantity</p>
+                      <p className="text-xl font-bold" data-testid={`text-quantity-${item.id}`}>
+                        {item.quantity} {item.unit}
+                      </p>
+                      {item.estimatedCost && (
+                        <p className="text-sm text-red-600 mt-1" data-testid={`text-cost-${item.id}`}>
+                          ₨{item.estimatedCost.toFixed(2)} loss
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </CardHeader>
+                {item.notes && (
+                  <CardContent>
+                    <p className="text-sm font-medium">Notes:</p>
+                    <p className="text-sm text-muted-foreground mt-1" data-testid={`text-notes-${item.id}`}>
+                      {item.notes}
+                    </p>
+                  </CardContent>
+                )}
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Record Wastage Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent data-testid="dialog-wastage-form">
+          <DialogHeader>
+            <DialogTitle data-testid="text-dialog-title">Record Wastage</DialogTitle>
+            <DialogDescription>
+              Document food wastage and associated losses
+            </DialogDescription>
+          </DialogHeader>
+
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="menuItemId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Inventory Item</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-menu-item">
+                          <SelectValue placeholder="Select item" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {inventory.map((item) => (
+                          <SelectItem key={item.id} value={item.menuItemId}>
+                            {item.menuItem?.name || "Unknown"} ({item.quantity} {item.unit} available)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="quantity"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Quantity Wasted</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.01" placeholder="5" {...field} data-testid="input-quantity" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="unit"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Unit</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-unit">
+                            <SelectValue placeholder="Select unit" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="kg">Kilograms (kg)</SelectItem>
+                          <SelectItem value="g">Grams (g)</SelectItem>
+                          <SelectItem value="l">Liters (l)</SelectItem>
+                          <SelectItem value="ml">Milliliters (ml)</SelectItem>
+                          <SelectItem value="pcs">Pieces (pcs)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="reason"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Reason</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-reason">
+                          <SelectValue placeholder="Select reason" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="expired">Expired</SelectItem>
+                        <SelectItem value="damaged">Damaged</SelectItem>
+                        <SelectItem value="overproduction">Overproduction</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="estimatedCost"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Estimated Cost (Optional)</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="0.01" placeholder="0.00" {...field} data-testid="input-estimated-cost" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Notes (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Additional details..." 
+                        {...field} 
+                        data-testid="input-notes"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} data-testid="button-cancel">
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={createWastageMutation.isPending}
+                  data-testid="button-save-wastage"
+                >
+                  {createWastageMutation.isPending ? "Recording..." : "Record Wastage"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+    </AdminLayout>
+  );
+}

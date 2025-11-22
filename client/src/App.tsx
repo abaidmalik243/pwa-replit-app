@@ -35,6 +35,15 @@ import AdminPromoCodes from "@/pages/admin-promo-codes";
 import AdminDeliveryCharges from "@/pages/admin-delivery-charges";
 import AdminVariants from "@/pages/admin-variants";
 import RiderDashboard from "@/pages/rider-dashboard";
+import CustomerAccount from "@/pages/customer-account";
+import CustomerAddresses from "@/pages/customer-addresses";
+import CustomerFavorites from "@/pages/customer-favorites";
+import CustomerLoyalty from "@/pages/customer-loyalty";
+import CustomerOrders from "@/pages/customer-orders";
+import AdminInventory from "@/pages/admin-inventory";
+import AdminSuppliers from "@/pages/admin-suppliers";
+import AdminRefunds from "@/pages/admin-refunds";
+import AdminWastage from "@/pages/admin-wastage";
 
 function Router() {
   return (
@@ -155,6 +164,51 @@ function Router() {
       <Route path="/admin/settings">
         <ProtectedRoute requireRole={["admin"]}>
           <AdminSettings />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/inventory">
+        <ProtectedRoute requireRole={["admin", "staff"]}>
+          <AdminInventory />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/suppliers">
+        <ProtectedRoute requireRole={["admin", "staff"]}>
+          <AdminSuppliers />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/refunds">
+        <ProtectedRoute requireRole={["admin", "staff"]}>
+          <AdminRefunds />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/wastage">
+        <ProtectedRoute requireRole={["admin", "staff"]}>
+          <AdminWastage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/account">
+        <ProtectedRoute requireRole={["customer"]}>
+          <CustomerAccount />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/account/addresses">
+        <ProtectedRoute requireRole={["customer"]}>
+          <CustomerAddresses />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/account/favorites">
+        <ProtectedRoute requireRole={["customer"]}>
+          <CustomerFavorites />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/account/loyalty">
+        <ProtectedRoute requireRole={["customer"]}>
+          <CustomerLoyalty />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/account/orders">
+        <ProtectedRoute requireRole={["customer"]}>
+          <CustomerOrders />
         </ProtectedRoute>
       </Route>
       <Route component={NotFound} />

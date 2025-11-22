@@ -171,6 +171,58 @@ export interface IStorage {
   createMenuItemVariant(menuItemVariant: schema.InsertMenuItemVariant): Promise<schema.MenuItemVariant>;
   deleteMenuItemVariant(id: string): Promise<boolean>;
   deleteMenuItemVariantsByMenuItem(menuItemId: string): Promise<boolean>;
+
+  // Customer Addresses
+  getCustomerAddresses(customerId: string): Promise<schema.CustomerAddress[]>;
+  getCustomerAddress(id: string): Promise<schema.CustomerAddress | undefined>;
+  createCustomerAddress(address: schema.InsertCustomerAddress): Promise<schema.CustomerAddress>;
+  updateCustomerAddress(id: string, address: Partial<schema.InsertCustomerAddress>): Promise<schema.CustomerAddress | undefined>;
+  deleteCustomerAddress(id: string): Promise<boolean>;
+  setDefaultAddress(customerId: string, addressId: string): Promise<void>;
+
+  // Customer Favorites
+  getCustomerFavorites(customerId: string): Promise<schema.CustomerFavorite[]>;
+  addFavorite(customerId: string, menuItemId: string): Promise<schema.CustomerFavorite>;
+  removeFavorite(customerId: string, menuItemId: string): Promise<boolean>;
+  isFavorite(customerId: string, menuItemId: string): Promise<boolean>;
+
+  // Loyalty Points
+  getLoyaltyPoints(customerId: string): Promise<schema.LoyaltyPoints | undefined>;
+  createOrUpdateLoyaltyPoints(customerId: string, points: Partial<schema.InsertLoyaltyPoints>): Promise<schema.LoyaltyPoints>;
+  getLoyaltyTransactions(customerId: string): Promise<schema.LoyaltyTransaction[]>;
+  createLoyaltyTransaction(transaction: schema.InsertLoyaltyTransaction): Promise<schema.LoyaltyTransaction>;
+  calculateEarnedPoints(orderTotal: number): Promise<number>;
+  
+  // Refunds
+  getRefund(id: string): Promise<schema.Refund | undefined>;
+  getRefundsByOrder(orderId: string): Promise<schema.Refund[]>;
+  getAllRefunds(): Promise<schema.Refund[]>;
+  createRefund(refund: schema.InsertRefund): Promise<schema.Refund>;
+  updateRefund(id: string, refund: Partial<schema.InsertRefund>): Promise<schema.Refund | undefined>;
+
+  // Suppliers
+  getAllSuppliers(): Promise<schema.Supplier[]>;
+  getSupplier(id: string): Promise<schema.Supplier | undefined>;
+  createSupplier(supplier: schema.InsertSupplier): Promise<schema.Supplier>;
+  updateSupplier(id: string, supplier: Partial<schema.InsertSupplier>): Promise<schema.Supplier | undefined>;
+  deleteSupplier(id: string): Promise<boolean>;
+
+  // Inventory Transactions
+  getInventoryTransactions(menuItemId: string, branchId: string): Promise<schema.InventoryTransaction[]>;
+  getAllInventoryTransactions(): Promise<schema.InventoryTransaction[]>;
+  createInventoryTransaction(transaction: schema.InsertInventoryTransaction): Promise<schema.InventoryTransaction>;
+  
+  // Stock Wastage
+  getStockWastage(branchId: string): Promise<schema.StockWastage[]>;
+  createStockWastage(wastage: schema.InsertStockWastage): Promise<schema.StockWastage>;
+  
+  // Reorder Points
+  getReorderPoints(branchId: string): Promise<schema.ReorderPoint[]>;
+  getReorderPoint(id: string): Promise<schema.ReorderPoint | undefined>;
+  createReorderPoint(point: schema.InsertReorderPoint): Promise<schema.ReorderPoint>;
+  updateReorderPoint(id: string, point: Partial<schema.InsertReorderPoint>): Promise<schema.ReorderPoint | undefined>;
+  deleteReorderPoint(id: string): Promise<boolean>;
+  checkLowStock(branchId: string): Promise<Array<{menuItem: schema.MenuItem, currentStock: number, reorderLevel: number}>>;
 }
 
 export class DbStorage implements IStorage {
@@ -852,6 +904,293 @@ export class DbStorage implements IStorage {
   async deleteMenuItemVariantsByMenuItem(menuItemId: string) {
     await db.delete(schema.menuItemVariants).where(eq(schema.menuItemVariants.menuItemId, menuItemId));
     return true;
+  }
+
+  // Customer Addresses
+  async getCustomerAddresses(customerId: string) {
+    return await db.select().from(schema.customerAddresses)
+      .where(eq(schema.customerAddresses.customerId, customerId))
+      .orderBy(desc(schema.customerAddresses.isDefault), desc(schema.customerAddresses.createdAt));
+  }
+
+  async getCustomerAddress(id: string) {
+    const result = await db.select().from(schema.customerAddresses).where(eq(schema.customerAddresses.id, id));
+    return result[0];
+  }
+
+  async createCustomerAddress(address: schema.InsertCustomerAddress) {
+    const result = await db.insert(schema.customerAddresses).values(address).returning();
+    return result[0];
+  }
+
+  async updateCustomerAddress(id: string, address: Partial<schema.InsertCustomerAddress>) {
+    // SECURITY: Remove customerId from address object to prevent tampering
+    const { customerId, ...safeAddress } = address;
+    
+    const result = await db.update(schema.customerAddresses)
+      .set({ ...safeAddress, updatedAt: new Date() })
+      .where(eq(schema.customerAddresses.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteCustomerAddress(id: string) {
+    const result = await db.delete(schema.customerAddresses)
+      .where(eq(schema.customerAddresses.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  async setDefaultAddress(customerId: string, addressId: string) {
+    // Unset all addresses as default for this customer
+    await db.update(schema.customerAddresses)
+      .set({ isDefault: false })
+      .where(eq(schema.customerAddresses.customerId, customerId));
+    
+    // Set the specified address as default
+    await db.update(schema.customerAddresses)
+      .set({ isDefault: true })
+      .where(eq(schema.customerAddresses.id, addressId));
+  }
+
+  // Customer Favorites
+  async getCustomerFavorites(customerId: string) {
+    return await db.select().from(schema.customerFavorites)
+      .where(eq(schema.customerFavorites.customerId, customerId))
+      .orderBy(desc(schema.customerFavorites.createdAt));
+  }
+
+  async addFavorite(customerId: string, menuItemId: string) {
+    const result = await db.insert(schema.customerFavorites)
+      .values({ customerId, menuItemId })
+      .returning();
+    return result[0];
+  }
+
+  async removeFavorite(customerId: string, menuItemId: string) {
+    await db.delete(schema.customerFavorites)
+      .where(and(
+        eq(schema.customerFavorites.customerId, customerId),
+        eq(schema.customerFavorites.menuItemId, menuItemId)
+      ));
+    return true;
+  }
+
+  async isFavorite(customerId: string, menuItemId: string) {
+    const result = await db.select().from(schema.customerFavorites)
+      .where(and(
+        eq(schema.customerFavorites.customerId, customerId),
+        eq(schema.customerFavorites.menuItemId, menuItemId)
+      ));
+    return result.length > 0;
+  }
+
+  // Loyalty Points
+  async getLoyaltyPoints(customerId: string) {
+    const result = await db.select().from(schema.loyaltyPoints)
+      .where(eq(schema.loyaltyPoints.customerId, customerId));
+    return result[0];
+  }
+
+  async createOrUpdateLoyaltyPoints(customerId: string, points: Partial<schema.InsertLoyaltyPoints>) {
+    const existing = await this.getLoyaltyPoints(customerId);
+    
+    if (existing) {
+      const result = await db.update(schema.loyaltyPoints)
+        .set({ ...points, updatedAt: new Date() })
+        .where(eq(schema.loyaltyPoints.customerId, customerId))
+        .returning();
+      return result[0];
+    } else {
+      const result = await db.insert(schema.loyaltyPoints)
+        .values({ customerId, ...points } as schema.InsertLoyaltyPoints)
+        .returning();
+      return result[0];
+    }
+  }
+
+  async getLoyaltyTransactions(customerId: string) {
+    return await db.select().from(schema.loyaltyTransactions)
+      .where(eq(schema.loyaltyTransactions.customerId, customerId))
+      .orderBy(desc(schema.loyaltyTransactions.createdAt));
+  }
+
+  async createLoyaltyTransaction(transaction: schema.InsertLoyaltyTransaction) {
+    const result = await db.insert(schema.loyaltyTransactions).values(transaction).returning();
+    return result[0];
+  }
+
+  async calculateEarnedPoints(orderTotal: number) {
+    // 1 point per Rs. 100 spent
+    return Math.floor(orderTotal / 100);
+  }
+
+  // Refunds
+  async getRefund(id: string) {
+    const result = await db.select().from(schema.refunds).where(eq(schema.refunds.id, id));
+    return result[0];
+  }
+
+  async getRefundsByOrder(orderId: string) {
+    return await db.select().from(schema.refunds)
+      .where(eq(schema.refunds.orderId, orderId))
+      .orderBy(desc(schema.refunds.requestedAt));
+  }
+
+  async getAllRefunds() {
+    return await db.select().from(schema.refunds).orderBy(desc(schema.refunds.requestedAt));
+  }
+
+  async createRefund(refund: schema.InsertRefund) {
+    const result = await db.insert(schema.refunds).values(refund).returning();
+    return result[0];
+  }
+
+  async updateRefund(id: string, refund: Partial<schema.InsertRefund>) {
+    const result = await db.update(schema.refunds)
+      .set(refund)
+      .where(eq(schema.refunds.id, id))
+      .returning();
+    return result[0];
+  }
+
+  // Suppliers
+  async getAllSuppliers() {
+    return await db.select().from(schema.suppliers).orderBy(schema.suppliers.name);
+  }
+
+  async getSupplier(id: string) {
+    const result = await db.select().from(schema.suppliers).where(eq(schema.suppliers.id, id));
+    return result[0];
+  }
+
+  async createSupplier(supplier: schema.InsertSupplier) {
+    const result = await db.insert(schema.suppliers).values(supplier).returning();
+    return result[0];
+  }
+
+  async updateSupplier(id: string, supplier: Partial<schema.InsertSupplier>) {
+    const result = await db.update(schema.suppliers)
+      .set(supplier)
+      .where(eq(schema.suppliers.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteSupplier(id: string) {
+    await db.delete(schema.suppliers).where(eq(schema.suppliers.id, id));
+    return true;
+  }
+
+  // Inventory Transactions
+  async getInventoryTransactions(menuItemId: string, branchId: string) {
+    return await db.select().from(schema.inventoryTransactions)
+      .where(and(
+        eq(schema.inventoryTransactions.menuItemId, menuItemId),
+        eq(schema.inventoryTransactions.branchId, branchId)
+      ))
+      .orderBy(desc(schema.inventoryTransactions.createdAt));
+  }
+
+  async getAllInventoryTransactions() {
+    return await db.select().from(schema.inventoryTransactions)
+      .orderBy(desc(schema.inventoryTransactions.createdAt));
+  }
+
+  async createInventoryTransaction(transaction: schema.InsertInventoryTransaction) {
+    const result = await db.insert(schema.inventoryTransactions).values(transaction).returning();
+    
+    // Update menu item stock quantity
+    const menuItem = await this.getMenuItem(transaction.menuItemId);
+    if (menuItem) {
+      await this.updateMenuItem(transaction.menuItemId, {
+        stockQuantity: transaction.balanceAfter
+      });
+    }
+    
+    return result[0];
+  }
+
+  // Stock Wastage
+  async getStockWastage(branchId: string) {
+    return await db.select().from(schema.stockWastage)
+      .where(eq(schema.stockWastage.branchId, branchId))
+      .orderBy(desc(schema.stockWastage.wasteDate));
+  }
+
+  async createStockWastage(wastage: schema.InsertStockWastage) {
+    const result = await db.insert(schema.stockWastage).values(wastage).returning();
+    
+    // Create corresponding inventory transaction
+    const menuItem = await this.getMenuItem(wastage.menuItemId);
+    if (menuItem) {
+      const newBalance = (menuItem.stockQuantity || 0) - wastage.quantity;
+      await this.createInventoryTransaction({
+        menuItemId: wastage.menuItemId,
+        branchId: wastage.branchId,
+        transactionType: 'wastage',
+        quantity: -wastage.quantity,
+        balanceAfter: newBalance,
+        reason: wastage.reason,
+        performedBy: wastage.reportedBy || undefined,
+      });
+    }
+    
+    return result[0];
+  }
+
+  // Reorder Points
+  async getReorderPoints(branchId: string) {
+    return await db.select().from(schema.reorderPoints)
+      .where(eq(schema.reorderPoints.branchId, branchId))
+      .orderBy(schema.reorderPoints.createdAt);
+  }
+
+  async getReorderPoint(id: string) {
+    const result = await db.select().from(schema.reorderPoints).where(eq(schema.reorderPoints.id, id));
+    return result[0];
+  }
+
+  async createReorderPoint(point: schema.InsertReorderPoint) {
+    const result = await db.insert(schema.reorderPoints).values(point).returning();
+    return result[0];
+  }
+
+  async updateReorderPoint(id: string, point: Partial<schema.InsertReorderPoint>) {
+    const result = await db.update(schema.reorderPoints)
+      .set({ ...point, updatedAt: new Date() })
+      .where(eq(schema.reorderPoints.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteReorderPoint(id: string) {
+    await db.delete(schema.reorderPoints).where(eq(schema.reorderPoints.id, id));
+    return true;
+  }
+
+  async checkLowStock(branchId: string) {
+    // Get all reorder points for this branch
+    const reorderPoints = await this.getReorderPoints(branchId);
+    const lowStockItems: Array<{menuItem: schema.MenuItem, currentStock: number, reorderLevel: number}> = [];
+    
+    for (const point of reorderPoints) {
+      if (!point.isActive) continue;
+      
+      const menuItem = await this.getMenuItem(point.menuItemId);
+      if (!menuItem) continue;
+      
+      const currentStock = menuItem.stockQuantity || 0;
+      if (currentStock <= point.reorderLevel) {
+        lowStockItems.push({
+          menuItem,
+          currentStock,
+          reorderLevel: point.reorderLevel
+        });
+      }
+    }
+    
+    return lowStockItems;
   }
 }
 

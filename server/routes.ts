@@ -2577,6 +2577,392 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== Customer Addresses Routes ====================
+  
+  app.get("/api/customers/:customerId/addresses", authenticate, async (req, res) => {
+    try {
+      const { customerId } = req.params;
+      if (req.user!.role !== "admin" && req.user!.role !== "staff" && req.user!.id !== customerId) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+      const addresses = await storage.getCustomerAddresses(customerId);
+      res.json(addresses);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/customers/:customerId/addresses", authenticate, async (req, res) => {
+    try {
+      const { customerId } = req.params;
+      if (req.user!.role !== "admin" && req.user!.role !== "staff" && req.user!.id !== customerId) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+      const address = await storage.createCustomerAddress({ ...req.body, customerId });
+      res.status(201).json(address);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/customers/:customerId/addresses/:id", authenticate, async (req, res) => {
+    try {
+      const { customerId, id } = req.params;
+      if (req.user!.role !== "admin" && req.user!.role !== "staff" && req.user!.id !== customerId) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+      
+      // SECURITY: Verify ownership before update
+      const existing = await storage.getCustomerAddress(id);
+      if (!existing || existing.customerId !== customerId) {
+        return res.status(404).json({ error: "Address not found" });
+      }
+      
+      const address = await storage.updateCustomerAddress(id, req.body);
+      res.json(address);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/customers/:customerId/addresses/:id", authenticate, async (req, res) => {
+    try {
+      const { customerId, id } = req.params;
+      if (req.user!.role !== "admin" && req.user!.role !== "staff" && req.user!.id !== customerId) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+      
+      // SECURITY: Verify ownership before delete
+      const existing = await storage.getCustomerAddress(id);
+      if (!existing || existing.customerId !== customerId) {
+        return res.status(404).json({ error: "Address not found" });
+      }
+      
+      await storage.deleteCustomerAddress(id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/customers/:customerId/addresses/:id/set-default", authenticate, async (req, res) => {
+    try {
+      const { customerId, id } = req.params;
+      if (req.user!.role !== "admin" && req.user!.role !== "staff" && req.user!.id !== customerId) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+      
+      // SECURITY: Verify ownership before setting default
+      const existing = await storage.getCustomerAddress(id);
+      if (!existing || existing.customerId !== customerId) {
+        return res.status(404).json({ error: "Address not found" });
+      }
+      
+      await storage.setDefaultAddress(customerId, id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ==================== Customer Favorites ====================
+  
+  app.get("/api/customers/:customerId/favorites", authenticate, async (req, res) => {
+    try {
+      const { customerId } = req.params;
+      if (req.user!.role !== "admin" && req.user!.role !== "staff" && req.user!.id !== customerId) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+      const favorites = await storage.getCustomerFavorites(customerId);
+      res.json(favorites);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/customers/:customerId/favorites", authenticate, async (req, res) => {
+    try {
+      const { customerId } = req.params;
+      const { menuItemId } = req.body;
+      if (req.user!.role !== "admin" && req.user!.role !== "staff" && req.user!.id !== customerId) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+      const favorite = await storage.addFavorite(customerId, menuItemId);
+      res.status(201).json(favorite);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/customers/:customerId/favorites/:menuItemId", authenticate, async (req, res) => {
+    try {
+      const { customerId, menuItemId } = req.params;
+      if (req.user!.role !== "admin" && req.user!.role !== "staff" && req.user!.id !== customerId) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+      await storage.removeFavorite(customerId, menuItemId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ==================== Loyalty Points ====================
+  
+  app.get("/api/customers/:customerId/loyalty", authenticate, async (req, res) => {
+    try {
+      const { customerId } = req.params;
+      if (req.user!.role !== "admin" && req.user!.role !== "staff" && req.user!.id !== customerId) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+      const points = await storage.getLoyaltyPoints(customerId);
+      res.json(points || { customerId, totalPoints: 0, availablePoints: 0, lifetimeEarned: 0, lifetimeRedeemed: 0, tier: "bronze" });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/customers/:customerId/loyalty/transactions", authenticate, async (req, res) => {
+    try {
+      const { customerId } = req.params;
+      if (req.user!.role !== "admin" && req.user!.role !== "staff" && req.user!.id !== customerId) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+      const transactions = await storage.getLoyaltyTransactions(customerId);
+      res.json(transactions);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/customers/:customerId/loyalty/redeem", authenticate, async (req, res) => {
+    try {
+      const { customerId } = req.params;
+      const { points, orderId } = req.body;
+      if (req.user!.role !== "admin" && req.user!.role !== "staff" && req.user!.id !== customerId) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+      const loyaltyPoints = await storage.getLoyaltyPoints(customerId);
+      if (!loyaltyPoints || loyaltyPoints.availablePoints < points) {
+        return res.status(400).json({ error: "Insufficient points" });
+      }
+      const newAvailable = loyaltyPoints.availablePoints - points;
+      const newRedeemed = loyaltyPoints.lifetimeRedeemed + points;
+      await storage.createOrUpdateLoyaltyPoints(customerId, {
+        availablePoints: newAvailable,
+        lifetimeRedeemed: newRedeemed
+      });
+      await storage.createLoyaltyTransaction({
+        customerId,
+        orderId,
+        transactionType: "redeem",
+        points: -points,
+        balanceAfter: newAvailable,
+        description: `Redeemed ${points} points`
+      });
+      res.json({ success: true, newBalance: newAvailable });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ==================== Order History ====================
+  
+  app.get("/api/customers/:customerId/orders", authenticate, async (req, res) => {
+    try {
+      const { customerId } = req.params;
+      if (req.user!.role !== "admin" && req.user!.role !== "staff" && req.user!.id !== customerId) {
+        return res.status(403).json({ error: "Unauthorized" });
+      }
+      const orders = await storage.getAllOrders();
+      const customerOrders = orders.filter(o => o.customerId === customerId);
+      res.json(customerOrders);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ==================== Refunds ====================
+  
+  app.get("/api/refunds", authenticate, authorize("admin", "staff"), async (req, res) => {
+    try {
+      const refunds = await storage.getAllRefunds();
+      res.json(refunds);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/orders/:orderId/refunds", authenticate, async (req, res) => {
+    try {
+      const { orderId } = req.params;
+      const refunds = await storage.getRefundsByOrder(orderId);
+      res.json(refunds);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/refunds", authenticate, authorize("admin", "staff"), async (req, res) => {
+    try {
+      const refund = await storage.createRefund({
+        ...req.body,
+        processedBy: req.user!.id
+      });
+      res.status(201).json(refund);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/refunds/:id", authenticate, authorize("admin", "staff"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const refund = await storage.updateRefund(id, {
+        ...req.body,
+        processedBy: req.user!.id,
+        processedAt: req.body.status === "completed" ? new Date() : undefined
+      });
+      res.json(refund);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ==================== Suppliers ====================
+  
+  app.get("/api/suppliers", authenticate, authorize("admin", "staff"), async (req, res) => {
+    try {
+      const suppliers = await storage.getAllSuppliers();
+      res.json(suppliers);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/suppliers", authenticate, authorize("admin", "staff"), async (req, res) => {
+    try {
+      const supplier = await storage.createSupplier(req.body);
+      res.status(201).json(supplier);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/suppliers/:id", authenticate, authorize("admin", "staff"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const supplier = await storage.updateSupplier(id, req.body);
+      res.json(supplier);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/suppliers/:id", authenticate, authorize("admin", "staff"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteSupplier(id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ==================== Inventory ====================
+  
+  app.get("/api/inventory/transactions", authenticate, authorize("admin", "staff"), async (req, res) => {
+    try {
+      const transactions = await storage.getAllInventoryTransactions();
+      res.json(transactions);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/inventory/transactions", authenticate, authorize("admin", "staff"), async (req, res) => {
+    try {
+      const transaction = await storage.createInventoryTransaction({
+        ...req.body,
+        performedBy: req.user!.id
+      });
+      res.status(201).json(transaction);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/inventory/wastage/:branchId", authenticate, authorize("admin", "staff"), async (req, res) => {
+    try {
+      const { branchId } = req.params;
+      const wastage = await storage.getStockWastage(branchId);
+      res.json(wastage);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/inventory/wastage", authenticate, authorize("admin", "staff"), async (req, res) => {
+    try {
+      const wastage = await storage.createStockWastage({
+        ...req.body,
+        reportedBy: req.user!.id
+      });
+      res.status(201).json(wastage);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/inventory/reorder-points/:branchId", authenticate, authorize("admin", "staff"), async (req, res) => {
+    try {
+      const { branchId } = req.params;
+      const points = await storage.getReorderPoints(branchId);
+      res.json(points);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/inventory/low-stock/:branchId", authenticate, authorize("admin", "staff"), async (req, res) => {
+    try {
+      const { branchId } = req.params;
+      const lowStock = await storage.checkLowStock(branchId);
+      res.json(lowStock);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/inventory/reorder-points", authenticate, authorize("admin", "staff"), async (req, res) => {
+    try {
+      const point = await storage.createReorderPoint(req.body);
+      res.status(201).json(point);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/inventory/reorder-points/:id", authenticate, authorize("admin", "staff"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const point = await storage.updateReorderPoint(id, req.body);
+      res.json(point);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/inventory/reorder-points/:id", authenticate, authorize("admin", "staff"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteReorderPoint(id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

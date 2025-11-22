@@ -74,7 +74,7 @@ export default function CustomerHome() {
   });
 
   // Fetch bestselling items from API with configurable timeframe (30 days, top 6 items)
-  const { data: bestsellingItems = [] } = useQuery<(DBMenuItem & { orderCount: number })[]>({
+  const { data: bestsellingItems = [], isLoading: bestsellingLoading } = useQuery<(DBMenuItem & { orderCount: number })[]>({
     queryKey: ["/api/menu-items/bestselling", selectedBranchId, { days: 30, limit: 6 }],
     queryFn: async () => {
       const res = await fetch(`/api/menu-items/bestselling/${selectedBranchId}?days=30&limit=6`);
@@ -438,7 +438,7 @@ export default function CustomerHome() {
       <ImageSlider />
 
       {/* Bestselling Items Section */}
-      {bestsellingItems.length > 0 && (
+      {(bestsellingLoading || bestsellingItems.length > 0) && selectedBranchId && (
         <div className="bg-gradient-to-br from-primary/5 via-primary/10 to-primary/5 py-8 border-y">
           <div className="container px-4">
             <div className="flex items-center gap-2 mb-6">
@@ -448,32 +448,47 @@ export default function CustomerHome() {
               </h2>
               <span className="text-sm text-muted-foreground ml-auto">Last 30 Days</span>
             </div>
-            <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide">
-              {bestsellingItems.map((item) => {
-                const categoryName = dbCategories.find((c) => c.id === item.categoryId)?.name || "Other";
-                const menuItem: MenuItem = {
-                  id: item.id,
-                  name: item.name,
-                  description: item.description || "",
-                  price: parseFloat(item.price),
-                  image: item.imageUrl || Object.values(defaultImages)[0],
-                  category: categoryName,
-                  isVegetarian: false,
-                };
-                return (
-                  <div 
-                    key={item.id} 
-                    className="relative min-w-[280px] snap-start"
-                    data-testid={`card-bestselling-${item.id}`}
-                  >
-                    <div className="absolute -top-2 -right-2 bg-primary text-primary-foreground rounded-full w-8 h-8 flex items-center justify-center text-xs font-bold z-10 shadow-lg">
-                      {item.orderCount}
+            {bestsellingLoading ? (
+              <div className="flex gap-4 overflow-x-auto pb-4" data-testid="skeleton-bestselling">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <div key={i} className="min-w-[280px] animate-pulse">
+                    <div className="bg-card rounded-lg border p-4 h-[300px]">
+                      <div className="bg-muted rounded-md h-40 mb-4"></div>
+                      <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
+                      <div className="h-3 bg-muted rounded w-1/2 mb-4"></div>
+                      <div className="h-4 bg-muted rounded w-1/4"></div>
                     </div>
-                    <MenuItemCard item={menuItem} onAddToCart={handleAddToCart} />
                   </div>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide">
+                {bestsellingItems.map((item) => {
+                  const categoryName = dbCategories.find((c) => c.id === item.categoryId)?.name || "Other";
+                  const menuItem: MenuItem = {
+                    id: item.id,
+                    name: item.name,
+                    description: item.description || "",
+                    price: parseFloat(item.price),
+                    image: item.imageUrl || Object.values(defaultImages)[0],
+                    category: categoryName,
+                    isVegetarian: false,
+                  };
+                  return (
+                    <div 
+                      key={item.id} 
+                      className="relative min-w-[280px] snap-start"
+                      data-testid={`card-bestselling-${item.id}`}
+                    >
+                      <div className="absolute -top-2 -right-2 bg-primary text-primary-foreground rounded-full w-8 h-8 flex items-center justify-center text-xs font-bold z-10 shadow-lg">
+                        {item.orderCount}
+                      </div>
+                      <MenuItemCard item={menuItem} onAddToCart={handleAddToCart} />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}

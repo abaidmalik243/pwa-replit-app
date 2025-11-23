@@ -483,7 +483,7 @@ export default function CustomerHome() {
                       <div className="absolute -top-2 -right-2 bg-primary text-primary-foreground rounded-full w-8 h-8 flex items-center justify-center text-xs font-bold z-10 shadow-lg">
                         {item.orderCount}
                       </div>
-                      <MenuItemCard item={menuItem} onAddToCart={handleAddToCart} />
+                      <MenuItemCard item={menuItem} onAddToCart={handleAddToCart} context="bestseller" />
                     </div>
                   );
                 })}

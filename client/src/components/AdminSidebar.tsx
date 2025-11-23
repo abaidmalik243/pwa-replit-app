@@ -47,32 +47,34 @@ export default function AdminSidebar({ soundEnabled = true, onToggleSound, onLog
 
   return (
     <div className="flex flex-col h-full bg-sidebar border-r border-sidebar-border">
-      <div className="p-6 flex items-center gap-2">
+      <div className="p-6 flex items-center gap-2 flex-shrink-0">
         <span className="text-2xl">🍕</span>
         <h2 className="text-xl font-bold text-sidebar-primary" data-testid="text-admin-logo">Kebabish Pizza</h2>
       </div>
 
-      <nav className="flex-1 px-3 space-y-1">
-        {menuItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = location === item.path;
-          
-          return (
-            <Link key={item.path} href={item.path}>
-              <Button
-                variant="ghost"
-                className={`w-full justify-start gap-3 ${isActive ? 'bg-sidebar-accent' : ''}`}
-                data-testid={`button-nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
-              >
-                <Icon className="h-5 w-5" />
-                <span>{item.label}</span>
-              </Button>
-            </Link>
-          );
-        })}
-      </nav>
+      <div className="flex-1 overflow-y-auto">
+        <nav className="px-3 py-2 space-y-1">
+          {menuItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = location === item.path;
+            
+            return (
+              <Link key={item.path} href={item.path}>
+                <Button
+                  variant="ghost"
+                  className={`w-full justify-start gap-3 ${isActive ? 'bg-sidebar-accent' : ''}`}
+                  data-testid={`button-nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+                >
+                  <Icon className="h-5 w-5" />
+                  <span>{item.label}</span>
+                </Button>
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
 
-      <div className="p-3 space-y-2">
+      <div className="p-3 space-y-2 flex-shrink-0 border-t border-sidebar-border">
         <Button
           variant="ghost"
           className="w-full justify-start gap-3"

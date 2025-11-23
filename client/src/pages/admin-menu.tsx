@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Edit2, Trash2, Plus, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import MenuItemForm from "@/components/MenuItemForm";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
@@ -233,6 +233,9 @@ export default function AdminMenu() {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingItem ? "Edit Menu Item" : "Add Menu Item"}</DialogTitle>
+            <DialogDescription>
+              {editingItem ? "Update the menu item details below." : "Fill in the details to add a new menu item."}
+            </DialogDescription>
           </DialogHeader>
           <MenuItemForm
             initialData={editingItem ? {

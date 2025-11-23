@@ -6,7 +6,7 @@ import AdminHeader from "@/components/AdminHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -148,6 +148,9 @@ export default function AdminCategories() {
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Add New Category</DialogTitle>
+                  <DialogDescription>
+                    Create a new menu category for organizing food items.
+                  </DialogDescription>
                 </DialogHeader>
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -231,6 +234,9 @@ export default function AdminCategories() {
                           <DialogContent>
                             <DialogHeader>
                               <DialogTitle>Edit Category</DialogTitle>
+                              <DialogDescription>
+                                Update category name and description.
+                              </DialogDescription>
                             </DialogHeader>
                             <Form {...form}>
                               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">

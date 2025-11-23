@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MapPin } from "lucide-react";
@@ -155,6 +155,9 @@ export default function OrderTypeDialog({ isOpen, onClose, branches, onSelect, c
       <DialogContent className="sm:max-w-md" data-testid="dialog-order-type">
         <VisuallyHidden>
           <DialogTitle>Select Order Type and Location</DialogTitle>
+          <DialogDescription>
+            Choose delivery or pickup and select your preferred branch location.
+          </DialogDescription>
         </VisuallyHidden>
         <div className="flex flex-col items-center gap-6 py-4">
           <div className="flex items-center gap-2">

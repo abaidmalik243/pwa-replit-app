@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -220,6 +220,9 @@ export default function AdminPromoCodes() {
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Add New Promo Code</DialogTitle>
+              <DialogDescription>
+                Create a new promotional code with discount settings and usage limits.
+              </DialogDescription>
             </DialogHeader>
             <PromoCodeForm 
               form={form} 
@@ -255,6 +258,9 @@ export default function AdminPromoCodes() {
                     <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                       <DialogHeader>
                         <DialogTitle>Edit Promo Code</DialogTitle>
+                        <DialogDescription>
+                          Update the promotional code settings below.
+                        </DialogDescription>
                       </DialogHeader>
                       <PromoCodeForm 
                         form={form} 

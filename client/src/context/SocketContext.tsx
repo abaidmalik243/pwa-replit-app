@@ -18,6 +18,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       autoConnect: true,
       reconnection: true,
       reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
       reconnectionAttempts: Infinity,
     });
 
@@ -26,14 +27,31 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       setIsConnected(true);
     });
 
-    socket.on("disconnect", () => {
-      console.log("WebSocket disconnected");
+    socket.on("disconnect", (reason) => {
+      console.log("WebSocket disconnected:", reason);
       setIsConnected(false);
     });
 
     socket.on("connect_error", (error) => {
-      console.error("WebSocket connection error:", error);
+      console.error("WebSocket connection error:", error.message || "Unknown error");
       setIsConnected(false);
+    });
+
+    socket.on("reconnect", (attemptNumber) => {
+      console.log("WebSocket reconnected after", attemptNumber, "attempts");
+      setIsConnected(true);
+    });
+
+    socket.on("reconnect_attempt", (attemptNumber) => {
+      console.log("WebSocket reconnection attempt", attemptNumber);
+    });
+
+    socket.on("reconnect_error", (error) => {
+      console.error("WebSocket reconnection error:", error.message || "Unknown error");
+    });
+
+    socket.on("reconnect_failed", () => {
+      console.error("WebSocket reconnection failed after maximum attempts");
     });
 
     socketRef.current = socket;

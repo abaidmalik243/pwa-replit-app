@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -187,6 +187,9 @@ export function PaymentDialog({
       <DialogContent className="max-w-2xl" data-testid="dialog-payment">
         <DialogHeader>
           <DialogTitle className="text-2xl">Process Payment</DialogTitle>
+          <DialogDescription>
+            Choose payment method and complete the transaction for order {orderNumber}.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">

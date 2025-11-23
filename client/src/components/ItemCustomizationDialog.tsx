@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { X, Minus, Plus } from "lucide-react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -102,6 +103,14 @@ export default function ItemCustomizationDialog({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-5xl p-0 gap-0">
+        <VisuallyHidden>
+          <DialogHeader>
+            <DialogTitle>Customize {item.name}</DialogTitle>
+            <DialogDescription>
+              Select your preferred options and quantity for {item.name}.
+            </DialogDescription>
+          </DialogHeader>
+        </VisuallyHidden>
         <div className="flex flex-col md:flex-row max-h-[90vh]">
           <div className="md:w-1/2 relative bg-black flex items-center justify-center">
             <Button

@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -320,6 +320,9 @@ export default function AdminVariants() {
             <DialogContent className="max-w-lg" data-testid="dialog-group-form">
               <DialogHeader>
                 <DialogTitle>{editingGroup ? "Edit" : "Create"} Variant Group</DialogTitle>
+                <DialogDescription>
+                  {editingGroup ? "Update the variant group settings below." : "Create a new variant group for menu item customization."}
+                </DialogDescription>
               </DialogHeader>
               <Form {...groupForm}>
                 <form onSubmit={groupForm.handleSubmit(handleGroupSubmit)} className="space-y-4">
@@ -468,6 +471,9 @@ export default function AdminVariants() {
           <DialogContent className="max-w-lg" data-testid="dialog-option-form">
             <DialogHeader>
               <DialogTitle>{editingOption ? "Edit" : "Create"} Variant Option</DialogTitle>
+              <DialogDescription>
+                {editingOption ? "Update the variant option details below." : "Add a new option to the variant group."}
+              </DialogDescription>
             </DialogHeader>
             <Form {...optionForm}>
               <form onSubmit={optionForm.handleSubmit(handleOptionSubmit)} className="space-y-4">

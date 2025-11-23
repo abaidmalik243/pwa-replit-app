@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -223,6 +223,9 @@ export default function AdminRiders() {
           <DialogContent className="max-w-md" data-testid="dialog-create-rider">
             <DialogHeader>
               <DialogTitle>Add New Rider</DialogTitle>
+              <DialogDescription>
+                Create a new delivery rider profile with vehicle details and branch assignment.
+              </DialogDescription>
             </DialogHeader>
             <RiderForm 
               form={form} 
@@ -310,6 +313,9 @@ export default function AdminRiders() {
                       <DialogContent className="max-w-md" data-testid={`dialog-edit-rider-${rider.id}`}>
                         <DialogHeader>
                           <DialogTitle>Edit Rider</DialogTitle>
+                          <DialogDescription>
+                            Update rider information and status.
+                          </DialogDescription>
                         </DialogHeader>
                         <RiderForm 
                           form={form} 

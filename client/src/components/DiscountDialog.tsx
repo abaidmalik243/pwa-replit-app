@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -107,6 +107,9 @@ export function DiscountDialog({
       <DialogContent className="max-w-lg" data-testid="dialog-discount">
         <DialogHeader>
           <DialogTitle className="text-2xl">Apply Discount</DialogTitle>
+          <DialogDescription>
+            Apply a percentage or fixed amount discount to order {orderNumber}.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">

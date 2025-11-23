@@ -6,7 +6,7 @@ import AdminHeader from "@/components/AdminHeader";
 import UserRoleTable, { UserData } from "@/components/UserRoleTable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -213,6 +213,9 @@ export default function AdminUsers() {
               <DialogContent className="max-w-md">
                 <DialogHeader>
                   <DialogTitle>{editingUser ? "Edit User" : "Add New User"}</DialogTitle>
+                  <DialogDescription>
+                    {editingUser ? "Update user account details and permissions." : "Create a new user account with role and branch assignment."}
+                  </DialogDescription>
                 </DialogHeader>
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">

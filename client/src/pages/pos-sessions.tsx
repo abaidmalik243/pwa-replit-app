@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import AdminSidebar from "@/components/AdminSidebar";
@@ -393,6 +393,9 @@ export default function PosSessions() {
         <DialogContent data-testid="dialog-open-session">
           <DialogHeader>
             <DialogTitle>Open Cash Register</DialogTitle>
+            <DialogDescription>
+              Enter the opening cash balance to start a new session.
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleOpenSession}>
             <div className="space-y-4 py-4">
@@ -435,6 +438,9 @@ export default function PosSessions() {
         <DialogContent data-testid="dialog-close-session">
           <DialogHeader>
             <DialogTitle>Close Cash Register</DialogTitle>
+            <DialogDescription>
+              Count the closing cash and record the session ending.
+            </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCloseSession}>
             <div className="space-y-4 py-4">

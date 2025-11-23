@@ -97,7 +97,7 @@ export default function AdminInventory() {
     defaultValues: {
       reorderLevel: "",
       reorderQuantity: "",
-      preferredSupplierId: "",
+      preferredSupplierId: "none",
       leadTimeDays: "",
     },
   });
@@ -237,7 +237,7 @@ export default function AdminInventory() {
       branchId,
       reorderLevel: data.reorderLevel,
       reorderQuantity: data.reorderQuantity,
-      preferredSupplierId: data.preferredSupplierId || null,
+      preferredSupplierId: data.preferredSupplierId === "none" || !data.preferredSupplierId ? null : data.preferredSupplierId,
       leadTimeDays: data.leadTimeDays || 7,
       isActive: true,
     };
@@ -605,7 +605,7 @@ export default function AdminInventory() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">No supplier</SelectItem>
+                        <SelectItem value="none">No supplier</SelectItem>
                         {suppliers.map(supplier => (
                           <SelectItem key={supplier.id} value={supplier.id}>
                             {supplier.name}

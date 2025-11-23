@@ -54,7 +54,7 @@ export default function AdminMarketingCampaignDetail() {
     defaultValues: {
       name: "",
       description: "",
-      branchId: "",
+      branchId: "all",
       targetAudience: "all",
       messageTemplate: "",
       scheduledAt: "",
@@ -66,7 +66,7 @@ export default function AdminMarketingCampaignDetail() {
       form.reset({
         name: campaign.name || "",
         description: campaign.description || "",
-        branchId: campaign.branchId || "",
+        branchId: campaign.branchId || "all",
         targetAudience: campaign.targetAudience || "all",
         messageTemplate: campaign.messageTemplate || "",
         scheduledAt: campaign.scheduledAt ? format(new Date(campaign.scheduledAt), "yyyy-MM-dd'T'HH:mm") : "",
@@ -78,6 +78,7 @@ export default function AdminMarketingCampaignDetail() {
     mutationFn: async (data: CampaignFormData) => {
       const payload = {
         ...data,
+        branchId: data.branchId === "all" ? null : data.branchId,
         templateVariables: {},
       };
       if (isNew) {
@@ -350,7 +351,7 @@ export default function AdminMarketingCampaignDetail() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">All Branches</SelectItem>
+                          <SelectItem value="all">All Branches</SelectItem>
                           {branches?.map((branch) => (
                             <SelectItem key={branch.id} value={branch.id}>
                               {branch.name}

@@ -73,7 +73,11 @@ export default function AdminPromoCodes() {
 
   const createMutation = useMutation({
     mutationFn: async (data: PromoCodeFormData) => {
-      return await apiRequest("/api/promo-codes", "POST", data);
+      const payload = {
+        ...data,
+        branchId: !data.branchId || data.branchId === "all" ? null : data.branchId,
+      };
+      return await apiRequest("/api/promo-codes", "POST", payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/promo-codes"] });
@@ -95,7 +99,11 @@ export default function AdminPromoCodes() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<PromoCodeFormData> }) => {
-      return await apiRequest(`/api/promo-codes/${id}`, "PATCH", data);
+      const payload = {
+        ...data,
+        branchId: !data.branchId || data.branchId === "all" ? null : data.branchId,
+      };
+      return await apiRequest(`/api/promo-codes/${id}`, "PATCH", payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/promo-codes"] });
@@ -146,7 +154,7 @@ export default function AdminPromoCodes() {
       usageLimit: "",
       perUserLimit: "",
       isActive: true,
-      branchId: "",
+      branchId: "all",
     },
   });
 
@@ -164,7 +172,7 @@ export default function AdminPromoCodes() {
       validFrom: promoCode.validFrom ? new Date(promoCode.validFrom).toISOString().slice(0, 16) : "",
       validUntil: promoCode.validUntil ? new Date(promoCode.validUntil).toISOString().slice(0, 16) : "",
       isActive: promoCode.isActive,
-      branchId: promoCode.branchId || "",
+      branchId: promoCode.branchId || "all",
     });
   };
 
@@ -529,7 +537,7 @@ function PromoCodeForm({
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="">All Branches</SelectItem>
+                  <SelectItem value="all">All Branches</SelectItem>
                   {branches.map((branch) => (
                     <SelectItem key={branch.id} value={branch.id}>
                       {branch.name} - {branch.city}

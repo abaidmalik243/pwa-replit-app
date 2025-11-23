@@ -1,4 +1,4 @@
-import { LayoutDashboard, ShoppingBag, UtensilsCrossed, Users, Settings, LogOut, Volume2, VolumeX, FolderOpen, Receipt, TrendingUp, Building2, CreditCard, Table2, ChefHat, Calculator, BarChart3, Bike, Truck, MapPin, Tag, DollarSign, Layers, Package, Store, Trash2, RefreshCcw, Calendar, Clock, FileText, MessageSquare, Mail, Target } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, UtensilsCrossed, Users, Settings, LogOut, Volume2, VolumeX, FolderOpen, Receipt, TrendingUp, Building2, CreditCard, Table2, ChefHat, Calculator, BarChart3, Bike, Truck, MapPin, Tag, DollarSign, Layers, Package, Store, Trash2, RefreshCcw, Calendar, Clock, FileText, MessageSquare, Mail, Target, Smartphone, PieChart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Link, useLocation } from "wouter";
@@ -14,22 +14,25 @@ export default function AdminSidebar({ soundEnabled = true, onToggleSound, onLog
 
   const menuItems = [
     { icon: LayoutDashboard, label: "Dashboard", path: "/admin" },
+    { icon: BarChart3, label: "Advanced Analytics", path: "/admin/analytics" },
     { icon: ShoppingBag, label: "Orders", path: "/admin/orders" },
     { icon: CreditCard, label: "POS", path: "/admin/pos" },
     { icon: Table2, label: "Tables", path: "/admin/pos-tables" },
     { icon: ChefHat, label: "Kitchen", path: "/admin/kitchen" },
     { icon: Calculator, label: "Sessions", path: "/admin/pos-sessions" },
+    { icon: PieChart, label: "POS Reports", path: "/admin/pos-reports" },
     { icon: UtensilsCrossed, label: "Menu Items", path: "/admin/menu" },
     { icon: FolderOpen, label: "Categories", path: "/admin/categories" },
     { icon: Layers, label: "Variants", path: "/admin/variants" },
     { icon: Building2, label: "Branches", path: "/admin/branches" },
     { icon: TrendingUp, label: "Demand", path: "/admin/demand" },
-    { icon: BarChart3, label: "Reports", path: "/admin/reports" },
+    { icon: FileText, label: "Reports", path: "/admin/reports" },
     { icon: Receipt, label: "Expenses", path: "/admin/expenses" },
     { icon: Package, label: "Inventory", path: "/admin/inventory" },
     { icon: Store, label: "Suppliers", path: "/admin/suppliers" },
     { icon: Trash2, label: "Wastage", path: "/admin/wastage" },
     { icon: RefreshCcw, label: "Refunds", path: "/admin/refunds" },
+    { icon: Smartphone, label: "JazzCash Monitoring", path: "/admin/jazzcash" },
     { icon: Bike, label: "Riders", path: "/admin/riders" },
     { icon: Truck, label: "Deliveries", path: "/admin/deliveries" },
     { icon: MapPin, label: "Rider Tracking", path: "/admin/rider-tracking" },

@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 import { useTranslation } from "react-i18next";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/context/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 
 export type Language = 'en' | 'ur' | 'ar';
 export type Currency = 'PKR' | 'USD' | 'AED' | 'SAR';
@@ -37,6 +39,8 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const { i18n } = useTranslation();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { toast } = useToast();
   const [language, setLanguage] = useState<Language>(() => {
     const saved = localStorage.getItem('language');
     return (saved as Language) || 'en';
@@ -45,13 +49,14 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     const saved = localStorage.getItem('currency');
     return (saved as Currency) || 'PKR';
   });
+  const [isHydrated, setIsHydrated] = useState(false);
 
   const isRTL = LANGUAGES[language].dir === 'rtl';
 
-  // Fetch user preferences if authenticated
-  const { data: userPrefs } = useQuery<UserPreferences>({
-    queryKey: ['/api/user/preferences'],
-    enabled: false, // Only fetch when user is authenticated
+  // Fetch user preferences if authenticated (wait for auth to finish loading)
+  const { data: userPrefs, isLoading: prefsLoading } = useQuery<UserPreferences>({
+    queryKey: ['/api/user/preferences', user?.id],
+    enabled: isAuthenticated && !authLoading,
     retry: false,
   });
 
@@ -61,7 +66,15 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       return await apiRequest('/api/user/preferences', 'PATCH', data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/user/preferences'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/user/preferences', user?.id] });
+    },
+    onError: (error: any) => {
+      console.error('Failed to save preferences:', error);
+      toast({
+        title: "Preference Save Failed",
+        description: "Your language and currency preferences couldn't be saved to your account. They will remain in this browser only.",
+        variant: "destructive",
+      });
     },
   });
 
@@ -84,28 +97,38 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('currency', currency);
   }, [currency]);
 
-  // Load user preferences if available
+  // Reset hydration flag when user changes (login/logout)
   useEffect(() => {
-    if (userPrefs) {
-      if (userPrefs.language && userPrefs.language !== language) {
+    setIsHydrated(false);
+  }, [user?.id]);
+
+  // Load user preferences if available (after auth loads and for each new user)
+  useEffect(() => {
+    if (!authLoading && !prefsLoading && userPrefs && !isHydrated) {
+      if (userPrefs.language) {
         setLanguage(userPrefs.language);
       }
-      if (userPrefs.currency && userPrefs.currency !== currency) {
+      if (userPrefs.currency) {
         setCurrency(userPrefs.currency);
       }
+      setIsHydrated(true);
     }
-  }, [userPrefs]);
+  }, [userPrefs, authLoading, prefsLoading, isHydrated]);
 
   const changeLanguage = (lang: Language) => {
     setLanguage(lang);
-    // Try to save to backend if user is authenticated
-    savePreferencesMutation.mutate({ language: lang });
+    // Save to backend only if user is authenticated
+    if (isAuthenticated) {
+      savePreferencesMutation.mutate({ language: lang });
+    }
   };
 
   const changeCurrency = (curr: Currency) => {
     setCurrency(curr);
-    // Try to save to backend if user is authenticated
-    savePreferencesMutation.mutate({ currency: curr });
+    // Save to backend only if user is authenticated
+    if (isAuthenticated) {
+      savePreferencesMutation.mutate({ currency: curr });
+    }
   };
 
   const formatCurrency = (amount: number): string => {

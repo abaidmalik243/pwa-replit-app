@@ -5073,7 +5073,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const devMenuItems = await storage.getAllMenuItems();
       const devOrders = await storage.getAllOrders();
       const devRiders = await storage.getAllRiders();
-      const allUsers = await db.select().from(schema.users);
+      const allUsers = await storage.getAllUsers();
       const devCustomers = allUsers.filter(u => u.role === "customer");
 
       // For production stats, we'd need to connect to production DB

@@ -49,7 +49,6 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     const saved = localStorage.getItem('currency');
     return (saved as Currency) || 'PKR';
   });
-  const [isHydrated, setIsHydrated] = useState(false);
 
   const isRTL = LANGUAGES[language].dir === 'rtl';
 
@@ -97,23 +96,18 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('currency', currency);
   }, [currency]);
 
-  // Reset hydration flag when user changes (login/logout)
+  // Load user preferences whenever they're available and different from local state
+  // This ensures backend preferences always sync (including after refetches)
   useEffect(() => {
-    setIsHydrated(false);
-  }, [user?.id]);
-
-  // Load user preferences if available (after auth loads and for each new user)
-  useEffect(() => {
-    if (!authLoading && !prefsLoading && userPrefs && !isHydrated) {
-      if (userPrefs.language) {
+    if (!authLoading && !prefsLoading && userPrefs) {
+      if (userPrefs.language && userPrefs.language !== language) {
         setLanguage(userPrefs.language);
       }
-      if (userPrefs.currency) {
+      if (userPrefs.currency && userPrefs.currency !== currency) {
         setCurrency(userPrefs.currency);
       }
-      setIsHydrated(true);
     }
-  }, [userPrefs, authLoading, prefsLoading, isHydrated]);
+  }, [userPrefs, authLoading, prefsLoading]);
 
   const changeLanguage = (lang: Language) => {
     setLanguage(lang);

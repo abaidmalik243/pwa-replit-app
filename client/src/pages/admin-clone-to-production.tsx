@@ -50,7 +50,7 @@ export default function AdminCloneToProduction() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ confirmationText, prodDbUrl }),
+        body: JSON.stringify({ confirmationText: confirmText, prodDbUrl }),
       });
       if (!response.ok) {
         const error = await response.json();
@@ -341,8 +341,8 @@ export default function AdminCloneToProduction() {
 
         {/* Clone Status */}
         {cloneStatus && (
-          <Card className="p-6">
-            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+          <Card className="p-6" data-testid="card-clone-status">
+            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2" data-testid="text-clone-status-title">
               {cloneStatus.success ? (
                 <>
                   <CheckCircle2 className="w-6 h-6 text-green-500" />
@@ -358,7 +358,7 @@ export default function AdminCloneToProduction() {
             
             {cloneStatus.success ? (
               <div className="space-y-4">
-                <Alert>
+                <Alert data-testid="alert-clone-success">
                   <CheckCircle2 className="h-4 w-4" />
                   <AlertTitle>Success</AlertTitle>
                   <AlertDescription>
@@ -366,7 +366,12 @@ export default function AdminCloneToProduction() {
                   </AlertDescription>
                 </Alert>
                 {cloneStatus.message && (
-                  <p className="text-sm text-muted-foreground">{cloneStatus.message}</p>
+                  <p className="text-sm text-muted-foreground" data-testid="text-clone-message">{cloneStatus.message}</p>
+                )}
+                {cloneStatus.timestamp && (
+                  <p className="text-sm text-muted-foreground" data-testid="text-clone-timestamp">
+                    Completed at: {new Date(cloneStatus.timestamp).toLocaleString()}
+                  </p>
                 )}
               </div>
             ) : (

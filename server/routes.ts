@@ -4640,6 +4640,430 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Seed production data (admin only, idempotent - can be re-run safely)
+  app.post("/api/admin/seed-data", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      const results: any = {
+        branches: 0,
+        branchesSkipped: 0,
+        categories: 0,
+        categoriesSkipped: 0,
+        menuItems: 0,
+        menuItemsSkipped: 0,
+        staff: 0,
+        staffSkipped: 0,
+        riders: 0,
+        ridersSkipped: 0,
+        promos: 0,
+        promosSkipped: 0,
+        inventory: 0,
+        tables: 0,
+        tablesSkipped: 0,
+        errors: []
+      };
+
+      // 1. Create Branches
+      const branches = [
+        {
+          name: "Main Branch - Downtown",
+          city: "Karachi",
+          address: "123 Main Street, Downtown, Karachi",
+          phone: "+92-321-1234567",
+          isActive: true,
+        },
+        {
+          name: "North Branch - Gulshan",
+          city: "Karachi",
+          address: "456 Gulshan Avenue, Gulshan-e-Iqbal, Karachi",
+          phone: "+92-321-2345678",
+          isActive: true,
+        },
+        {
+          name: "South Branch - Clifton",
+          city: "Karachi",
+          address: "789 Clifton Road, Clifton Block 5, Karachi",
+          phone: "+92-321-3456789",
+          isActive: true,
+        }
+      ];
+
+      const createdBranches: any[] = [];
+      const allExistingBranches = await storage.getAllBranches();
+      
+      for (const branch of branches) {
+        try {
+          // Check if branch already exists by name
+          const exists = allExistingBranches.find(b => b.name === branch.name);
+          if (exists) {
+            createdBranches.push(exists);
+            results.branchesSkipped++;
+          } else {
+            const created = await storage.createBranch(branch);
+            createdBranches.push(created);
+            results.branches++;
+          }
+        } catch (e: any) {
+          results.errors.push(`Branch "${branch.name}": ${e.message}`);
+        }
+      }
+
+      if (createdBranches.length === 0) {
+        throw new Error("Failed to create branches");
+      }
+
+      const mainBranch = createdBranches[0];
+
+      // 2. Create Staff Users
+      const staffUsers = [
+        { username: "manager1", email: "manager@kebabish.com", password: "manager123", fullName: "Manager One", role: "staff", branchId: mainBranch.id },
+        { username: "cashier1", email: "cashier1@kebabish.com", password: "cashier123", fullName: "Cashier One", role: "staff", branchId: mainBranch.id },
+        { username: "kitchen1", email: "kitchen1@kebabish.com", password: "kitchen123", fullName: "Kitchen Staff", role: "staff", branchId: mainBranch.id },
+      ];
+
+      for (const user of staffUsers) {
+        try {
+          // Check if user already exists by email
+          const exists = await storage.getUserByEmail(user.email);
+          if (exists) {
+            results.staffSkipped++;
+          } else {
+            const hashedPassword = await bcrypt.hash(user.password, 10);
+            await storage.createUser({ ...user, password: hashedPassword });
+            results.staff++;
+          }
+        } catch (e: any) {
+          results.errors.push(`Staff "${user.email}": ${e.message}`);
+        }
+      }
+
+      // 3. Create Categories
+      const categories = [
+        { name: "Pizzas", description: "Delicious handcrafted pizzas", displayOrder: 1, isActive: true },
+        { name: "Burgers", description: "Juicy gourmet burgers", displayOrder: 2, isActive: true },
+        { name: "Sides", description: "Perfect sides to complement your meal", displayOrder: 3, isActive: true },
+        { name: "Beverages", description: "Refreshing drinks", displayOrder: 4, isActive: true },
+        { name: "Desserts", description: "Sweet treats", displayOrder: 5, isActive: true },
+      ];
+
+      const createdCategories: any[] = [];
+      const allExistingCategories = await storage.getAllCategories();
+      
+      for (const category of categories) {
+        try {
+          // Check if category already exists by name
+          const exists = allExistingCategories.find(c => c.name === category.name);
+          if (exists) {
+            createdCategories.push(exists);
+            results.categoriesSkipped++;
+          } else {
+            const created = await storage.createCategory(category);
+            createdCategories.push(created);
+            results.categories++;
+          }
+        } catch (e: any) {
+          results.errors.push(`Category "${category.name}": ${e.message}`);
+        }
+      }
+
+      // 4. Create Menu Items with Variants
+      const pizzaCategory = createdCategories.find(c => c.name === "Pizzas");
+      const burgerCategory = createdCategories.find(c => c.name === "Burgers");
+      const sidesCategory = createdCategories.find(c => c.name === "Sides");
+      const beveragesCategory = createdCategories.find(c => c.name === "Beverages");
+      const dessertsCategory = createdCategories.find(c => c.name === "Desserts");
+
+      const menuItems = [
+        // Pizzas
+        {
+          name: "Margherita Pizza",
+          description: "Classic tomato sauce, mozzarella, and basil",
+          categoryId: pizzaCategory.id,
+          price: "899",
+          isAvailable: true,
+          isVegetarian: true,
+          variants: JSON.stringify([
+            {
+              id: "size",
+              name: "Size",
+              required: true,
+              options: [
+                { id: "small", name: "Small (10\")", priceModifier: "0" },
+                { id: "medium", name: "Medium (12\")", priceModifier: "300" },
+                { id: "large", name: "Large (14\")", priceModifier: "500" }
+              ]
+            },
+            {
+              id: "crust",
+              name: "Crust",
+              required: true,
+              options: [
+                { id: "thin", name: "Thin Crust", priceModifier: "0" },
+                { id: "thick", name: "Thick Crust", priceModifier: "100" }
+              ]
+            }
+          ])
+        },
+        {
+          name: "Pepperoni Pizza",
+          description: "Loaded with pepperoni and mozzarella",
+          categoryId: pizzaCategory.id,
+          price: "1199",
+          isAvailable: true,
+          isVegetarian: false,
+          variants: JSON.stringify([
+            {
+              id: "size",
+              name: "Size",
+              required: true,
+              options: [
+                { id: "small", name: "Small (10\")", priceModifier: "0" },
+                { id: "medium", name: "Medium (12\")", priceModifier: "300" },
+                { id: "large", name: "Large (14\")", priceModifier: "500" }
+              ]
+            }
+          ])
+        },
+        // Burgers
+        {
+          name: "Classic Beef Burger",
+          description: "Juicy beef patty with lettuce, tomato, and special sauce",
+          categoryId: burgerCategory.id,
+          price: "599",
+          isAvailable: true,
+          isVegetarian: false,
+          variants: JSON.stringify([
+            {
+              id: "size",
+              name: "Size",
+              required: true,
+              options: [
+                { id: "single", name: "Single Patty", priceModifier: "0" },
+                { id: "double", name: "Double Patty", priceModifier: "200" }
+              ]
+            }
+          ])
+        },
+        {
+          name: "Chicken Burger",
+          description: "Crispy chicken fillet with mayo and lettuce",
+          categoryId: burgerCategory.id,
+          price: "549",
+          isAvailable: true,
+          isVegetarian: false,
+          variants: JSON.stringify([])
+        },
+        // Sides
+        {
+          name: "French Fries",
+          description: "Crispy golden fries",
+          categoryId: sidesCategory.id,
+          price: "199",
+          isAvailable: true,
+          isVegetarian: true,
+          variants: JSON.stringify([
+            {
+              id: "size",
+              name: "Size",
+              required: true,
+              options: [
+                { id: "regular", name: "Regular", priceModifier: "0" },
+                { id: "large", name: "Large", priceModifier: "100" }
+              ]
+            }
+          ])
+        },
+        {
+          name: "Onion Rings",
+          description: "Crispy battered onion rings",
+          categoryId: sidesCategory.id,
+          price: "249",
+          isAvailable: true,
+          isVegetarian: true,
+          variants: JSON.stringify([])
+        },
+        // Beverages
+        {
+          name: "Soft Drink",
+          description: "Coca-Cola, Sprite, or Fanta",
+          categoryId: beveragesCategory.id,
+          price: "99",
+          isAvailable: true,
+          isVegetarian: true,
+          variants: JSON.stringify([
+            {
+              id: "size",
+              name: "Size",
+              required: true,
+              options: [
+                { id: "regular", name: "Regular", priceModifier: "0" },
+                { id: "large", name: "Large", priceModifier: "50" }
+              ]
+            }
+          ])
+        },
+        {
+          name: "Fresh Juice",
+          description: "Orange or Mango juice",
+          categoryId: beveragesCategory.id,
+          price: "199",
+          isAvailable: true,
+          isVegetarian: true,
+          variants: JSON.stringify([])
+        },
+        // Desserts
+        {
+          name: "Chocolate Brownie",
+          description: "Warm chocolate brownie with vanilla ice cream",
+          categoryId: dessertsCategory.id,
+          price: "299",
+          isAvailable: true,
+          isVegetarian: true,
+          variants: JSON.stringify([])
+        }
+      ];
+
+      const allExistingMenuItems = await storage.getAllMenuItems();
+      
+      for (const item of menuItems) {
+        try {
+          // Check if menu item already exists by name
+          const exists = allExistingMenuItems.find(m => m.name === item.name);
+          if (exists) {
+            results.menuItemsSkipped++;
+          } else {
+            await storage.createMenuItem(item);
+            results.menuItems++;
+          }
+        } catch (e: any) {
+          results.errors.push(`Menu Item "${item.name}": ${e.message}`);
+        }
+      }
+
+      // 5. Create Riders
+      const riders = [
+        {
+          name: "Ahmed Khan",
+          phone: "+92-300-1111111",
+          vehicleNumber: "KHI-1234",
+          vehicleType: "motorcycle",
+          isActive: true,
+          isAvailable: true,
+          branchId: mainBranch.id,
+          currentLatitude: "24.8607",
+          currentLongitude: "67.0011"
+        },
+        {
+          name: "Hassan Ali",
+          phone: "+92-300-2222222",
+          vehicleNumber: "KHI-5678",
+          vehicleType: "motorcycle",
+          isActive: true,
+          isAvailable: true,
+          branchId: mainBranch.id,
+          currentLatitude: "24.8607",
+          currentLongitude: "67.0011"
+        }
+      ];
+
+      for (const rider of riders) {
+        try {
+          // Check if rider already exists by phone
+          const exists = await storage.getRiderByPhone(rider.phone);
+          if (exists) {
+            results.ridersSkipped++;
+          } else {
+            await storage.createRider(rider);
+            results.riders++;
+          }
+        } catch (e: any) {
+          results.errors.push(`Rider "${rider.name}": ${e.message}`);
+        }
+      }
+
+      // 6. Create Promotional Codes
+      const promos = [
+        {
+          code: "WELCOME10",
+          description: "Welcome discount - 10% off",
+          discountType: "percentage",
+          discountValue: "10",
+          minOrderAmount: "500",
+          maxDiscountAmount: "200",
+          validFrom: new Date(),
+          validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          usageLimit: 1000,
+          usedCount: 0,
+          isActive: true
+        },
+        {
+          code: "SAVE200",
+          description: "Flat 200 PKR off on orders above 1500",
+          discountType: "fixed",
+          discountValue: "200",
+          minOrderAmount: "1500",
+          maxDiscountAmount: "200",
+          validFrom: new Date(),
+          validUntil: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
+          usageLimit: 500,
+          usedCount: 0,
+          isActive: true
+        }
+      ];
+
+      const allExistingPromos = await storage.getAllPromoCodes();
+      
+      for (const promo of promos) {
+        try {
+          // Check if promo code already exists by code
+          const exists = allExistingPromos.find(p => p.code === promo.code);
+          if (exists) {
+            results.promosSkipped++;
+          } else {
+            await storage.createPromoCode(promo);
+            results.promos++;
+          }
+        } catch (e: any) {
+          results.errors.push(`Promo "${promo.code}": ${e.message}`);
+        }
+      }
+
+      // 7. Create POS Tables for dine-in
+      const tables = [
+        { tableName: "Table 1", tableNumber: 1, capacity: 2, status: "available", branchId: mainBranch.id },
+        { tableName: "Table 2", tableNumber: 2, capacity: 4, status: "available", branchId: mainBranch.id },
+        { tableName: "Table 3", tableNumber: 3, capacity: 4, status: "available", branchId: mainBranch.id },
+        { tableName: "Table 4", tableNumber: 4, capacity: 6, status: "available", branchId: mainBranch.id },
+        { tableName: "Table 5", tableNumber: 5, capacity: 8, status: "available", branchId: mainBranch.id },
+      ];
+
+      const allExistingTables = await storage.getPosTablesByBranch(mainBranch.id);
+      
+      for (const table of tables) {
+        try {
+          // Check if table already exists by table number
+          const exists = allExistingTables.find(t => t.tableNumber === table.tableNumber);
+          if (exists) {
+            results.tablesSkipped++;
+          } else {
+            await storage.createPosTable(table);
+            results.tables++;
+          }
+        } catch (e: any) {
+          results.errors.push(`Table ${table.tableNumber}: ${e.message}`);
+        }
+      }
+
+      res.json({
+        success: true,
+        message: "Production data seeded successfully",
+        results
+      });
+    } catch (error: any) {
+      console.error("Seeding error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

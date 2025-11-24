@@ -57,6 +57,7 @@ import AdminMarketingCampaigns from "@/pages/admin-marketing-campaigns";
 import AdminMarketingCampaignDetail from "@/pages/admin-marketing-campaign-detail";
 import AdminMessageTemplates from "@/pages/admin-message-templates";
 import AdminCustomerSegments from "@/pages/admin-customer-segments";
+import AdminSeedData from "@/pages/admin-seed-data";
 
 function Router() {
   return (
@@ -178,6 +179,11 @@ function Router() {
       <Route path="/admin/settings">
         <ProtectedRoute requireRole={["admin"]}>
           <AdminSettings />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/seed-data">
+        <ProtectedRoute requireRole={["admin"]}>
+          <AdminSeedData />
         </ProtectedRoute>
       </Route>
       <Route path="/admin/inventory">

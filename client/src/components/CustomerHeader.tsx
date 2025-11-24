@@ -2,6 +2,7 @@ import { ShoppingCart, Phone, Settings, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useLocation } from "wouter";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 interface CustomerHeaderProps {
   cartItemCount?: number;
@@ -59,6 +60,7 @@ export default function CustomerHeader({
         </div>
 
         <div className="flex items-center gap-2">
+          <LanguageSwitcher />
           <Button 
             variant="default"
             onClick={() => setLocation("/admin")}

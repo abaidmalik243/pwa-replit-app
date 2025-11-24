@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import type { Branch } from "@shared/schema";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 interface AdminHeaderProps {
   breadcrumbs: string[];
@@ -116,6 +117,8 @@ export default function AdminHeader({ breadcrumbs, notificationCount = 0, userNa
               </SelectContent>
             </Select>
           )}
+
+          <LanguageSwitcher />
 
           <Button size="icon" variant="ghost" className="relative" data-testid="button-notifications">
             <Bell className="h-4 w-4 md:h-5 md:w-5" />

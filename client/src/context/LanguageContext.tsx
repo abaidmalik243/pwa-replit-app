@@ -10,7 +10,7 @@ export type Currency = 'PKR' | 'USD' | 'AED' | 'SAR';
 
 export const LANGUAGES = {
   en: { name: 'English', nativeName: 'English', flag: '🇬🇧', dir: 'ltr' },
-  ur: { name: 'Urdu', nativeName: 'اردو', flag: '🇵🇰', dir: 'rtl' },
+  ur: { name: 'Urdu', nativeName: 'اردو', flag: '🇵🇰', dir: 'ltr' },
   ar: { name: 'Arabic', nativeName: 'العربية', flag: '🇸🇦', dir: 'rtl' },
 } as const;
 

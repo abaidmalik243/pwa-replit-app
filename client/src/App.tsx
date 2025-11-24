@@ -277,16 +277,16 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <LanguageProvider>
-        <AuthProvider>
+      <AuthProvider>
+        <LanguageProvider>
           <SocketProvider>
             <TooltipProvider>
               <Toaster />
               <Router />
             </TooltipProvider>
           </SocketProvider>
-        </AuthProvider>
-      </LanguageProvider>
+        </LanguageProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

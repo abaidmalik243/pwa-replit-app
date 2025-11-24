@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "wouter";
+import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import { ChevronLeft, Loader2 } from "lucide-react";
 import type { Branch } from "@shared/schema";
 
 export default function CustomerCheckout() {
-  const navigate = useNavigate();
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [customerName, setCustomerName] = useState("");
@@ -34,7 +34,7 @@ export default function CustomerCheckout() {
     const savedOrderInfo = localStorage.getItem("kebabish-order-info");
     
     if (!savedCart || !savedOrderInfo) {
-      navigate("/");
+      setLocation("/");
       return;
     }
 
@@ -42,9 +42,9 @@ export default function CustomerCheckout() {
       setCartData(JSON.parse(savedCart));
       setOrderInfo(JSON.parse(savedOrderInfo));
     } catch (e) {
-      navigate("/");
+      setLocation("/");
     }
-  }, [navigate]);
+  }, [setLocation]);
 
   // Fetch branches for delivery charges
   const { data: branches = [] } = useQuery<Branch[]>({
@@ -101,7 +101,7 @@ export default function CustomerCheckout() {
         notes,
       };
 
-      const response = await apiRequest("POST", "/api/orders", orderPayload);
+      const response = await apiRequest("POST", "/api/orders", orderPayload) as any;
 
       // Clear cart
       localStorage.removeItem("kebabish-cart");
@@ -112,14 +112,14 @@ export default function CustomerCheckout() {
       } else if (paymentMethod === "jazzcash") {
         // Store order ID for JazzCash verification
         localStorage.setItem("pending-order-id", response.id);
-        navigate("/payment-result?status=pending&method=jazzcash&orderId=" + response.id);
+        setLocation("/payment-result?status=pending&method=jazzcash&orderId=" + response.id);
       } else {
         // Cash payment - order confirmed
         toast({
           title: "Order placed successfully",
           description: `Order #${response.orderNumber} confirmed!`,
         });
-        navigate(`/account/orders`);
+        setLocation(`/account/orders`);
       }
     } catch (error: any) {
       toast({
@@ -138,7 +138,7 @@ export default function CustomerCheckout() {
         {/* Header */}
         <div className="sticky top-0 z-40 bg-background border-b">
           <div className="flex items-center gap-4 p-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/")} data-testid="button-back">
+            <Button variant="ghost" size="icon" onClick={() => setLocation("/")} data-testid="button-back">
               <ChevronLeft className="w-5 h-5" />
             </Button>
             <h1 className="text-2xl font-bold" data-testid="text-checkout-title">Checkout</h1>

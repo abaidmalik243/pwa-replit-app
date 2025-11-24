@@ -58,6 +58,7 @@ import AdminMarketingCampaignDetail from "@/pages/admin-marketing-campaign-detai
 import AdminMessageTemplates from "@/pages/admin-message-templates";
 import AdminCustomerSegments from "@/pages/admin-customer-segments";
 import AdminSeedData from "@/pages/admin-seed-data";
+import AdminCloneToProduction from "@/pages/admin-clone-to-production";
 
 function Router() {
   return (
@@ -184,6 +185,11 @@ function Router() {
       <Route path="/admin/seed-data">
         <ProtectedRoute requireRole={["admin"]}>
           <AdminSeedData />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/clone-to-production">
+        <ProtectedRoute requireRole={["admin"]}>
+          <AdminCloneToProduction />
         </ProtectedRoute>
       </Route>
       <Route path="/admin/inventory">

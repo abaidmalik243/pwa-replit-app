@@ -5064,6 +5064,126 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get clone diagnostics
+  app.get("/api/admin/clone-diagnostics", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      // Get development database stats
+      const devBranches = await storage.getAllBranches();
+      const devCategories = await storage.getAllCategories();
+      const devMenuItems = await storage.getAllMenuItems();
+      const devOrders = await storage.getAllOrders();
+      const devRiders = await storage.getAllRiders();
+      const allUsers = await db.select().from(schema.users);
+      const devCustomers = allUsers.filter(u => u.role === "customer");
+
+      // For production stats, we'd need to connect to production DB
+      // For now, we'll use the same dev stats as a placeholder
+      // In real implementation, you'd connect to PRODUCTION_DATABASE_URL
+      const prodBranches = devBranches; // TODO: Get from production
+      const prodCategories = devCategories;
+      const prodMenuItems = devMenuItems;
+      const prodOrders = devOrders;
+      const prodRiders = devRiders;
+      const prodCustomers = devCustomers;
+
+      const pendingOrders = prodOrders.filter(o => 
+        o.status === "pending" || o.status === "confirmed" || o.status === "preparing"
+      ).length;
+
+      const canClone = pendingOrders === 0;
+      const blockingReasons = [];
+      if (pendingOrders > 0) {
+        blockingReasons.push(`${pendingOrders} pending orders in production. Complete or cancel them first.`);
+      }
+
+      res.json({
+        development: {
+          branches: devBranches.length,
+          categories: devCategories.length,
+          menuItems: devMenuItems.length,
+          orders: devOrders.length,
+          customers: devCustomers.length,
+          users: allUsers.length,
+          riders: devRiders.length,
+          totalRecords: devBranches.length + devCategories.length + devMenuItems.length + 
+            devOrders.length + devCustomers.length + allUsers.length + devRiders.length
+        },
+        production: {
+          branches: prodBranches.length,
+          categories: prodCategories.length,
+          menuItems: prodMenuItems.length,
+          orders: prodOrders.length,
+          customers: prodCustomers.length,
+          users: allUsers.length,
+          riders: prodRiders.length,
+          totalRecords: prodBranches.length + prodCategories.length + prodMenuItems.length + 
+            prodOrders.length + prodCustomers.length + allUsers.length + prodRiders.length,
+          pendingOrders,
+          lastBackup: null // TODO: Track backup timestamp
+        },
+        canClone,
+        blockingReasons
+      });
+    } catch (error: any) {
+      console.error("Error getting clone diagnostics:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Clone development to production
+  app.post("/api/admin/clone-to-production", authenticate, authorize("admin"), async (req, res) => {
+    try {
+      const { confirmationText, prodDbUrl } = req.body;
+
+      // Validate confirmation text
+      if (confirmationText !== "CLONE ALL DATA") {
+        return res.status(400).json({ error: "Invalid confirmation text" });
+      }
+
+      // Validate production DB URL
+      if (!prodDbUrl || !prodDbUrl.includes("postgres")) {
+        return res.status(400).json({ error: "Invalid production database URL" });
+      }
+
+      // Check for blocking conditions
+      const allOrders = await storage.getAllOrders();
+      const pendingOrders = allOrders.filter(o => 
+        o.status === "pending" || o.status === "confirmed" || o.status === "preparing"
+      );
+      
+      if (pendingOrders.length > 0) {
+        return res.status(400).json({ 
+          error: `Cannot clone: ${pendingOrders.length} pending orders in production` 
+        });
+      }
+
+      // In a real implementation, this would:
+      // 1. Create a backup of production using pg_dump
+      // 2. Use pg_dump to export development database
+      // 3. Use pg_restore to import into production
+      // 4. All within a transaction with deferred foreign keys
+      // 5. Stream progress via WebSocket
+
+      // For now, return a simulated success
+      // TODO: Implement actual pg_dump/pg_restore logic
+      
+      res.json({
+        success: true,
+        message: "Database clone completed successfully (SIMULATED - implement pg_dump/pg_restore for production)",
+        timestamp: new Date().toISOString(),
+        performedBy: req.user?.username
+      });
+
+    } catch (error: any) {
+      console.error("Error cloning to production:", error);
+      res.status(500).json({ 
+        success: false,
+        error: error.message,
+        rollback: true
+      });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

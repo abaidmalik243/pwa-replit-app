@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AuthProvider } from "@/context/AuthContext";
 import { SocketProvider } from "@/context/SocketContext";
+import { LanguageProvider } from "@/context/LanguageContext";
 import NotFound from "@/pages/not-found";
 import CustomerHome from "@/pages/customer-home";
 import Login from "@/pages/login";
@@ -276,14 +277,16 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <SocketProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Router />
-          </TooltipProvider>
-        </SocketProvider>
-      </AuthProvider>
+      <LanguageProvider>
+        <AuthProvider>
+          <SocketProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Router />
+            </TooltipProvider>
+          </SocketProvider>
+        </AuthProvider>
+      </LanguageProvider>
     </QueryClientProvider>
   );
 }

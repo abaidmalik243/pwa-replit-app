@@ -175,6 +175,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(req.user);
   });
 
+  // Get user preferences
+  app.get("/api/user/preferences", authenticate, async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      
+      const user = await storage.getUser(req.user.id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      res.json({
+        language: user.language || 'en',
+        currency: user.currency || 'PKR',
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Failed to get preferences" });
+    }
+  });
+
+  // Update user preferences
+  app.patch("/api/user/preferences", authenticate, async (req, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const { language, currency } = req.body;
+      
+      // Validate language and currency values
+      const validLanguages = ['en', 'ur', 'ar'];
+      const validCurrencies = ['PKR', 'USD', 'AED', 'SAR'];
+      
+      if (language && !validLanguages.includes(language)) {
+        return res.status(400).json({ error: "Invalid language" });
+      }
+      
+      if (currency && !validCurrencies.includes(currency)) {
+        return res.status(400).json({ error: "Invalid currency" });
+      }
+      
+      // Update user preferences
+      const updatedUser = await storage.updateUser(req.user.id, {
+        ...(language && { language }),
+        ...(currency && { currency }),
+      });
+      
+      res.json({
+        language: updatedUser.language,
+        currency: updatedUser.currency,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Failed to update preferences" });
+    }
+  });
+
   // Logout - clear auth cookie
   app.post("/api/auth/logout", (req, res) => {
     res.clearCookie('authToken');

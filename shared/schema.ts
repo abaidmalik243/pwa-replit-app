@@ -33,6 +33,8 @@ export const users = pgTable("users", {
   role: text("role").notNull().default("customer"), // admin, staff, customer, rider
   permissions: text("permissions").array(), // Feature-based permissions (e.g., "manage_menu", "view_reports")
   branchId: varchar("branch_id").references(() => branches.id),
+  language: text("language").default("en"), // User's preferred language (en, ur, ar)
+  currency: text("currency").default("PKR"), // User's preferred currency (PKR, USD, AED, SAR)
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

@@ -87,6 +87,20 @@ Complete Socket.IO integration provides instant real-time updates across all ter
 - **WhatsApp API Integration**: System is ready for WhatsApp Business API integration - requires external service credentials (NOT Twilio for promotional messages per user requirement)
 - **Integration Note**: Campaign launch endpoint creates personalized recipients and updates campaign status. Actual WhatsApp message sending requires external API integration - credentials should be stored as secrets when ready.
 
+**Multi-Language & Localization System**: Complete internationalization (i18n) infrastructure supporting multiple languages and currencies with bidirectional text support. Features include:
+- **Language Support**: English (en), Urdu (ur), and Arabic (ar) with full UI translations
+- **RTL Support**: Automatic right-to-left layout for Arabic using CSS logical properties and dynamic `dir` attribute
+- **Currency Options**: PKR (Pakistani Rupee), USD (US Dollar), AED (UAE Dirham), SAR (Saudi Riyal) with locale-aware formatting via `Intl.NumberFormat`
+- **LanguageContext Provider**: Centralized state management using React Context with AuthContext integration
+- **Backend Persistence**: User preferences (language, currency) stored in PostgreSQL `users` table
+- **Dual Storage Strategy**: Immediate localStorage persistence + authenticated user backend sync via `/api/user/preferences` endpoints
+- **Differential Sync**: Server preferences automatically sync on login, refetch, and cross-session updates without infinite loops
+- **Error Handling**: Toast notifications for failed preference saves with graceful fallback to localStorage
+- **LanguageSwitcher Component**: Dropdown UI in header with flag icons and currency selection
+- **Translation Infrastructure**: react-i18next with JSON translation files in `/client/public/locales/{en,ur,ar}/translation.json`
+- **Authentication Integration**: Uses AuthContext for reliable auth detection and user-scoped query caching
+- **Query Optimization**: User-scoped query keys `['/api/user/preferences', user?.id]` prevent cross-user cache leakage
+
 ## External Dependencies
 
 ### UI Component Libraries
@@ -116,6 +130,12 @@ Complete Socket.IO integration provides instant real-time updates across all ter
 -   nanoid
 -   cmdk
 
+### Internationalization
+-   react-i18next
+-   i18next
+-   i18next-browser-languagedetector
+-   i18next-http-backend
+
 ### Fonts
 -   Google Fonts (Architects Daughter, DM Sans, Fira Code, Geist Mono)
 
@@ -135,7 +155,8 @@ Complete Socket.IO integration provides instant real-time updates across all ter
 - Advanced analytics dashboard (sales, customers, products, peak hours)
 - JazzCash payment monitoring and admin dashboard
 - Staff Shift & Schedule Management - Scheduling, attendance tracking, overtime calculation, shift-based reporting
-- **WhatsApp Marketing Campaigns** (NEW) - Campaign management, message templates, customer segmentation, audience targeting
+- WhatsApp Marketing Campaigns - Campaign management, message templates, customer segmentation, audience targeting
+- **Multi-Language & Localization** (NEW) - English, Urdu, Arabic with RTL support; PKR, USD, AED, SAR currencies; backend persistence
 - Real-time WebSocket communication
 - Role-based access control (Admin, Staff, Customer, Rider)
 - Staff shift-based POS sessions
@@ -158,6 +179,5 @@ Complete Socket.IO integration provides instant real-time updates across all ter
 2. Third-party integrations (Foodpanda, Careem, QuickBooks)
 3. Subscription and premium membership tiers
 4. Advanced customer service (chatbot, live chat)
-5. Multi-language support (Urdu, Arabic)
 
 For complete feature documentation, see `FEATURES_DOCUMENTATION.md`

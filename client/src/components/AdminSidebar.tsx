@@ -7,9 +7,10 @@ interface AdminSidebarProps {
   soundEnabled?: boolean;
   onToggleSound?: () => void;
   onLogout?: () => void;
+  onNavigate?: () => void;
 }
 
-export default function AdminSidebar({ soundEnabled = true, onToggleSound, onLogout }: AdminSidebarProps) {
+export default function AdminSidebar({ soundEnabled = true, onToggleSound, onLogout, onNavigate }: AdminSidebarProps) {
   const [location] = useLocation();
 
   const menuItems = [
@@ -49,7 +50,7 @@ export default function AdminSidebar({ soundEnabled = true, onToggleSound, onLog
   ];
 
   return (
-    <div className="flex flex-col h-full bg-sidebar border-r border-sidebar-border">
+    <div className="flex flex-col h-full w-64 bg-sidebar border-r border-sidebar-border">
       <div className="p-6 flex items-center gap-2 flex-shrink-0">
         <span className="text-2xl">🍕</span>
         <h2 className="text-xl font-bold text-sidebar-primary" data-testid="text-admin-logo">Kebabish Pizza</h2>
@@ -67,6 +68,7 @@ export default function AdminSidebar({ soundEnabled = true, onToggleSound, onLog
                   variant="ghost"
                   className={`w-full justify-start gap-3 ${isActive ? 'bg-sidebar-accent' : ''}`}
                   data-testid={`button-nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+                  onClick={onNavigate}
                 >
                   <Icon className="h-5 w-5" />
                   <span>{item.label}</span>

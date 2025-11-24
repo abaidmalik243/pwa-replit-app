@@ -28,6 +28,7 @@ export default function AdminCategories() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const { toast } = useToast();
 
   const { data: categories = [], isLoading } = useQuery<Category[]>({
@@ -114,11 +115,18 @@ export default function AdminCategories() {
 
   return (
     <div className="flex h-screen bg-background">
-      <div className="w-64">
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden" 
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      <div className={`fixed md:static inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <AdminSidebar
           soundEnabled={false}
           onToggleSound={() => {}}
           onLogout={() => localStorage.removeItem("user")}
+          onNavigate={() => setSidebarOpen(false)}
         />
       </div>
 
@@ -127,6 +135,7 @@ export default function AdminCategories() {
           breadcrumbs={["Admin", "Categories"]}
           notificationCount={0}
           userName="Admin User"
+          onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
         />
 
         <main className="flex-1 overflow-y-auto p-6">

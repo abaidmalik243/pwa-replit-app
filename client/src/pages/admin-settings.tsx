@@ -1,3 +1,4 @@
+import { useState } from "react";
 import AdminSidebar from "@/components/AdminSidebar";
 import AdminHeader from "@/components/AdminHeader";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 
 export default function AdminSettings() {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const { toast } = useToast();
 
   const handleSave = () => {
@@ -19,7 +21,13 @@ export default function AdminSettings() {
 
   return (
     <div className="flex h-screen bg-background">
-      <div className="w-64">
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden" 
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      <div className={`fixed md:static inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <AdminSidebar
           soundEnabled={false}
           onToggleSound={() => {}}
@@ -27,6 +35,7 @@ export default function AdminSettings() {
             localStorage.removeItem("user");
             window.location.href = "/";
           }}
+          onNavigate={() => setSidebarOpen(false)}
         />
       </div>
 
@@ -35,6 +44,7 @@ export default function AdminSettings() {
           breadcrumbs={["Admin", "Settings"]}
           notificationCount={0}
           userName="Admin User"
+          onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
         />
 
         <main className="flex-1 overflow-y-auto p-6">

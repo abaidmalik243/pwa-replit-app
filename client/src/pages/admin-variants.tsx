@@ -313,6 +313,7 @@ export default function AdminVariants() {
           soundEnabled={soundEnabled}
           onToggleSound={() => setSoundEnabled(!soundEnabled)}
           onLogout={logout}
+          onNavigate={() => setSidebarOpen(false)}
         />
       </div>
 

@@ -279,7 +279,10 @@ export default function AdminShifts() {
         />
       )}
       <div className={`fixed md:static inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
-        <AdminSidebar onLogout={logout} />
+        <AdminSidebar 
+          onLogout={logout}
+          onNavigate={() => setSidebarOpen(false)}
+        />
       </div>
       
       <div className="flex-1 flex flex-col overflow-hidden">

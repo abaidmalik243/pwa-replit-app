@@ -41,6 +41,7 @@ import CustomerAddresses from "@/pages/customer-addresses";
 import CustomerFavorites from "@/pages/customer-favorites";
 import CustomerLoyalty from "@/pages/customer-loyalty";
 import CustomerOrders from "@/pages/customer-orders";
+import CustomerCheckout from "@/pages/customer-checkout";
 import AdminInventory from "@/pages/admin-inventory";
 import AdminSuppliers from "@/pages/admin-suppliers";
 import AdminRefunds from "@/pages/admin-refunds";
@@ -268,6 +269,9 @@ function Router() {
         <ProtectedRoute requireRole={["customer"]}>
           <CustomerOrders />
         </ProtectedRoute>
+      </Route>
+      <Route path="/checkout">
+        <CustomerCheckout />
       </Route>
       <Route component={NotFound} />
     </Switch>

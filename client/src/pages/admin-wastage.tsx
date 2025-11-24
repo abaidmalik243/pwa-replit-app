@@ -120,7 +120,7 @@ export default function AdminWastage() {
     createWastageMutation.mutate(payload);
   };
 
-  const totalWastageCost = isLoading ? 0 : wastage.reduce((sum, item) => sum + (item.estimatedCost || 0), 0);
+  const totalWastageCost = wastage.reduce((sum, item) => sum + (item.estimatedCost || 0), 0);
   const mostCommonReason = isLoading || wastage.length === 0 ? "-" : wastageTypeLabels[wastage[0].wastageType];
 
   return (

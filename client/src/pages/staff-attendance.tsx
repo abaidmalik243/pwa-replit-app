@@ -157,7 +157,7 @@ export default function StaffAttendance() {
   };
 
   const getShiftName = (shiftId: string) => {
-    return shifts.find(s => s.id === shiftId)?.name || "Unknown Shift";
+    return shifts.find(s => s.id === shiftId)?.shiftName || "Unknown Shift";
   };
 
   const calculateElapsedTime = () => {
@@ -169,16 +169,28 @@ export default function StaffAttendance() {
     return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   };
 
+  const isLoading = activeLoading || recordsLoading;
+
   return (
-    <div className="flex h-screen w-full">
-      <AdminSidebar open={sidebarOpen} onOpenChange={setSidebarOpen} />
+    <div className="flex h-screen bg-background">
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden" 
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      <div className={`fixed md:static inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        <AdminSidebar
+          onLogout={logout}
+        />
+      </div>
       
-      <div className="flex flex-col flex-1 overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden">
         <AdminHeader
-          sidebarOpen={sidebarOpen}
-          setSidebarOpen={setSidebarOpen}
-          user={user}
-          logout={logout}
+          breadcrumbs={["Staff", "Attendance Tracking"]}
+          notificationCount={0}
+          userName={user?.username || "Staff User"}
+          onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
         />
 
         <main className="flex-1 overflow-auto p-4">
@@ -327,7 +339,7 @@ export default function StaffAttendance() {
                         >
                           <div className="space-y-1">
                             <div className="font-medium">
-                              {shift ? shift.name : "Unknown Shift"}
+                              {shift ? shift.shiftName : "Unknown Shift"}
                             </div>
                             <div className="text-sm text-muted-foreground">
                               {format(new Date(record.clockInTime), "MMM d, yyyy - h:mm a")}

@@ -23,12 +23,12 @@ import type { StaffShift, ShiftAssignment, User, Branch } from "@shared/schema";
 
 // Shift template schema
 const shiftSchema = z.object({
-  name: z.string().min(1, "Shift name is required"),
+  shiftName: z.string().min(1, "Shift name is required"),
   branchId: z.string().min(1, "Branch is required"),
   startTime: z.string().min(1, "Start time is required"),
   endTime: z.string().min(1, "End time is required"),
-  durationMinutes: z.string().min(1).transform(val => parseInt(val, 10)),
-  breakDurationMinutes: z.string().optional().transform(val => val ? parseInt(val, 10) : 0),
+  durationMinutes: z.number().min(1, "Duration is required"),
+  breakDurationMinutes: z.number().optional().default(0),
   overtimeMultiplier: z.string().optional().default("1.5"),
   isActive: z.boolean().default(true),
 });
@@ -58,24 +58,24 @@ export default function AdminShifts() {
   const [selectedBranchFilter, setSelectedBranchFilter] = useState<string>("all");
 
   // Fetch all branches
-  const { data: branches = [] } = useQuery<Branch[]>({
+  const { data: branches = [], isLoading: branchesLoading } = useQuery<Branch[]>({
     queryKey: ["/api/branches"],
   });
 
   // Fetch all shifts
-  const { data: shifts = [] } = useQuery<StaffShift[]>({
+  const { data: shifts = [], isLoading: shiftsLoading } = useQuery<StaffShift[]>({
     queryKey: ["/api/shifts"],
   });
 
   // Fetch staff users
-  const { data: staffUsers = [] } = useQuery<User[]>({
+  const { data: staffUsers = [], isLoading: staffLoading } = useQuery<User[]>({
     queryKey: ["/api/users"],
     select: (users) => users.filter(u => u.role === "staff" || u.role === "admin"),
   });
 
   // Fetch shift assignments for the selected week
   const weekEnd = endOfWeek(selectedWeekStart);
-  const { data: assignments = [] } = useQuery<ShiftAssignment[]>({
+  const { data: assignments = [], isLoading: assignmentsLoading } = useQuery<ShiftAssignment[]>({
     queryKey: ["/api/shift-assignments", { searchParams: { 
       startDate: selectedWeekStart.toISOString(),
       endDate: weekEnd.toISOString(),
@@ -98,12 +98,12 @@ export default function AdminShifts() {
   const shiftForm = useForm<ShiftFormData>({
     resolver: zodResolver(shiftSchema),
     defaultValues: {
-      name: "",
+      shiftName: "",
       branchId: user?.branchId || "",
       startTime: "09:00",
       endTime: "17:00",
-      durationMinutes: "480",
-      breakDurationMinutes: "60",
+      durationMinutes: 480,
+      breakDurationMinutes: 60,
       overtimeMultiplier: "1.5",
       isActive: true,
     },
@@ -190,12 +190,12 @@ export default function AdminShifts() {
   const handleEditShift = (shift: StaffShift) => {
     setSelectedShift(shift);
     shiftForm.reset({
-      name: shift.name,
+      shiftName: shift.shiftName,
       branchId: shift.branchId,
       startTime: shift.startTime,
       endTime: shift.endTime,
-      durationMinutes: shift.durationMinutes.toString(),
-      breakDurationMinutes: (shift.breakDurationMinutes || 0).toString(),
+      durationMinutes: shift.durationMinutes,
+      breakDurationMinutes: shift.breakDurationMinutes || 0,
       overtimeMultiplier: shift.overtimeMultiplier || "1.5",
       isActive: shift.isActive ?? true,
     });
@@ -246,13 +246,13 @@ export default function AdminShifts() {
 
   // Get shift name by ID
   const getShiftName = (shiftId: string) => {
-    return shifts.find(s => s.id === shiftId)?.name || "Unknown";
+    return shifts.find(s => s.id === shiftId)?.shiftName || "Unknown";
   };
 
   // Get user name by ID
   const getUserName = (userId: string) => {
     const user = staffUsers.find(u => u.id === userId);
-    return user ? `${user.firstName} ${user.lastName}` : "Unknown";
+    return user?.fullName || user?.username || "Unknown";
   };
 
   // Get assignments for a specific day
@@ -268,20 +268,30 @@ export default function AdminShifts() {
     ? shifts 
     : shifts.filter(s => s.branchId === selectedBranchFilter);
 
+  const isLoading = branchesLoading || shiftsLoading || staffLoading || assignmentsLoading;
+
   return (
-    <div className="flex h-screen w-full">
-      <AdminSidebar open={sidebarOpen} onOpenChange={setSidebarOpen} />
+    <div className="flex h-screen bg-background">
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden" 
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      <div className={`fixed md:static inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        <AdminSidebar onLogout={logout} />
+      </div>
       
-      <div className="flex flex-col flex-1 overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden">
         <AdminHeader
-          sidebarOpen={sidebarOpen}
-          setSidebarOpen={setSidebarOpen}
-          user={user}
-          logout={logout}
+          breadcrumbs={["Admin", "Shift Management"]}
+          notificationCount={0}
+          userName={user?.username || "Admin User"}
+          onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
         />
 
-        <main className="flex-1 overflow-auto p-4">
-          <div className="max-w-7xl mx-auto space-y-4">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+          <div className="space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <h1 className="text-3xl font-bold" data-testid="text-page-title">Staff Shift Management</h1>
@@ -374,7 +384,7 @@ export default function AdminShifts() {
                                   data-testid={`card-assignment-${assignment.id}`}
                                 >
                                   <div className="font-medium truncate">{getUserName(assignment.userId)}</div>
-                                  <div className="text-muted-foreground truncate">{shift?.name}</div>
+                                  <div className="text-muted-foreground truncate">{shift?.shiftName}</div>
                                   <div className="text-muted-foreground">{shift?.startTime} - {shift?.endTime}</div>
                                   <Badge 
                                     variant={
@@ -419,7 +429,7 @@ export default function AdminShifts() {
                       <CardHeader>
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1">
-                            <CardTitle className="text-lg">{shift.name}</CardTitle>
+                            <CardTitle className="text-lg">{shift.shiftName}</CardTitle>
                             <CardDescription>{getBranchName(shift.branchId)}</CardDescription>
                           </div>
                           <div className="flex gap-1">
@@ -485,7 +495,7 @@ export default function AdminShifts() {
             <form onSubmit={shiftForm.handleSubmit(onShiftSubmit)} className="space-y-4">
               <FormField
                 control={shiftForm.control}
-                name="name"
+                name="shiftName"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Shift Name</FormLabel>
@@ -633,7 +643,7 @@ export default function AdminShifts() {
                       <SelectContent>
                         {shifts.map(shift => (
                           <SelectItem key={shift.id} value={shift.id}>
-                            {shift.name} ({shift.startTime} - {shift.endTime})
+                            {shift.shiftName} ({shift.startTime} - {shift.endTime})
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -658,7 +668,7 @@ export default function AdminShifts() {
                       <SelectContent>
                         {staffUsers.map(user => (
                           <SelectItem key={user.id} value={user.id}>
-                            {user.firstName} {user.lastName}
+                            {user.fullName || user.username}
                           </SelectItem>
                         ))}
                       </SelectContent>

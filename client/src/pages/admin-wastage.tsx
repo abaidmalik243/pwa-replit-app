@@ -120,7 +120,8 @@ export default function AdminWastage() {
     createWastageMutation.mutate(payload);
   };
 
-  const totalWastageCost = wastage.reduce((sum, item) => sum + (item.estimatedCost || 0), 0);
+  const totalWastageCost = isLoading ? 0 : wastage.reduce((sum, item) => sum + (item.estimatedCost || 0), 0);
+  const mostCommonReason = isLoading || wastage.length === 0 ? "-" : wastageTypeLabels[wastage[0].wastageType];
 
   return (
     <div className="flex h-screen bg-background">
@@ -132,8 +133,6 @@ export default function AdminWastage() {
       )}
       <div className={`fixed md:static inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <AdminSidebar
-          soundEnabled={false}
-          onToggleSound={() => {}}
           onLogout={logout}
         />
       </div>
@@ -156,7 +155,7 @@ export default function AdminWastage() {
               <Trash2 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold" data-testid="text-total-wastage">{wastage.length}</div>
+              <div className="text-2xl font-bold" data-testid="text-total-wastage">{isLoading ? "-" : wastage.length}</div>
             </CardContent>
           </Card>
 
@@ -167,7 +166,7 @@ export default function AdminWastage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-red-600" data-testid="text-total-cost">
-                ₨{totalWastageCost.toFixed(2)}
+                ₨{isLoading ? "-" : totalWastageCost.toFixed(2)}
               </div>
             </CardContent>
           </Card>
@@ -179,7 +178,7 @@ export default function AdminWastage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold" data-testid="text-common-reason">
-                {wastage.length > 0 ? wastageTypeLabels[wastage[0].wastageType] : "-"}
+                {mostCommonReason}
               </div>
             </CardContent>
           </Card>

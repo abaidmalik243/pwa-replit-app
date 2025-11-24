@@ -20,18 +20,18 @@ export default function AdminShiftReports() {
   const monthEnd = endOfMonth(new Date(selectedMonth));
 
   // Fetch branches
-  const { data: branches = [] } = useQuery<Branch[]>({
+  const { data: branches = [], isLoading: branchesLoading } = useQuery<Branch[]>({
     queryKey: ["/api/branches"],
   });
 
   // Fetch staff users
-  const { data: staffUsers = [] } = useQuery<User[]>({
+  const { data: staffUsers = [], isLoading: staffLoading } = useQuery<User[]>({
     queryKey: ["/api/users"],
     select: (users) => users.filter(u => u.role === "staff" || u.role === "admin"),
   });
 
   // Fetch attendance records for the selected month
-  const { data: attendanceRecords = [] } = useQuery<ShiftAttendance[]>({
+  const { data: attendanceRecords = [], isLoading: attendanceLoading } = useQuery<ShiftAttendance[]>({
     queryKey: ["/api/attendance", selectedMonth],
     queryFn: async () => {
       const response = await fetch("/api/attendance");
@@ -45,7 +45,7 @@ export default function AdminShiftReports() {
   });
 
   // Fetch shift assignments
-  const { data: assignments = [] } = useQuery<ShiftAssignment[]>({
+  const { data: assignments = [], isLoading: assignmentsLoading } = useQuery<ShiftAssignment[]>({
     queryKey: ["/api/shift-assignments", { searchParams: {
       startDate: monthStart.toISOString(),
       endDate: monthEnd.toISOString(),
@@ -62,7 +62,7 @@ export default function AdminShiftReports() {
   });
 
   // Fetch overtime records
-  const { data: overtimeRecords = [] } = useQuery<OvertimeRecord[]>({
+  const { data: overtimeRecords = [], isLoading: overtimeLoading } = useQuery<OvertimeRecord[]>({
     queryKey: ["/api/overtime", { searchParams: {
       startDate: monthStart.toISOString(),
       endDate: monthEnd.toISOString(),
@@ -78,19 +78,21 @@ export default function AdminShiftReports() {
     },
   });
 
-  // Calculate metrics
-  const totalShiftsScheduled = assignments.length;
-  const completedShifts = assignments.filter(a => a.status === "completed").length;
-  const totalHoursWorked = attendanceRecords.reduce((sum, record) => {
+  const isLoading = branchesLoading || staffLoading || attendanceLoading || assignmentsLoading || overtimeLoading;
+
+  // Calculate metrics (only when data is loaded)
+  const totalShiftsScheduled = isLoading ? 0 : assignments.length;
+  const completedShifts = isLoading ? 0 : assignments.filter(a => a.status === "completed").length;
+  const totalHoursWorked = isLoading ? 0 : attendanceRecords.reduce((sum, record) => {
     return sum + (record.totalMinutesWorked || 0);
   }, 0) / 60;
-  const totalOvertimeHours = attendanceRecords.reduce((sum, record) => {
+  const totalOvertimeHours = isLoading ? 0 : attendanceRecords.reduce((sum, record) => {
     return sum + (record.overtimeMinutes || 0);
   }, 0) / 60;
-  const completionRate = totalShiftsScheduled > 0 ? (completedShifts / totalShiftsScheduled) * 100 : 0;
+  const completionRate = isLoading || totalShiftsScheduled === 0 ? 0 : (completedShifts / totalShiftsScheduled) * 100;
 
-  // Staff performance data
-  const staffPerformance = staffUsers.map(staff => {
+  // Staff performance data (only when data is loaded)
+  const staffPerformance = isLoading ? [] : staffUsers.map(staff => {
     const staffAttendance = attendanceRecords.filter(a => a.userId === staff.id);
     const staffAssignments = assignments.filter(a => a.userId === staff.id);
     const staffOvertime = overtimeRecords.filter(o => o.userId === staff.id);
@@ -101,7 +103,7 @@ export default function AdminShiftReports() {
 
     return {
       userId: staff.id,
-      name: `${staff.firstName} ${staff.lastName}`,
+      name: staff.fullName || staff.username,
       totalShifts: staffAssignments.length,
       completedShifts: completedCount,
       totalHours: totalMinutes / 60,
@@ -120,18 +122,35 @@ export default function AdminShiftReports() {
   });
 
   return (
-    <div className="flex h-screen w-full">
-      <AdminSidebar open={sidebarOpen} onOpenChange={setSidebarOpen} />
+    <div className="flex h-screen bg-background">
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden" 
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      <div className={`fixed md:static inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        <AdminSidebar onLogout={logout} />
+      </div>
       
-      <div className="flex flex-col flex-1 overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden">
         <AdminHeader
-          sidebarOpen={sidebarOpen}
-          setSidebarOpen={setSidebarOpen}
-          user={user}
-          logout={logout}
+          breadcrumbs={["Admin", "Shift Reports"]}
+          notificationCount={0}
+          userName={user?.username || "Admin User"}
+          onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
         />
 
-        <main className="flex-1 overflow-auto p-4">
+        {isLoading ? (
+          <main className="flex-1 overflow-auto p-4">
+            <div className="max-w-7xl mx-auto">
+              <div className="text-center py-12">
+                <div className="text-lg text-muted-foreground">Loading shift reports...</div>
+              </div>
+            </div>
+          </main>
+        ) : (
+          <main className="flex-1 overflow-auto p-4">
           <div className="max-w-7xl mx-auto space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
@@ -298,7 +317,7 @@ export default function AdminShiftReports() {
                         >
                           <div>
                             <div className="font-medium">
-                              {staff ? `${staff.firstName} ${staff.lastName}` : "Unknown Staff"}
+                              {staff ? (staff.fullName || staff.username) : "Unknown Staff"}
                             </div>
                             <div className="text-sm text-muted-foreground">
                               {format(new Date(record.calculationDate), "MMM d, yyyy")}
@@ -324,6 +343,7 @@ export default function AdminShiftReports() {
             )}
           </div>
         </main>
+        )}
       </div>
     </div>
   );

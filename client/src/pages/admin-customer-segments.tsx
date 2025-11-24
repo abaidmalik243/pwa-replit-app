@@ -14,6 +14,9 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
+import AdminSidebar from "@/components/AdminSidebar";
+import AdminHeader from "@/components/AdminHeader";
+import { useAuth } from "@/context/AuthContext";
 
 const segmentSchema = z.object({
   name: z.string().min(1, "Segment name is required"),
@@ -24,6 +27,9 @@ type SegmentFormData = z.infer<typeof segmentSchema>;
 
 export default function AdminCustomerSegments() {
   const { toast } = useToast();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const { logout } = useAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSegment, setEditingSegment] = useState<any>(null);
 
@@ -157,12 +163,36 @@ export default function AdminCustomerSegments() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold" data-testid="text-page-title">Customer Segments</h1>
-          <p className="text-muted-foreground mt-1">Create and manage customer segments for targeted campaigns</p>
-        </div>
+    <div className="flex h-screen bg-background">
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden" 
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      <div className={`fixed md:static inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        <AdminSidebar
+          soundEnabled={soundEnabled}
+          onToggleSound={() => setSoundEnabled(!soundEnabled)}
+          onLogout={logout}
+        />
+      </div>
+
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <AdminHeader
+          breadcrumbs={["Admin", "Customer Segments"]}
+          notificationCount={0}
+          userName="Admin User"
+          onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
+        />
+
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold" data-testid="text-page-title">Customer Segments</h1>
+                <p className="text-muted-foreground mt-1">Create and manage customer segments for targeted campaigns</p>
+              </div>
         <Button onClick={() => handleOpenDialog()} data-testid="button-create-segment">
           <Plus className="h-4 w-4 mr-2" />
           Create Segment
@@ -319,6 +349,9 @@ export default function AdminCustomerSegments() {
           </Form>
         </DialogContent>
       </Dialog>
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

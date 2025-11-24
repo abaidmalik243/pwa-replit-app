@@ -7,6 +7,9 @@ import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { useSocketEvent } from "@/context/SocketContext";
 import { queryClient } from "@/lib/queryClient";
+import AdminSidebar from "@/components/AdminSidebar";
+import AdminHeader from "@/components/AdminHeader";
+import { useAuth } from "@/context/AuthContext";
 
 type Rider = {
   id: string;
@@ -47,6 +50,9 @@ type Branch = {
 };
 
 export default function AdminRiderTracking() {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const { logout } = useAuth();
   const [selectedBranch, setSelectedBranch] = useState<string>("all");
 
   const { data: riders = [], isLoading: ridersLoading } = useQuery<Rider[]>({
@@ -126,11 +132,35 @@ export default function AdminRiderTracking() {
   }
 
   return (
-    <div className="space-y-6" data-testid="page-rider-tracking">
-      <div>
-        <h1 className="text-3xl font-bold">Live Rider Tracking</h1>
-        <p className="text-muted-foreground">Monitor active riders and deliveries in real-time</p>
+    <div className="flex h-screen bg-background">
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden" 
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      <div className={`fixed md:static inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        <AdminSidebar
+          soundEnabled={soundEnabled}
+          onToggleSound={() => setSoundEnabled(!soundEnabled)}
+          onLogout={logout}
+        />
       </div>
+
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <AdminHeader
+          breadcrumbs={["Admin", "Rider Tracking"]}
+          notificationCount={0}
+          userName="Admin User"
+          onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
+        />
+
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+          <div className="space-y-6" data-testid="page-rider-tracking">
+            <div>
+              <h1 className="text-3xl font-bold">Live Rider Tracking</h1>
+              <p className="text-muted-foreground">Monitor active riders and deliveries in real-time</p>
+            </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -408,6 +438,9 @@ export default function AdminRiderTracking() {
           </CardContent>
         </Card>
       )}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

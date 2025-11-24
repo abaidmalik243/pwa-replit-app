@@ -3,6 +3,9 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import AdminSidebar from "@/components/AdminSidebar";
+import AdminHeader from "@/components/AdminHeader";
+import { useAuth } from "@/context/AuthContext";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -65,6 +68,9 @@ interface VariantOption {
 
 export default function AdminVariants() {
   const { toast } = useToast();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const { logout } = useAuth();
   const [isGroupDialogOpen, setIsGroupDialogOpen] = useState(false);
   const [isOptionDialogOpen, setIsOptionDialogOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<VariantGroup | null>(null);
@@ -295,15 +301,39 @@ export default function AdminVariants() {
   };
 
   return (
-    <div className="flex-1 overflow-auto p-8" data-testid="page-admin-variants">
-      <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Variant Management</h1>
-            <p className="text-muted-foreground mt-2">
-              Manage menu item variant groups (e.g., Size, Crust) and their options (e.g., Small, Medium, Large)
-            </p>
-          </div>
+    <div className="flex h-screen bg-background">
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden" 
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      <div className={`fixed md:static inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        <AdminSidebar
+          soundEnabled={soundEnabled}
+          onToggleSound={() => setSoundEnabled(!soundEnabled)}
+          onLogout={logout}
+        />
+      </div>
+
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <AdminHeader
+          breadcrumbs={["Admin", "Variants"]}
+          notificationCount={0}
+          userName="Admin User"
+          onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
+        />
+
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+          <div data-testid="page-admin-variants">
+            <div className="max-w-7xl mx-auto space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-3xl font-bold tracking-tight">Variant Management</h1>
+                  <p className="text-muted-foreground mt-2">
+                    Manage menu item variant groups (e.g., Size, Crust) and their options (e.g., Small, Medium, Large)
+                  </p>
+                </div>
           <Dialog open={isGroupDialogOpen} onOpenChange={(open) => {
             setIsGroupDialogOpen(open);
             if (!open) {
@@ -794,6 +824,9 @@ export default function AdminVariants() {
               })}
           </div>
         )}
+      </div>
+          </div>
+        </main>
       </div>
     </div>
   );

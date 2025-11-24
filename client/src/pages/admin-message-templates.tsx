@@ -14,6 +14,9 @@ import { Plus, Edit, Trash2, Copy, MessageSquare } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import AdminSidebar from "@/components/AdminSidebar";
+import AdminHeader from "@/components/AdminHeader";
+import { useAuth } from "@/context/AuthContext";
 
 const templateSchema = z.object({
   name: z.string().min(1, "Template name is required"),
@@ -25,6 +28,9 @@ type TemplateFormData = z.infer<typeof templateSchema>;
 
 export default function AdminMessageTemplates() {
   const { toast } = useToast();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const { logout } = useAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<any>(null);
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -187,12 +193,36 @@ export default function AdminMessageTemplates() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold" data-testid="text-page-title">Message Templates</h1>
-          <p className="text-muted-foreground mt-1">Create reusable message templates for campaigns</p>
-        </div>
+    <div className="flex h-screen bg-background">
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden" 
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      <div className={`fixed md:static inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        <AdminSidebar
+          soundEnabled={soundEnabled}
+          onToggleSound={() => setSoundEnabled(!soundEnabled)}
+          onLogout={logout}
+        />
+      </div>
+
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <AdminHeader
+          breadcrumbs={["Admin", "Message Templates"]}
+          notificationCount={0}
+          userName="Admin User"
+          onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
+        />
+
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold" data-testid="text-page-title">Message Templates</h1>
+                <p className="text-muted-foreground mt-1">Create reusable message templates for campaigns</p>
+              </div>
         <Button onClick={() => handleOpenDialog()} data-testid="button-create-template">
           <Plus className="h-4 w-4 mr-2" />
           Create Template
@@ -411,6 +441,9 @@ export default function AdminMessageTemplates() {
           </Form>
         </DialogContent>
       </Dialog>
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

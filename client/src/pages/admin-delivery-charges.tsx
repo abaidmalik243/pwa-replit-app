@@ -9,9 +9,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Save, Settings } from "lucide-react";
 import type { Branch, DeliveryChargesConfig } from "@shared/schema";
+import AdminSidebar from "@/components/AdminSidebar";
+import AdminHeader from "@/components/AdminHeader";
+import { useAuth } from "@/context/AuthContext";
 
 export default function AdminDeliveryCharges() {
   const { toast } = useToast();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const { logout } = useAuth();
   const [selectedBranchId, setSelectedBranchId] = useState<string>("");
 
   // Fetch branches
@@ -111,12 +117,36 @@ export default function AdminDeliveryCharges() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold" data-testid="text-page-title">Delivery Charges Configuration</h1>
-          <p className="text-muted-foreground">Manage delivery charges for each branch</p>
-        </div>
+    <div className="flex h-screen bg-background">
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden" 
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      <div className={`fixed md:static inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        <AdminSidebar
+          soundEnabled={soundEnabled}
+          onToggleSound={() => setSoundEnabled(!soundEnabled)}
+          onLogout={logout}
+        />
+      </div>
+
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <AdminHeader
+          breadcrumbs={["Admin", "Delivery Charges"]}
+          notificationCount={0}
+          userName="Admin User"
+          onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
+        />
+
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold" data-testid="text-page-title">Delivery Charges Configuration</h1>
+                <p className="text-muted-foreground">Manage delivery charges for each branch</p>
+              </div>
       </div>
 
       <div className="grid gap-6">
@@ -338,6 +368,9 @@ export default function AdminDeliveryCharges() {
             </CardContent>
           </Card>
         )}
+      </div>
+          </div>
+        </main>
       </div>
     </div>
   );

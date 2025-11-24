@@ -7,9 +7,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Send, Calendar, Users, CheckCircle2, XCircle, Clock, Target, MessageSquare } from "lucide-react";
 import { format } from "date-fns";
+import AdminSidebar from "@/components/AdminSidebar";
+import AdminHeader from "@/components/AdminHeader";
+import { useAuth } from "@/context/AuthContext";
 
 export default function AdminMarketingCampaigns() {
   const [, setLocation] = useLocation();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const { logout } = useAuth();
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
   const { data: campaigns, isLoading } = useQuery<any[]>({
@@ -68,12 +74,36 @@ export default function AdminMarketingCampaigns() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold" data-testid="text-page-title">Marketing Campaigns</h1>
-          <p className="text-muted-foreground mt-1">Create and manage WhatsApp promotional campaigns</p>
-        </div>
+    <div className="flex h-screen bg-background">
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden" 
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      <div className={`fixed md:static inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        <AdminSidebar
+          soundEnabled={soundEnabled}
+          onToggleSound={() => setSoundEnabled(!soundEnabled)}
+          onLogout={logout}
+        />
+      </div>
+
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <AdminHeader
+          breadcrumbs={["Admin", "Marketing Campaigns"]}
+          notificationCount={0}
+          userName="Admin User"
+          onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
+        />
+
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold" data-testid="text-page-title">Marketing Campaigns</h1>
+                <p className="text-muted-foreground mt-1">Create and manage WhatsApp promotional campaigns</p>
+              </div>
         <Button onClick={() => setLocation("/admin/marketing-campaigns/new")} data-testid="button-create-campaign">
           <Plus className="h-4 w-4 mr-2" />
           Create Campaign
@@ -231,6 +261,9 @@ export default function AdminMarketingCampaigns() {
           )}
         </TabsContent>
       </Tabs>
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

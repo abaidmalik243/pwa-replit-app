@@ -11,9 +11,14 @@ import { useToast } from "@/hooks/use-toast";
 import { useSocketEvent } from "@/context/SocketContext";
 import type { Order } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
+import AdminSidebar from "@/components/AdminSidebar";
+import AdminHeader from "@/components/AdminHeader";
+import { useAuth } from "@/context/AuthContext";
 
 export default function KitchenDisplay() {
   const { toast } = useToast();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { logout } = useAuth();
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [soundEnabled, setSoundEnabled] = useState(() => {
     const stored = localStorage.getItem("kds-sound-enabled");
@@ -190,44 +195,68 @@ export default function KitchenDisplay() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-background">
-      {/* Header */}
-      <div className="border-b bg-card">
-        <div className="flex items-center justify-between p-4">
-          <div className="flex items-center gap-3">
-            <ChefHat className="w-8 h-8 text-primary" />
-            <div>
-              <h1 className="text-2xl font-bold" data-testid="heading-kds">Kitchen Display</h1>
-              <p className="text-sm text-muted-foreground">
-                {filteredOrders.length} {filteredOrders.length === 1 ? 'order' : 'orders'}
-              </p>
-            </div>
-          </div>
+    <div className="flex h-screen bg-background">
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden" 
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      <div className={`fixed md:static inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        <AdminSidebar
+          soundEnabled={soundEnabled}
+          onToggleSound={toggleSound}
+          onLogout={logout}
+        />
+      </div>
 
-          <div className="flex items-center gap-3">
-            {/* Status filter */}
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-40" data-testid="select-status-filter">
-                <Filter className="w-4 h-4 mr-2" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Orders</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="preparing">Preparing</SelectItem>
-                <SelectItem value="ready">Ready</SelectItem>
-              </SelectContent>
-            </Select>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <AdminHeader
+          breadcrumbs={["Admin", "Kitchen Display"]}
+          notificationCount={0}
+          userName="Admin User"
+          onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
+        />
 
-            {/* Sound toggle */}
-            <Button
-              size="icon"
-              variant="outline"
-              onClick={toggleSound}
-              data-testid="button-toggle-sound"
-            >
-              {soundEnabled ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
-            </Button>
+        <main className="flex-1 overflow-y-auto">
+          <div className="flex flex-col h-full bg-background">
+            {/* Header */}
+            <div className="border-b bg-card">
+              <div className="flex items-center justify-between p-4">
+                <div className="flex items-center gap-3">
+                  <ChefHat className="w-8 h-8 text-primary" />
+                  <div>
+                    <h1 className="text-2xl font-bold" data-testid="heading-kds">Kitchen Display</h1>
+                    <p className="text-sm text-muted-foreground">
+                      {filteredOrders.length} {filteredOrders.length === 1 ? 'order' : 'orders'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  {/* Status filter */}
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-40" data-testid="select-status-filter">
+                      <Filter className="w-4 h-4 mr-2" />
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Orders</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="preparing">Preparing</SelectItem>
+                      <SelectItem value="ready">Ready</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {/* Sound toggle */}
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={toggleSound}
+                    data-testid="button-toggle-sound"
+                  >
+                    {soundEnabled ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
+                  </Button>
 
             {/* Stats */}
             <div className="flex gap-4 px-4 border-l">
@@ -380,6 +409,9 @@ export default function KitchenDisplay() {
           )}
         </div>
       </ScrollArea>
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

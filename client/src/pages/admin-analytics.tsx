@@ -6,54 +6,92 @@ import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area, X
 import { TrendingUp, TrendingDown, Users, ShoppingCart, DollarSign, Package, Clock, Star } from "lucide-react";
 import { useState } from "react";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
+import AdminSidebar from "@/components/AdminSidebar";
+import AdminHeader from "@/components/AdminHeader";
+import { useAuth } from "@/context/AuthContext";
 
 const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
 export default function AdminAnalytics() {
   const [timeRange, setTimeRange] = useState("7");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const { logout } = useAuth();
 
-  const { data: salesTrends } = useQuery({
+  const { data: salesTrends, isLoading: loadingSales } = useQuery({
     queryKey: ["/api/analytics/sales-trends", { searchParams: { days: timeRange } }],
   });
 
-  const { data: customerAnalytics } = useQuery({
+  const { data: customerAnalytics, isLoading: loadingCustomers } = useQuery({
     queryKey: ["/api/analytics/customer-behavior", { searchParams: { days: timeRange } }],
   });
 
-  const { data: productPerformance } = useQuery({
+  const { data: productPerformance, isLoading: loadingProducts } = useQuery({
     queryKey: ["/api/analytics/product-performance", { searchParams: { days: timeRange } }],
   });
 
-  const { data: peakHours } = useQuery({
+  const { data: peakHours, isLoading: loadingHours } = useQuery({
     queryKey: ["/api/analytics/peak-hours", { searchParams: { days: timeRange } }],
   });
 
-  const { data: overview } = useQuery({
+  const { data: overview, isLoading: loadingOverview } = useQuery({
     queryKey: ["/api/analytics/overview", { searchParams: { days: timeRange } }],
   });
 
+  const isLoading = loadingSales || loadingCustomers || loadingProducts || loadingHours || loadingOverview;
+
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">Advanced Analytics</h1>
-            <p className="text-muted-foreground">
-              Comprehensive insights into sales, customers, and performance
-            </p>
-          </div>
-          <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-40" data-testid="select-timerange">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7">Last 7 Days</SelectItem>
-              <SelectItem value="30">Last 30 Days</SelectItem>
-              <SelectItem value="90">Last 90 Days</SelectItem>
-              <SelectItem value="365">Last Year</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+    <div className="flex h-screen bg-background">
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden" 
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      <div className={`fixed md:static inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        <AdminSidebar
+          soundEnabled={soundEnabled}
+          onToggleSound={() => setSoundEnabled(!soundEnabled)}
+          onLogout={logout}
+        />
+      </div>
+
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <AdminHeader
+          breadcrumbs={["Admin", "Advanced Analytics"]}
+          notificationCount={0}
+          userName="Admin User"
+          onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
+        />
+
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+          <div className="max-w-7xl mx-auto space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl md:text-3xl font-bold mb-2">Advanced Analytics</h1>
+                <p className="text-muted-foreground text-sm md:text-base">
+                  Comprehensive insights into sales, customers, and performance
+                </p>
+              </div>
+              <Select value={timeRange} onValueChange={setTimeRange}>
+                <SelectTrigger className="w-40" data-testid="select-timerange">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">Last 7 Days</SelectItem>
+                  <SelectItem value="30">Last 30 Days</SelectItem>
+                  <SelectItem value="90">Last 90 Days</SelectItem>
+                  <SelectItem value="365">Last Year</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {isLoading ? (
+              <div className="text-center py-12 text-muted-foreground">
+                Loading analytics data...
+              </div>
+            ) : (
+              <>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
@@ -443,6 +481,10 @@ export default function AdminAnalytics() {
             </Card>
           </TabsContent>
         </Tabs>
+            </>
+            )}
+          </div>
+        </main>
       </div>
     </div>
   );

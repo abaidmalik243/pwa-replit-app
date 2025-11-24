@@ -3,6 +3,9 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import AdminSidebar from "@/components/AdminSidebar";
+import AdminHeader from "@/components/AdminHeader";
+import { useAuth } from "@/context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -71,6 +74,9 @@ type Delivery = {
 
 export default function AdminDeliveries() {
   const { toast } = useToast();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const { logout } = useAuth();
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [selectedRiderId, setSelectedRiderId] = useState("");
@@ -220,12 +226,36 @@ export default function AdminDeliveries() {
   }
 
   return (
-    <div className="p-6 space-y-6" data-testid="page-admin-deliveries">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Delivery Management</h1>
-        <p className="text-muted-foreground">Assign riders and track deliveries</p>
+    <div className="flex h-screen bg-background">
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden" 
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      <div className={`fixed md:static inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        <AdminSidebar
+          soundEnabled={soundEnabled}
+          onToggleSound={() => setSoundEnabled(!soundEnabled)}
+          onLogout={logout}
+        />
       </div>
+
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <AdminHeader
+          breadcrumbs={["Admin", "Deliveries"]}
+          notificationCount={0}
+          userName="Admin User"
+          onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
+        />
+
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+          <div className="space-y-6" data-testid="page-admin-deliveries">
+            {/* Header */}
+            <div className="mb-6">
+              <h1 className="text-3xl font-bold">Delivery Management</h1>
+              <p className="text-muted-foreground">Assign riders and track deliveries</p>
+            </div>
 
       <div className="space-y-6">
         {/* Unassigned Orders */}
@@ -523,6 +553,9 @@ export default function AdminDeliveries() {
           </div>
         </DialogContent>
       </Dialog>
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

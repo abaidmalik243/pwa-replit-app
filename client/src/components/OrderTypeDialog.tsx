@@ -151,7 +151,7 @@ export default function OrderTypeDialog({ isOpen, onClose, branches, onSelect, c
                     (orderType === "pickup" || (orderType === "delivery" && (deliveryAreas.length === 0 || selectedArea)));
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={false} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md" data-testid="dialog-order-type">
         <VisuallyHidden>
           <DialogTitle>Select Order Type and Location</DialogTitle>

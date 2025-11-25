@@ -25,7 +25,69 @@ export default function OrderTypeDialog({ isOpen, onClose, branches, onSelect, c
   const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
   const [locationMessage, setLocationMessage] = useState<string>("");
 
-  const cities = Array.from(new Set(branches.filter(b => b.isActive).map(b => b.city)));
+  // const cities = Array.from(new Set(branches.filter(b => b.isActive).map(b => b.city)));
+
+  const cities = [
+  {
+    "id": "35aa7683-e846-4f85-a135-14982b00f6d5",
+    "name": "Kebabish Pizza Sahiwal",
+    "city": "Sahiwal",
+    "address": "Civil Lines, Sahiwal",
+    "phone": "+92-300-2345678",
+    "is_active": true,
+    "delivery_areas": [
+      "Farid Town",
+      "Allama Iqbal Colony",
+      "Civil Lines",
+      "High Street",
+      "Jinnah Colony"
+    ],
+    "logo_url": null,
+    "primary_color": null,
+    "latitude": "30.6708000",
+    "longitude": "73.1116000"
+  },
+  {
+    "id": "dd54d237-0f8b-4b71-94c0-fa14be3159b7",
+    "name": "Kebabish Pizza Faisalabad",
+    "city": "Faisalabad",
+    "address": "Kohinoor City, Faisalabad",
+    "phone": "+92-300-3456789",
+    "is_active": true,
+    "delivery_areas": [
+      "D-Ground",
+      "Peoples Colony",
+      "Susan Road",
+      "Madina Town",
+      "Gulberg"
+    ],
+    "logo_url": null,
+    "primary_color": null,
+    "latitude": "31.4180000",
+    "longitude": "73.0790000"
+  },
+  {
+    "id": "e225ab39-ce72-4170-89b5-8dc5bff3f2c3",
+    "name": "Kebabish Pizza Okara",
+    "city": "Okara",
+    "address": "Ravi Road opp JS Bank, Okara",
+    "phone": "+92-306-4966646",
+    "is_active": true,
+    "delivery_areas": [
+      "City Center",
+      "Model Town",
+      "Satellite Town",
+      "Sadar Bazaar",
+      "Civil Lines",
+      "M.A Jinnah Road",
+      "Gallah Mandi"
+    ],
+    "logo_url": "",
+    "primary_color": "",
+    "latitude": "30.8081000",
+    "longitude": "73.4534000"
+  }
+];
 
   const filteredBranches = selectedCity
     ? branches.filter(b => b.city === selectedCity && b.isActive)
@@ -151,7 +213,7 @@ export default function OrderTypeDialog({ isOpen, onClose, branches, onSelect, c
                     (orderType === "pickup" || (orderType === "delivery" && (deliveryAreas.length === 0 || selectedArea)));
 
   return (
-    <Dialog open={false} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md" data-testid="dialog-order-type">
         <VisuallyHidden>
           <DialogTitle>Select Order Type and Location</DialogTitle>

@@ -1,4 +1,5 @@
 import { Phone, Mail, MapPin } from "lucide-react";
+import { Link } from "wouter";
 
 export default function Footer() {
   return (
@@ -67,8 +68,21 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="border-t mt-8 pt-8 text-center text-sm text-muted-foreground">
-          <p>&copy; {new Date().getFullYear()} Kebabish Pizza. All rights reserved.</p>
+        <div className="border-t mt-8 pt-8 text-center">
+          <div className="flex flex-wrap items-center justify-center gap-2 mb-3 text-sm">
+            <Link href="/terms-conditions">
+              <span className="text-muted-foreground hover:text-primary transition-colors hover-elevate px-3 py-1 rounded cursor-pointer" data-testid="link-terms-conditions">
+                Terms & Conditions
+              </span>
+            </Link>
+            <span className="text-muted-foreground">|</span>
+            <Link href="/privacy-policy">
+              <span className="text-muted-foreground hover:text-primary transition-colors hover-elevate px-3 py-1 rounded cursor-pointer" data-testid="link-privacy-policy">
+                Privacy Policy
+              </span>
+            </Link>
+          </div>
+          <p className="text-sm text-muted-foreground">&copy; {new Date().getFullYear()} Kebabish Pizza. All rights reserved.</p>
         </div>
       </div>
     </footer>

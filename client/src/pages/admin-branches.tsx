@@ -6,12 +6,13 @@ import AdminHeader from "@/components/AdminHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
 import { Plus, Pencil, Trash2, MapPin, Phone, Building2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -38,6 +39,7 @@ export default function AdminBranches() {
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
   const [newArea, setNewArea] = useState("");
   const { toast } = useToast();
+  const { logout } = useAuth();
 
   const { data: branches = [], isLoading } = useQuery<Branch[]>({
     queryKey: ["/api/branches"],
@@ -61,7 +63,7 @@ export default function AdminBranches() {
 
   const createMutation = useMutation({
     mutationFn: async (data: BranchForm) => {
-      const res = await apiRequest("POST", "/api/branches", data);
+      const res = await apiRequest("/api/branches", "POST", data);
       return await res.json();
     },
     onSuccess: () => {
@@ -77,7 +79,7 @@ export default function AdminBranches() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: BranchForm }) => {
-      const res = await apiRequest("PUT", `/api/branches/${id}`, data);
+      const res = await apiRequest(`/api/branches/${id}`, "PUT", data);
       return await res.json();
     },
     onSuccess: () => {
@@ -93,7 +95,7 @@ export default function AdminBranches() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await apiRequest("DELETE", `/api/branches/${id}`);
+      const res = await apiRequest(`/api/branches/${id}`, "DELETE");
       return await res.json();
     },
     onSuccess: () => {
@@ -159,7 +161,7 @@ export default function AdminBranches() {
         <AdminSidebar
           soundEnabled={true}
           onToggleSound={() => {}}
-          onLogout={() => console.log("Logout")}
+          onLogout={logout}
         />
       </div>
 
@@ -194,6 +196,9 @@ export default function AdminBranches() {
               <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>{editingBranch ? "Edit Branch" : "Add New Branch"}</DialogTitle>
+                  <DialogDescription>
+                    {editingBranch ? "Update the branch details and delivery areas." : "Create a new branch location with delivery coverage areas."}
+                  </DialogDescription>
                 </DialogHeader>
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">

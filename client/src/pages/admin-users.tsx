@@ -6,7 +6,7 @@ import AdminHeader from "@/components/AdminHeader";
 import UserRoleTable, { UserData } from "@/components/UserRoleTable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -15,6 +15,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
 import type { User, Branch } from "@shared/schema";
 
 const userFormSchema = z.object({
@@ -44,6 +45,7 @@ export default function AdminUsers() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { toast } = useToast();
+  const { logout } = useAuth();
 
   const { data: dbUsers = [], isLoading } = useQuery<User[]>({
     queryKey: ["/api/users"],
@@ -77,7 +79,7 @@ export default function AdminUsers() {
 
   const createMutation = useMutation({
     mutationFn: async (data: UserForm) => {
-      const res = await apiRequest("POST", "/api/users", data);
+      const res = await apiRequest("/api/users", "POST", data);
       return await res.json();
     },
     onSuccess: () => {
@@ -93,7 +95,7 @@ export default function AdminUsers() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<UserForm> }) => {
-      const res = await apiRequest("PUT", `/api/users/${id}`, data);
+      const res = await apiRequest(`/api/users/${id}`, "PUT", data);
       return await res.json();
     },
     onSuccess: () => {
@@ -110,7 +112,7 @@ export default function AdminUsers() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await apiRequest("DELETE", `/api/users/${id}`);
+      const res = await apiRequest(`/api/users/${id}`, "DELETE");
       return await res.json();
     },
     onSuccess: () => {
@@ -176,7 +178,7 @@ export default function AdminUsers() {
         <AdminSidebar
           soundEnabled={soundEnabled}
           onToggleSound={() => setSoundEnabled(!soundEnabled)}
-          onLogout={() => console.log("Logout")}
+          onLogout={logout}
         />
       </div>
 
@@ -211,6 +213,9 @@ export default function AdminUsers() {
               <DialogContent className="max-w-md">
                 <DialogHeader>
                   <DialogTitle>{editingUser ? "Edit User" : "Add New User"}</DialogTitle>
+                  <DialogDescription>
+                    {editingUser ? "Update user account details and permissions." : "Create a new user account with role and branch assignment."}
+                  </DialogDescription>
                 </DialogHeader>
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">

@@ -44,6 +44,7 @@ export default function AdminExpenses() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedBranch, setSelectedBranch] = useState<string>("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const { toast } = useToast();
 
   const { data: branches = [] } = useQuery<Branch[]>({
@@ -73,7 +74,7 @@ export default function AdminExpenses() {
 
   const createMutation = useMutation({
     mutationFn: async (data: ExpenseForm) => {
-      const res = await apiRequest("POST", "/api/expenses", {
+      const res = await apiRequest("/api/expenses", "POST", {
         ...data,
         amount: data.amount,
         date: new Date(data.date).toISOString(),
@@ -113,11 +114,18 @@ export default function AdminExpenses() {
 
   return (
     <div className="flex h-screen bg-background">
-      <div className="w-64">
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden" 
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      <div className={`fixed md:static inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <AdminSidebar
           soundEnabled={false}
           onToggleSound={() => {}}
           onLogout={() => localStorage.removeItem("user")}
+          onNavigate={() => setSidebarOpen(false)}
         />
       </div>
 
@@ -126,6 +134,7 @@ export default function AdminExpenses() {
           breadcrumbs={["Admin", "Expenses"]}
           notificationCount={0}
           userName="Admin User"
+          onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
         />
 
         <main className="flex-1 overflow-y-auto p-6">

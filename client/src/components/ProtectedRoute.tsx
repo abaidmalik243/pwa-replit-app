@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useLocation } from "wouter";
+import { useAuth } from "@/context/AuthContext";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -12,36 +13,39 @@ export function ProtectedRoute({
   requireAuth = true,
   requireRole 
 }: ProtectedRouteProps) {
+  const { user, isLoading, isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    if (requireAuth) {
-      const userStr = localStorage.getItem("user");
-      if (!userStr) {
-        setLocation("/login");
+    // Wait for auth state to load
+    if (isLoading) return;
+
+    if (requireAuth && !isAuthenticated) {
+      setLocation("/login");
+      return;
+    }
+
+    if (requireRole && user) {
+      if (!requireRole.includes(user.role)) {
+        setLocation("/");
         return;
       }
-
-      if (requireRole) {
-        const user = JSON.parse(userStr);
-        if (!requireRole.includes(user.role)) {
-          setLocation("/");
-          return;
-        }
-      }
     }
-  }, [requireAuth, requireRole, setLocation]);
+  }, [requireAuth, requireRole, user, isAuthenticated, isLoading, setLocation]);
 
-  const userStr = localStorage.getItem("user");
-  if (requireAuth && !userStr) {
+  // Show nothing while loading
+  if (isLoading) {
     return null;
   }
 
-  if (requireRole && userStr) {
-    const user = JSON.parse(userStr);
-    if (!requireRole.includes(user.role)) {
-      return null;
-    }
+  // Not authenticated
+  if (requireAuth && !isAuthenticated) {
+    return null;
+  }
+
+  // Wrong role
+  if (requireRole && user && !requireRole.includes(user.role)) {
+    return null;
   }
 
   return <>{children}</>;

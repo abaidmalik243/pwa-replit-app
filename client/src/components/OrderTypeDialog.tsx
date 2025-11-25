@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MapPin } from "lucide-react";
@@ -65,15 +65,24 @@ export default function OrderTypeDialog({ isOpen, onClose, branches, onSelect, c
   }, [selectedCity, filteredBranches]);
 
   const handleSelect = () => {
-    if (!selectedBranch) return;
-
-    // Validate branch belongs to selected city
-    if (selectedBranch.city !== selectedCity) return;
-
-    if (orderType === "delivery" && !selectedArea) {
+    console.log("[OrderTypeDialog] handleSelect called", { selectedBranch, selectedCity, selectedArea, orderType });
+    if (!selectedBranch) {
+      console.warn("[OrderTypeDialog] No branch selected");
       return;
     }
 
+    // Validate branch belongs to selected city
+    if (selectedBranch.city !== selectedCity) {
+      console.warn("[OrderTypeDialog] Branch city mismatch");
+      return;
+    }
+
+    if (orderType === "delivery" && !selectedArea) {
+      console.warn("[OrderTypeDialog] No area selected for delivery");
+      return;
+    }
+
+    console.log("[OrderTypeDialog] Calling onSelect with:", orderType, selectedBranch.id, selectedArea);
     onSelect(orderType, selectedBranch.id, selectedArea);
     onClose();
   };
@@ -118,11 +127,12 @@ export default function OrderTypeDialog({ isOpen, onClose, branches, onSelect, c
           }
         });
 
-        if (nearestBranch) {
-          setSelectedCity(nearestBranch.city);
-          setSelectedBranch(nearestBranch);
+        if (nearestBranch !== null) {
+          const branch: Branch = nearestBranch;
+          setSelectedCity(branch.city);
+          setSelectedBranch(branch);
           setSelectedArea(""); // Clear area to force user confirmation
-          setLocationMessage(`Found nearest branch: ${nearestBranch.name}`);
+          setLocationMessage(`Found nearest branch: ${branch.name}`);
         }
       },
       (error) => {
@@ -138,13 +148,16 @@ export default function OrderTypeDialog({ isOpen, onClose, branches, onSelect, c
 
   const canProceed = selectedBranch && 
                     selectedBranch.city === selectedCity && 
-                    (orderType === "pickup" || (orderType === "delivery" && selectedArea));
+                    (orderType === "pickup" || (orderType === "delivery" && (deliveryAreas.length === 0 || selectedArea)));
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md" data-testid="dialog-order-type">
         <VisuallyHidden>
           <DialogTitle>Select Order Type and Location</DialogTitle>
+          <DialogDescription>
+            Choose delivery or pickup and select your preferred branch location.
+          </DialogDescription>
         </VisuallyHidden>
         <div className="flex flex-col items-center gap-6 py-4">
           <div className="flex items-center gap-2">

@@ -5,6 +5,8 @@ import AdminSidebar from "@/components/AdminSidebar";
 import AdminHeader from "@/components/AdminHeader";
 import OrderCard, { Order } from "@/components/OrderCard";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
+import { useSocketEvent } from "@/context/SocketContext";
 import { playNotificationSound } from "@/lib/notificationSound";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,13 +18,22 @@ export default function AdminDashboard() {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { toast } = useToast();
+  const { logout } = useAuth();
   const previousPendingCount = useRef(0);
   const hasInitialized = useRef(false);
 
-  // Fetch orders from API
+  // Fetch orders from API (WebSocket real-time updates)
   const { data: dbOrders = [], isLoading } = useQuery<DBOrder[]>({
     queryKey: ["/api/orders"],
-    refetchInterval: 30000, // Refetch every 30 seconds for new orders
+  });
+
+  // Real-time order updates via WebSocket
+  useSocketEvent<DBOrder>("order:created", (order) => {
+    queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+  });
+
+  useSocketEvent<DBOrder>("order:statusUpdated", (order) => {
+    queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
   });
 
   // Transform DB orders to match OrderCard format
@@ -40,7 +51,7 @@ export default function AdminDashboard() {
   // Update order status mutation
   const updateOrderMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const res = await apiRequest("PUT", `/api/orders/${id}`, { status });
+      const res = await apiRequest(`/api/orders/${id}`, "PUT", { status });
       return await res.json();
     },
     onSuccess: () => {
@@ -226,7 +237,7 @@ export default function AdminDashboard() {
         <AdminSidebar
           soundEnabled={soundEnabled}
           onToggleSound={() => setSoundEnabled(!soundEnabled)}
-          onLogout={() => console.log("Logout")}
+          onLogout={logout}
         />
       </div>
 

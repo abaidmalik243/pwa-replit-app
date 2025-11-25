@@ -7,11 +7,15 @@ import Footer from "@/components/Footer";
 import CategoryFilter from "@/components/CategoryFilter";
 import MenuItemCard, { MenuItem } from "@/components/MenuItemCard";
 import CartDrawer, { CartItem } from "@/components/CartDrawer";
+import ItemCustomizationDialog, { VariantGroup, CustomizationSelection } from "@/components/ItemCustomizationDialog";
 import OrderTypeDialog from "@/components/OrderTypeDialog";
 import OrderConfirmationDialog, { OrderDetails } from "@/components/OrderConfirmationDialog";
+import { CustomerJazzCashDialog } from "@/components/CustomerJazzCashDialog";
+import { JazzCashPaymentGateway } from "@/components/JazzCashPaymentGateway";
+import ScrollToTop from "@/components/ScrollToTop";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Search, TrendingUp } from "lucide-react";
 import type { MenuItem as DBMenuItem, Category, Branch } from "@shared/schema";
 
 import burgerImage from "@assets/generated_images/Gourmet_burger_hero_image_fed670c3.png";
@@ -40,9 +44,18 @@ export default function CustomerHome() {
   const [isConfirmationOpen, setIsConfirmationOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
+  const [isCustomizationOpen, setIsCustomizationOpen] = useState(false);
+  const [selectedMenuItem, setSelectedMenuItem] = useState<MenuItem | null>(null);
   const [orderType, setOrderType] = useState<"delivery" | "pickup">("delivery");
   const [selectedBranchId, setSelectedBranchId] = useState<string>("");
   const [selectedArea, setSelectedArea] = useState<string>("");
+  const [showJazzCashDialog, setShowJazzCashDialog] = useState(false);
+  const [showJazzCashGateway, setShowJazzCashGateway] = useState(false);
+  const [pendingJazzCashOrder, setPendingJazzCashOrder] = useState<{
+    id: string;
+    orderNumber: string;
+    total: number;
+  } | null>(null);
   const { toast } = useToast();
 
   // Fetch branches from API
@@ -58,6 +71,18 @@ export default function CustomerHome() {
   // Fetch categories from API
   const { data: dbCategories = [] } = useQuery<Category[]>({
     queryKey: ["/api/categories"],
+  });
+
+  // Fetch bestselling items from API with configurable timeframe (30 days, top 6 items)
+  const { data: bestsellingItems = [], isLoading: bestsellingLoading } = useQuery<(DBMenuItem & { orderCount: number })[]>({
+    queryKey: ["/api/menu-items/bestselling", selectedBranchId, { days: 30, limit: 6 }],
+    queryFn: async () => {
+      const res = await fetch(`/api/menu-items/bestselling/${selectedBranchId}?days=30&limit=6`);
+      if (!res.ok) throw new Error("Failed to fetch bestselling items");
+      return res.json();
+    },
+    enabled: !!selectedBranchId && selectedBranchId !== "",
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 
   // Check if user has already selected location
@@ -102,16 +127,21 @@ export default function CustomerHome() {
   // Transform database menu items to component format
   const menuItems: MenuItem[] = dbMenuItems
     .filter((item) => item.isAvailable)
-    .map((item) => ({
-      id: item.id,
-      name: item.name,
-      description: item.description || "",
-      price: parseFloat(item.price),
-      image: item.imageUrl || Object.values(defaultImages)[0],
-      category: dbCategories.find((c) => c.id === item.categoryId)?.name || "Other",
-      isVegetarian: false,
-      isAvailable: item.isAvailable,
-    }));
+    .map((item) => {
+      const categoryName = dbCategories.find((c) => c.id === item.categoryId)?.name || "Other";
+      const hasVariants = categoryName === "Pizzas" || categoryName === "Fries";
+      return {
+        id: item.id,
+        name: item.name,
+        description: item.description || "",
+        price: parseFloat(item.price),
+        image: item.imageUrl || Object.values(defaultImages)[0],
+        category: categoryName,
+        isVegetarian: false,
+        isAvailable: item.isAvailable,
+        hasVariants,
+      };
+    });
 
   // Get unique categories from menu items + "All" and "Bestsellers"
   const uniqueCategories = Array.from(
@@ -127,15 +157,71 @@ export default function CustomerHome() {
   });
 
   const handleAddToCart = (item: MenuItem) => {
-    setCartItems((prev) => {
-      const existing = prev.find((i) => i.id === item.id);
-      if (existing) {
-        return prev.map((i) =>
-          i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
-        );
-      }
-      return [...prev, { id: item.id, name: item.name, price: item.price, quantity: 1, image: item.image }];
+    if (item.hasVariants) {
+      setSelectedMenuItem(item);
+      setIsCustomizationOpen(true);
+    } else {
+      addItemToCart(item, { variantSelections: {}, instructions: "", quantity: 1 });
+    }
+  };
+
+  const addItemToCart = (item: MenuItem, customization: CustomizationSelection) => {
+    const variantGroups = getVariantGroupsForItem(item);
+    
+    // Calculate final price including variant option prices - use reduce to avoid mutation
+    const { finalPrice, variants } = variantGroups
+      .filter(g => customization.variantSelections[g.id])
+      .reduce((acc, g) => {
+        const selectedOption = g.options.find(o => o.id === customization.variantSelections[g.id]);
+        return {
+          finalPrice: acc.finalPrice + (selectedOption?.price || 0),
+          variants: [
+            ...acc.variants,
+            {
+              groupName: g.name,
+              optionName: selectedOption?.name || ""
+            }
+          ]
+        };
+      }, { finalPrice: item.price, variants: [] as { groupName: string; optionName: string }[] });
+
+    // Check if identical item already exists in cart
+    const existingItemIndex = cartItems.findIndex(cartItem => {
+      // Must match: same menu item, same variants, same instructions
+      if (cartItem.name !== item.name) return false;
+      if ((cartItem.instructions || '') !== (customization.instructions || '')) return false;
+      
+      // Compare variants
+      const cartVariantsStr = JSON.stringify(cartItem.variants || []);
+      const newVariantsStr = JSON.stringify(variants);
+      
+      return cartVariantsStr === newVariantsStr;
     });
+
+    if (existingItemIndex !== -1) {
+      // Item exists, increase quantity
+      setCartItems((prev) =>
+        prev.map((cartItem, idx) =>
+          idx === existingItemIndex
+            ? { ...cartItem, quantity: cartItem.quantity + customization.quantity }
+            : cartItem
+        )
+      );
+    } else {
+      // New item, add to cart
+      const cartItem: CartItem = {
+        id: `${item.id}-${Date.now()}`,
+        name: item.name,
+        description: item.description,
+        price: finalPrice,
+        quantity: customization.quantity,
+        image: item.image,
+        variants: variants.length > 0 ? variants : undefined,
+        instructions: customization.instructions || undefined,
+      };
+
+      setCartItems((prev) => [...prev, cartItem]);
+    }
 
     toast({
       title: "Added to cart",
@@ -144,8 +230,8 @@ export default function CustomerHome() {
   };
 
   const handleUpdateQuantity = (id: string, quantity: number) => {
-    if (quantity === 0) {
-      setCartItems((prev) => prev.filter((item) => item.id !== id));
+    if (quantity <= 0) {
+      handleRemoveItem(id);
     } else {
       setCartItems((prev) =>
         prev.map((item) => (item.id === id ? { ...item, quantity } : item))
@@ -153,20 +239,99 @@ export default function CustomerHome() {
     }
   };
 
+  const handleRemoveItem = (id: string) => {
+    setCartItems((prev) => prev.filter((item) => item.id !== id));
+    toast({
+      title: "Item removed",
+      description: "Item has been removed from your cart",
+    });
+  };
+
+  const handleClearCart = () => {
+    setCartItems([]);
+    toast({
+      title: "Cart cleared",
+      description: "All items have been removed from your cart",
+    });
+  };
+
+  const getVariantGroupsForItem = (item: MenuItem): VariantGroup[] => {
+    if (item.category === "Pizzas") {
+      return [
+        {
+          id: "crust",
+          name: "Crust Type",
+          required: true,
+          options: [
+            { id: "deep-pan", name: "Deep Pan" },
+            { id: "stuff-crust", name: "Stuff Crust" },
+          ],
+        },
+        {
+          id: "size",
+          name: "Size",
+          required: true,
+          options: [
+            { id: "6-inch", name: "Pan Pizza 6 Inches" },
+            { id: "9-inch", name: "Pan Pizza 9 Inches", price: 100 },
+            { id: "12-inch", name: "Pan Pizza 12 Inches", price: 200 },
+          ],
+        },
+      ];
+    }
+    if (item.category === "Fries") {
+      return [
+        {
+          id: "size",
+          name: "Size",
+          required: true,
+          options: [
+            { id: "small", name: "Small" },
+            { id: "medium", name: "Medium", price: 50 },
+            { id: "large", name: "Large", price: 100 },
+          ],
+        },
+      ];
+    }
+    return [];
+  };
+
+  const popularItems = menuItems.filter(item => item.category === "Pizzas" || item.category === "Burgers").slice(0, 5);
+
   const createOrderMutation = useMutation({
     mutationFn: async (orderData: any) => {
-      const res = await apiRequest("POST", "/api/orders", orderData);
-      return await res.json();
+      const response = await apiRequest("/api/orders", "POST", orderData);
+      return await response.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-      toast({
-        title: "Order placed successfully!",
-        description: `Your order #${data.orderNumber} has been received. We'll notify you when it's ready.`,
-      });
+      
+      // Close the cart and confirmation dialog
       setCartItems([]);
       setIsCartOpen(false);
       setIsConfirmationOpen(false);
+      
+      // Check payment method
+      if (data.paymentMethod === "jazzcash") {
+        // Open JazzCash payment gateway (automated)
+        setPendingJazzCashOrder({
+          id: data.id,
+          orderNumber: data.orderNumber,
+          total: parseFloat(data.total),
+        });
+        setShowJazzCashGateway(true);
+        
+        toast({
+          title: "Order Created!",
+          description: "Redirecting to JazzCash payment gateway...",
+        });
+      } else {
+        // Cash on Delivery - no payment needed
+        toast({
+          title: "Order placed successfully!",
+          description: `Your order #${data.orderNumber} has been received. We'll notify you when it's ready.`,
+        });
+      }
     },
     onError: (error: any) => {
       toast({
@@ -184,15 +349,13 @@ export default function CustomerHome() {
     setIsConfirmationOpen(true);
   };
 
-  const handleConfirmOrder = (orderDetails: OrderDetails) => {
+  const handleConfirmOrder = async (orderDetails: OrderDetails) => {
     // Generate order number
     const orderNumber = `ORD-${Date.now().toString().slice(-8)}`;
 
     // Calculate amounts
     const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    const deliveryCharges = orderType === "delivery" ? 50 : 0; // TODO: Calculate based on distance
-    const total = subtotal + deliveryCharges;
-
+    
     // Validate required data
     if (!selectedBranchId) {
       console.error("Missing branchId - cannot create order");
@@ -203,6 +366,25 @@ export default function CustomerHome() {
       });
       return;
     }
+
+    // Calculate delivery charges dynamically
+    let deliveryCharges = 0;
+    if (orderType === "delivery") {
+      try {
+        const response = await apiRequest("/api/delivery-charges/calculate", "POST", {
+          branchId: selectedBranchId,
+          orderAmount: subtotal,
+        });
+        const result = await response.json();
+        deliveryCharges = result.freeDelivery ? 0 : result.deliveryCharges;
+      } catch (error) {
+        console.error("Failed to calculate delivery charges:", error);
+        // Fallback to default delivery charge if calculation fails
+        deliveryCharges = 50;
+      }
+    }
+    
+    const total = subtotal + deliveryCharges;
 
     // Prepare order data - required fields only, add optional fields conditionally
     const orderData: Record<string, any> = {
@@ -255,6 +437,62 @@ export default function CustomerHome() {
 
       <ImageSlider />
 
+      {/* Bestselling Items Section */}
+      {(bestsellingLoading || bestsellingItems.length > 0) && selectedBranchId && (
+        <div className="bg-gradient-to-br from-primary/5 via-primary/10 to-primary/5 py-8 border-y">
+          <div className="container px-4">
+            <div className="flex items-center gap-2 mb-6">
+              <TrendingUp className="h-6 w-6 text-primary" />
+              <h2 className="text-2xl font-bold" data-testid="text-bestselling-title">
+                Bestselling Items
+              </h2>
+              <span className="text-sm text-muted-foreground ml-auto">Last 30 Days</span>
+            </div>
+            {bestsellingLoading ? (
+              <div className="flex gap-4 overflow-x-auto pb-4" data-testid="skeleton-bestselling">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <div key={i} className="min-w-[280px] animate-pulse">
+                    <div className="bg-card rounded-lg border p-4 h-[300px]">
+                      <div className="bg-muted rounded-md h-40 mb-4"></div>
+                      <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
+                      <div className="h-3 bg-muted rounded w-1/2 mb-4"></div>
+                      <div className="h-4 bg-muted rounded w-1/4"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-hide">
+                {bestsellingItems.map((item) => {
+                  const categoryName = dbCategories.find((c) => c.id === item.categoryId)?.name || "Other";
+                  const menuItem: MenuItem = {
+                    id: item.id,
+                    name: item.name,
+                    description: item.description || "",
+                    price: parseFloat(item.price),
+                    image: item.imageUrl || Object.values(defaultImages)[0],
+                    category: categoryName,
+                    isVegetarian: false,
+                  };
+                  return (
+                    <div 
+                      key={item.id} 
+                      className="relative min-w-[280px] snap-start"
+                      data-testid={`card-bestselling-${item.id}`}
+                    >
+                      <div className="absolute -top-2 -right-2 bg-primary text-primary-foreground rounded-full w-8 h-8 flex items-center justify-center text-xs font-bold z-10 shadow-lg">
+                        {item.orderCount}
+                      </div>
+                      <MenuItemCard item={menuItem} onAddToCart={handleAddToCart} context="bestseller" />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="container px-4 py-6">
         <div className="relative max-w-2xl mx-auto mb-6">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -290,12 +528,29 @@ export default function CustomerHome() {
 
       <Footer />
 
+      <ScrollToTop />
+
       <CartDrawer
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}
         items={cartItems}
+        popularItems={popularItems}
         onUpdateQuantity={handleUpdateQuantity}
+        onRemoveItem={handleRemoveItem}
+        onClearCart={handleClearCart}
+        onAddPopularItem={handleAddToCart}
         onCheckout={handleCheckout}
+      />
+
+      <ItemCustomizationDialog
+        isOpen={isCustomizationOpen}
+        onClose={() => {
+          setIsCustomizationOpen(false);
+          setSelectedMenuItem(null);
+        }}
+        item={selectedMenuItem}
+        variantGroups={selectedMenuItem ? getVariantGroupsForItem(selectedMenuItem) : []}
+        onAddToCart={addItemToCart}
       />
 
       <OrderTypeDialog
@@ -315,11 +570,45 @@ export default function CustomerHome() {
         onOpenChange={setIsConfirmationOpen}
         cartItems={cartItems}
         orderType={orderType}
+        branchId={selectedBranchId}
         branchName={selectedBranch?.name}
         selectedArea={selectedArea}
         onConfirmOrder={handleConfirmOrder}
         isSubmitting={createOrderMutation.isPending}
       />
+
+      {/* JazzCash Payment Gateway (Automated) */}
+      {pendingJazzCashOrder && (
+        <JazzCashPaymentGateway
+          open={showJazzCashGateway}
+          onClose={() => {
+            setShowJazzCashGateway(false);
+            setPendingJazzCashOrder(null);
+          }}
+          orderId={pendingJazzCashOrder.id}
+          orderNumber={pendingJazzCashOrder.orderNumber}
+          totalAmount={pendingJazzCashOrder.total}
+        />
+      )}
+
+      {/* JazzCash Manual Payment Dialog (Fallback) */}
+      {pendingJazzCashOrder && (
+        <CustomerJazzCashDialog
+          open={showJazzCashDialog}
+          onClose={() => {
+            setShowJazzCashDialog(false);
+            setPendingJazzCashOrder(null);
+          }}
+          orderId={pendingJazzCashOrder.id}
+          orderNumber={pendingJazzCashOrder.orderNumber}
+          totalAmount={pendingJazzCashOrder.total}
+          branchId={selectedBranchId}
+          onPaymentComplete={() => {
+            setShowJazzCashDialog(false);
+            setPendingJazzCashOrder(null);
+          }}
+        />
+      )}
     </div>
   );
 }

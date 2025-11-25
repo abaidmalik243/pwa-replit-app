@@ -1,4 +1,4 @@
-import { LayoutDashboard, ShoppingBag, UtensilsCrossed, Users, Settings, LogOut, Volume2, VolumeX, FolderOpen, Receipt, TrendingUp, Building2 } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, UtensilsCrossed, Users, Settings, LogOut, Volume2, VolumeX, FolderOpen, Receipt, TrendingUp, Building2, CreditCard, Table2, ChefHat, Calculator, BarChart3, Bike, Truck, MapPin, Tag, DollarSign, Layers, Package, Store, Trash2, RefreshCcw, Calendar, Clock, FileText, MessageSquare, Mail, Target, Smartphone, PieChart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Link, useLocation } from "wouter";
@@ -7,51 +7,79 @@ interface AdminSidebarProps {
   soundEnabled?: boolean;
   onToggleSound?: () => void;
   onLogout?: () => void;
+  onNavigate?: () => void;
 }
 
-export default function AdminSidebar({ soundEnabled = true, onToggleSound, onLogout }: AdminSidebarProps) {
+export default function AdminSidebar({ soundEnabled = true, onToggleSound, onLogout, onNavigate }: AdminSidebarProps) {
   const [location] = useLocation();
 
   const menuItems = [
     { icon: LayoutDashboard, label: "Dashboard", path: "/admin" },
+    { icon: BarChart3, label: "Advanced Analytics", path: "/admin/analytics" },
     { icon: ShoppingBag, label: "Orders", path: "/admin/orders" },
+    { icon: CreditCard, label: "POS", path: "/admin/pos" },
+    { icon: Table2, label: "Tables", path: "/admin/pos-tables" },
+    { icon: ChefHat, label: "Kitchen", path: "/admin/kitchen" },
+    { icon: Calculator, label: "Sessions", path: "/admin/pos-sessions" },
+    { icon: PieChart, label: "POS Reports", path: "/admin/pos-reports" },
     { icon: UtensilsCrossed, label: "Menu Items", path: "/admin/menu" },
     { icon: FolderOpen, label: "Categories", path: "/admin/categories" },
+    { icon: Layers, label: "Variants", path: "/admin/variants" },
     { icon: Building2, label: "Branches", path: "/admin/branches" },
     { icon: TrendingUp, label: "Demand", path: "/admin/demand" },
+    { icon: FileText, label: "Reports", path: "/admin/reports" },
     { icon: Receipt, label: "Expenses", path: "/admin/expenses" },
+    { icon: Package, label: "Inventory", path: "/admin/inventory" },
+    { icon: Store, label: "Suppliers", path: "/admin/suppliers" },
+    { icon: Trash2, label: "Wastage", path: "/admin/wastage" },
+    { icon: RefreshCcw, label: "Refunds", path: "/admin/refunds" },
+    { icon: Smartphone, label: "JazzCash Monitoring", path: "/admin/jazzcash" },
+    { icon: Bike, label: "Riders", path: "/admin/riders" },
+    { icon: Truck, label: "Deliveries", path: "/admin/deliveries" },
+    { icon: MapPin, label: "Rider Tracking", path: "/admin/rider-tracking" },
+    { icon: Tag, label: "Promo Codes", path: "/admin/promo-codes" },
+    { icon: DollarSign, label: "Delivery Charges", path: "/admin/delivery-charges" },
     { icon: Users, label: "Users & Roles", path: "/admin/users" },
+    { icon: Calendar, label: "Shift Schedule", path: "/admin/shifts" },
+    { icon: Clock, label: "Attendance", path: "/admin/attendance" },
+    { icon: FileText, label: "Shift Reports", path: "/admin/shift-reports" },
+    { icon: MessageSquare, label: "Marketing Campaigns", path: "/admin/marketing-campaigns" },
+    { icon: Mail, label: "Message Templates", path: "/admin/message-templates" },
+    { icon: Target, label: "Customer Segments", path: "/admin/customer-segments" },
     { icon: Settings, label: "Settings", path: "/admin/settings" },
   ];
 
   return (
-    <div className="flex flex-col h-full bg-sidebar border-r border-sidebar-border">
-      <div className="p-6 flex items-center gap-2">
+    <div className="flex flex-col h-full w-64 bg-sidebar border-r border-sidebar-border">
+      <div className="p-6 flex items-center gap-2 flex-shrink-0">
         <span className="text-2xl">🍕</span>
         <h2 className="text-xl font-bold text-sidebar-primary" data-testid="text-admin-logo">Kebabish Pizza</h2>
       </div>
 
-      <nav className="flex-1 px-3 space-y-1">
-        {menuItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = location === item.path;
-          
-          return (
-            <Link key={item.path} href={item.path}>
-              <Button
-                variant="ghost"
-                className={`w-full justify-start gap-3 ${isActive ? 'bg-sidebar-accent' : ''}`}
-                data-testid={`button-nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
-              >
-                <Icon className="h-5 w-5" />
-                <span>{item.label}</span>
-              </Button>
-            </Link>
-          );
-        })}
-      </nav>
+      <div className="flex-1 overflow-y-auto">
+        <nav className="px-3 py-2 space-y-1">
+          {menuItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = location === item.path;
+            
+            return (
+              <Link key={item.path} href={item.path}>
+                <Button
+                  variant="ghost"
+                  className={`w-full justify-start gap-3 ${isActive ? 'bg-sidebar-accent' : ''}`}
+                  data-testid={`button-nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+                  onClick={onNavigate}
+                >
+                  <Icon className="h-5 w-5" />
+                  <span>{item.label}</span>
+                </Button>
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
 
-      <div className="p-3 space-y-2">
+      <div className="p-3 space-y-2 flex-shrink-0 border-t border-sidebar-border">
         <Button
           variant="ghost"
           className="w-full justify-start gap-3"

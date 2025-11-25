@@ -1,22 +1,41 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+// Global logout handler - will be set by AuthContext
+let globalLogoutHandler: (() => void) | null = null;
+
+export function setGlobalLogoutHandler(handler: () => void) {
+  globalLogoutHandler = handler;
+}
+
 async function throwIfResNotOk(res: Response) {
+  // 304 Not Modified is a success - it means use cached data
+  if (res.status === 304) {
+    return;
+  }
+  
   if (!res.ok) {
+    // Handle 401 Unauthorized - trigger logout
+    if (res.status === 401 && globalLogoutHandler) {
+      globalLogoutHandler();
+    }
+    
     const text = (await res.text()) || res.statusText;
     throw new Error(`${res.status}: ${text}`);
   }
 }
 
 export async function apiRequest(
-  method: string,
   url: string,
+  method: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  const headers: HeadersInit = data ? { "Content-Type": "application/json" } : {};
+
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers,
     body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
+    credentials: "include", // Send cookies with request
   });
 
   await throwIfResNotOk(res);
@@ -29,8 +48,25 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
-      credentials: "include",
+    // Build URL from queryKey
+    let url = queryKey[0] as string;
+    
+    // Handle structured query keys with searchParams
+    if (queryKey.length > 1 && typeof queryKey[1] === 'object' && queryKey[1] !== null) {
+      const options = queryKey[1] as { searchParams?: Record<string, string | number> };
+      if (options.searchParams) {
+        const params = new URLSearchParams();
+        Object.entries(options.searchParams).forEach(([key, value]) => {
+          params.append(key, String(value));
+        });
+        const queryString = params.toString();
+        url = queryString ? `${url}?${queryString}` : url;
+      }
+    }
+    
+    const res = await fetch(url, {
+      credentials: "include", // Send cookies with request
+      cache: "no-store", // Bypass HTTP cache to avoid 304 responses
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {

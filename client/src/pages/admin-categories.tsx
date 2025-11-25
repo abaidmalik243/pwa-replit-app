@@ -6,7 +6,7 @@ import AdminHeader from "@/components/AdminHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -28,6 +28,7 @@ export default function AdminCategories() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const { toast } = useToast();
 
   const { data: categories = [], isLoading } = useQuery<Category[]>({
@@ -46,7 +47,7 @@ export default function AdminCategories() {
 
   const createMutation = useMutation({
     mutationFn: async (data: CategoryForm) => {
-      const res = await apiRequest("POST", "/api/categories", data);
+      const res = await apiRequest("/api/categories", "POST", data);
       return await res.json();
     },
     onSuccess: () => {
@@ -62,7 +63,7 @@ export default function AdminCategories() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: CategoryForm }) => {
-      const res = await apiRequest("PUT", `/api/categories/${id}`, data);
+      const res = await apiRequest(`/api/categories/${id}`, "PUT", data);
       return await res.json();
     },
     onSuccess: () => {
@@ -78,7 +79,7 @@ export default function AdminCategories() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await apiRequest("DELETE", `/api/categories/${id}`);
+      const res = await apiRequest(`/api/categories/${id}`, "DELETE");
       return await res.json();
     },
     onSuccess: () => {
@@ -114,11 +115,18 @@ export default function AdminCategories() {
 
   return (
     <div className="flex h-screen bg-background">
-      <div className="w-64">
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden" 
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      <div className={`fixed md:static inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <AdminSidebar
           soundEnabled={false}
           onToggleSound={() => {}}
           onLogout={() => localStorage.removeItem("user")}
+          onNavigate={() => setSidebarOpen(false)}
         />
       </div>
 
@@ -127,6 +135,7 @@ export default function AdminCategories() {
           breadcrumbs={["Admin", "Categories"]}
           notificationCount={0}
           userName="Admin User"
+          onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
         />
 
         <main className="flex-1 overflow-y-auto p-6">
@@ -148,6 +157,9 @@ export default function AdminCategories() {
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Add New Category</DialogTitle>
+                  <DialogDescription>
+                    Create a new menu category for organizing food items.
+                  </DialogDescription>
                 </DialogHeader>
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -231,6 +243,9 @@ export default function AdminCategories() {
                           <DialogContent>
                             <DialogHeader>
                               <DialogTitle>Edit Category</DialogTitle>
+                              <DialogDescription>
+                                Update category name and description.
+                              </DialogDescription>
                             </DialogHeader>
                             <Form {...form}>
                               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">

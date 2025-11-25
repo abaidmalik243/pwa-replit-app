@@ -4,6 +4,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import AdminSidebar from "@/components/AdminSidebar";
 import AdminHeader from "@/components/AdminHeader";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +16,7 @@ export default function AdminDemand() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
+  const { logout } = useAuth();
 
   // Fetch menu items
   const { data: menuItems = [], isLoading } = useQuery<MenuItem[]>({
@@ -35,7 +37,7 @@ export default function AdminDemand() {
   // Update stock mutation
   const updateStockMutation = useMutation({
     mutationFn: async ({ id, stockQuantity }: { id: string; stockQuantity: number }) => {
-      const res = await apiRequest("PUT", `/api/menu-items/${id}`, { stockQuantity });
+      const res = await apiRequest(`/api/menu-items/${id}`, "PUT", { stockQuantity });
       return await res.json();
     },
     onSuccess: () => {
@@ -77,7 +79,7 @@ export default function AdminDemand() {
         />
       )}
       <div className={`fixed md:static inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
-        <AdminSidebar onLogout={() => console.log("Logout")} />
+        <AdminSidebar onLogout={logout} />
       </div>
 
       <div className="flex-1 flex flex-col overflow-hidden">

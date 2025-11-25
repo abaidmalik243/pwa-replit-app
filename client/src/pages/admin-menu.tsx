@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Edit2, Trash2, Plus, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import MenuItemForm from "@/components/MenuItemForm";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
 import type { MenuItem as DBMenuItem, Category } from "@shared/schema";
 
 export default function AdminMenu() {
@@ -18,6 +19,7 @@ export default function AdminMenu() {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { toast } = useToast();
+  const { logout } = useAuth();
 
   // Fetch menu items and categories
   const { data: dbItems = [], isLoading: itemsLoading } = useQuery<DBMenuItem[]>({
@@ -31,7 +33,7 @@ export default function AdminMenu() {
   // Toggle availability mutation
   const toggleAvailabilityMutation = useMutation({
     mutationFn: async ({ id, isAvailable }: { id: string; isAvailable: boolean }) => {
-      const res = await apiRequest("PUT", `/api/menu-items/${id}`, { isAvailable });
+      const res = await apiRequest(`/api/menu-items/${id}`, "PUT", { isAvailable });
       return await res.json();
     },
     onSuccess: () => {
@@ -46,7 +48,7 @@ export default function AdminMenu() {
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await apiRequest("DELETE", `/api/menu-items/${id}`);
+      const res = await apiRequest(`/api/menu-items/${id}`, "DELETE");
       return await res.json();
     },
     onSuccess: () => {
@@ -62,10 +64,10 @@ export default function AdminMenu() {
   const saveMutation = useMutation({
     mutationFn: async (data: any) => {
       if (editingItem) {
-        const res = await apiRequest("PUT", `/api/menu-items/${editingItem.id}`, data);
+        const res = await apiRequest(`/api/menu-items/${editingItem.id}`, "PUT", data);
         return await res.json();
       } else {
-        const res = await apiRequest("POST", "/api/menu-items", data);
+        const res = await apiRequest("/api/menu-items", "POST", data);
         return await res.json();
       }
     },
@@ -114,7 +116,7 @@ export default function AdminMenu() {
         <AdminSidebar
           soundEnabled={soundEnabled}
           onToggleSound={() => setSoundEnabled(!soundEnabled)}
-          onLogout={() => console.log("Logout")}
+          onLogout={logout}
         />
       </div>
 
@@ -231,13 +233,17 @@ export default function AdminMenu() {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingItem ? "Edit Menu Item" : "Add Menu Item"}</DialogTitle>
+            <DialogDescription>
+              {editingItem ? "Update the menu item details below." : "Fill in the details to add a new menu item."}
+            </DialogDescription>
           </DialogHeader>
           <MenuItemForm
             initialData={editingItem ? {
+              id: editingItem.id,
               name: editingItem.name,
               description: editingItem.description || "",
               price: parseFloat(editingItem.price),
-              categoryId: editingItem.categoryId,
+              categoryId: editingItem.categoryId || undefined,
               imageUrl: editingItem.imageUrl || "",
               isAvailable: editingItem.isAvailable,
             } : undefined}

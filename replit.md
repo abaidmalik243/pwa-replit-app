@@ -2,7 +2,7 @@
 
 ## Overview
 
-Kebabish Pizza is a multi-branch food ordering Progressive Web Application (PWA) designed for a restaurant chain in Pakistan. It features a customer-facing ordering system and an administrative management panel. The application enables customers to browse menus, place orders, and track deliveries, while providing restaurant staff with real-time order management, menu control, user administration, and expense tracking. Built as a full-stack TypeScript solution, it focuses on responsive design, real-time updates, and role-based access control, aiming to enhance the food ordering experience and streamline restaurant operations.
+Kebabish Pizza is a multi-branch Progressive Web Application (PWA) for a restaurant chain. It integrates a customer ordering system with loyalty programs, a Point of Sale (POS) for staff, inventory management, and payment processing. The application aims to enhance customer experience and streamline multi-branch operations through responsive design, real-time updates, and role-based access. Key capabilities include customer accounts, real-time order management, kitchen display system, delivery management with rider tracking, and comprehensive reporting.
 
 ## User Preferences
 
@@ -10,103 +10,58 @@ Preferred communication style: Simple, everyday language.
 
 ## System Architecture
 
+### Core Architectural Decisions
+
+The system utilizes a relational database with UUID primary keys and supports role-based access control (admin, staff, customer, rider). A RESTful Express.js API handles authentication and resource management. Data persistence is managed via an `IStorage` interface abstracting Drizzle ORM, with Drizzle Kit for schema migrations. Real-time updates across all terminals are powered by Socket.IO integration, eliminating polling for events like order creation, status updates, and rider location.
+
 ### Technology Stack
 
-**Frontend**: React with TypeScript, Vite, shadcn/ui (Radix UI), Tailwind CSS, Wouter for routing, TanStack Query for server state, React Hook Form with Zod for form handling.
+**Frontend**: React with TypeScript, Vite, shadcn/ui (Radix UI), Tailwind CSS, Wouter, TanStack Query, React Hook Form with Zod.
 **Backend**: Express.js with TypeScript.
-**Database**: PostgreSQL with Drizzle ORM, utilizing Neon Serverless PostgreSQL.
-
-### Database Architecture
-
-The application uses a relational database with UUID primary keys. Core entities include:
-- **Branches**: Multi-location support with delivery areas, GPS coordinates, branding, and active status.
-- **Users**: Authentication and role-based access control (admin, staff, customer) with feature-based permissions and branch assignment.
-- **Categories**: Menu organization with images and descriptions.
-- **Menu Items**: Product catalog with pricing, descriptions, images, and availability.
-- **Orders**: Order management with customer info, item details, status tracking, and timestamps.
-- **Expenses**: Financial tracking by branch with categories and date-based reporting.
-
-### Authentication System
-
-Features Bcrypt hashing for passwords, cookie-based session management, and role-based access control (admin, staff, customer) with protected routes. Client-side route protection uses a `ProtectedRoute` component.
-
-### API Architecture
-
-RESTful Express.js endpoints under `/api` handle JSON requests/responses. Key routes include authentication (`/api/auth/signup`, `/api/auth/login`) and resource management (`/api/categories`, `/api/branches`, `/api/menu-items`, `/api/orders`, `/api/expenses`, `/api/users`). Includes custom middleware for request logging.
-
-### Storage Layer
-
-An `IStorage` interface in `server/storage.ts` abstracts CRUD operations, separating business logic from Drizzle ORM database access. Drizzle Kit manages schema migrations.
+**Database**: PostgreSQL with Drizzle ORM (Neon Serverless PostgreSQL).
 
 ### Frontend Architecture
 
-**Component Structure**: Reusable UI components (shadcn/ui), feature-specific components, page components, and custom hooks.
-**Dual Interface Design**:
-1.  **Customer Interface**: Visual-first design with order type/location selection, GPS-based nearest branch detection, hero slider, category filter, grid menu, slide-over cart, and responsive layout.
-2.  **Admin Panel**: Productivity-focused design with fixed sidebar navigation, breadcrumbs, dashboard with real-time order cards, CRUD interfaces, inventory demand tracking, and sound notifications for new orders.
-**State Management**: TanStack Query for server state, React `useState` for local UI state, React Hook Form with Zod for form state, and localStorage for user authentication state.
+The application features a dual interface: a visual-first Customer Interface and a productivity-focused Admin Panel with fixed sidebar navigation and real-time dashboards. State management uses TanStack Query for server state, React `useState` for local UI, React Hook Form for forms, and `localStorage` for authentication. It is built as a PWA with offline capabilities and a mobile-first responsive design using Tailwind CSS.
 
-### PWA Features
+### Feature Specifications
 
-Includes a web app manifest (`manifest.json`) for standalone display, theme colors, and icons. A service worker (`sw.js`) provides offline-first capabilities with network-first caching, precaching, dynamic caching, and an offline fallback page (`offline.html`) with reconnection detection. Supports installation to home screen and responsive design via Tailwind breakpoints.
+**POS Module**: Integrates order entry, visual table management, real-time Kitchen Display System (KDS), cash register/session management, multi-method payment processing (Cash, Card, JazzCash), discount management, reporting, and branch switching.
 
-### Real-Time Features
+**Menu Item Variant Management**: Allows complex menu item customization with configurable variant groups, options, and price modifiers.
 
-Admin dashboard includes Web Audio API-based notification sounds for new orders, using a custom sound generator with multi-tone patterns and a toggle for sound control.
+**Customer Payment System**: Supports Cash on Delivery (COD) and JazzCash, with staff verification for JazzCash.
 
-### Development Workflow
+**Promotional Codes System**: Flexible promo code management via admin interface, supporting various discount types, usage limits, and time-based validity.
 
-Utilizes Vite dev server with HMR, shared TypeScript types between client and server, configured path aliases, and Replit-specific Vite plugins for error handling.
+**Delivery Charges System**: Manages flexible delivery charges with static and dynamic pricing models, including distance-based calculations using OpenStreetMap Nominatim, free delivery thresholds, and estimated delivery times.
 
-### Build and Deployment
+**Customer Accounts System**: Offers saved addresses, favorites, a loyalty points program, and order history with reorder functionality.
 
-Vite builds the client to `/dist/public`, and ESBuild bundles the TypeScript server to `/dist`. Express serves the compiled React app in production, with Vite middleware in development. Environment variables configure database connections.
+**Inventory Management System**: Features real-time stock tracking, automatic deduction, low stock alerts, supplier management, transaction history, and wastage tracking.
 
-### Seeding Strategy
+**Payment Processing System**: Supports multiple payment methods including Stripe card payments and JazzCash mobile wallet. It includes automated refunds for Stripe, manual for JazzCash, and comprehensive payment tracking.
 
-An initial seed script creates three branches (Okara, Sahiwal, Faisalabad) with delivery areas and a default admin account.
+**Rider Management System**: Provides CRUD for riders, automatic user account creation, real-time GPS tracking, automated delivery assignment, status management, performance tracking, and live admin dashboard with map visualization.
+
+**JazzCash Admin Monitoring**: Admin dashboard at `/admin/jazzcash` for managing and monitoring JazzCash transactions, including configuration management, transaction history, statistics, and integration health.
+
+**Advanced Analytics Dashboard**: Business intelligence dashboard at `/admin/analytics` offering insights into sales trends, customer behavior, product performance, peak hours analysis, and key performance indicators across various timeframes.
+
+**Staff Shift & Schedule Management**: Workforce management system with automated scheduling, attendance tracking, and performance analytics. Includes shift scheduling, clock in/out, availability management, overtime tracking, and shift reports.
+
+**WhatsApp Marketing & Promotional Campaigns**: Marketing automation for customer engagement via WhatsApp. Features campaign management, reusable message templates with personalization, customer segmentation, and campaign analytics.
+
+**Multi-Language & Localization System**: Internationalization infrastructure supporting English, Urdu, and Arabic with RTL text, and multiple currencies (PKR, USD, AED, SAR). User preferences are stored in the backend and synchronized with local storage.
 
 ## External Dependencies
 
-### UI Component Libraries
-- **Radix UI**: Unstyled, accessible component primitives.
-- **shadcn/ui**: Pre-styled component collection built on Radix UI with Tailwind CSS.
-
-### Styling and Design
-- **Tailwind CSS**: Utility-first CSS framework.
-- **class-variance-authority**: Type-safe variant styling.
-- **clsx & tailwind-merge**: Utilities for class name merging.
-
-### Form Management
-- **React Hook Form**: Form library with validation.
-- **Zod**: TypeScript-first schema validation.
-- **@hookform/resolvers**: Validation resolver for React Hook Form.
-
-### Data Fetching
-- **TanStack Query (React Query)**: Server state management.
-
-### Database and ORM
-- **Drizzle ORM**: TypeScript ORM.
-- **@neondatabase/serverless**: Neon PostgreSQL serverless driver.
-- **drizzle-kit**: Schema management and migration tool.
-- **drizzle-zod**: Automatic Zod schema generation.
-
-### Authentication
-- **bcrypt**: Password hashing.
-- **connect-pg-simple**: PostgreSQL session store for Express.
-
-### Utilities
-- **date-fns**: Date manipulation.
-- **nanoid**: Unique ID generation.
-- **cmdk**: Command menu component.
-
-### Development Tools
-- **Vite**: Build tool and development server.
-- **TypeScript**: Type-safe JavaScript.
-- **tsx**: TypeScript execution for Node.js.
-- **ESBuild**: JavaScript bundler.
-- **PostCSS**: CSS processing.
-- **@replit/vite-plugin-***: Replit-specific development plugins.
-
-### Fonts
-- **Google Fonts**: Multiple font families (Architects Daughter, DM Sans, Fira Code, Geist Mono).
+-   **UI Component Libraries**: Radix UI, shadcn/ui
+-   **Styling**: Tailwind CSS
+-   **Form Management**: React Hook Form, Zod
+-   **Data Fetching**: TanStack Query
+-   **Database/ORM**: Drizzle ORM, @neondatabase/serverless
+-   **Authentication**: bcrypt, connect-pg-simple
+-   **Utilities**: date-fns, nanoid, cmdk
+-   **Internationalization**: react-i18next, i18next, i18next-browser-languagedetector, i18next-http-backend
+-   **Fonts**: Google Fonts

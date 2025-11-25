@@ -1,20 +1,22 @@
-import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { useState, useEffect } from "react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
-import { ShoppingBag, MapPin, Phone, CreditCard, User, MessageSquare } from "lucide-react";
+import { ShoppingBag, MapPin, Phone, CreditCard, User, MessageSquare, Loader2 } from "lucide-react";
 import type { CartItem } from "./CartDrawer";
 import { formatCurrency } from "@/lib/utils";
+import { apiRequest } from "@/lib/queryClient";
 
 interface OrderConfirmationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   cartItems: CartItem[];
   orderType: "delivery" | "pickup";
+  branchId?: string;
   branchName?: string;
   selectedArea?: string;
   onConfirmOrder: (orderDetails: OrderDetails) => void;
@@ -35,6 +37,7 @@ export default function OrderConfirmationDialog({
   onOpenChange,
   cartItems,
   orderType,
+  branchId,
   branchName,
   selectedArea,
   onConfirmOrder,
@@ -47,10 +50,73 @@ export default function OrderConfirmationDialog({
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "jazzcash">("cash");
   const [notes, setNotes] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [deliveryFee, setDeliveryFee] = useState(0);
+  const [isCalculatingFee, setIsCalculatingFee] = useState(false);
+  const [feeCalculationError, setFeeCalculationError] = useState<string | null>(null);
 
   const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const deliveryFee = orderType === "delivery" ? 50 : 0;
   const total = subtotal + deliveryFee;
+
+  // Calculate delivery charges when dialog opens, subtotal changes, or address changes
+  useEffect(() => {
+    let isMounted = true;
+    let timeoutId: NodeJS.Timeout;
+
+    const calculateDeliveryCharges = async () => {
+      if (orderType !== "delivery" || !branchId || !open) {
+        if (isMounted) setDeliveryFee(0);
+        return;
+      }
+
+      // Skip calculation if address is empty (will use default charge)
+      if (!customerAddress.trim()) {
+        if (isMounted) {
+          setDeliveryFee(50); // Default charge when no address
+          setFeeCalculationError(null);
+        }
+        return;
+      }
+
+      if (isMounted) {
+        setIsCalculatingFee(true);
+        setFeeCalculationError(null);
+      }
+
+      try {
+        const response = await apiRequest("/api/delivery-charges/calculate", "POST", {
+          branchId,
+          orderAmount: subtotal,
+          deliveryAddress: customerAddress.trim(),
+        });
+        const result = await response.json();
+        if (isMounted) {
+          setDeliveryFee(result.freeDelivery ? 0 : result.deliveryCharges);
+        }
+      } catch (error) {
+        console.error("Failed to calculate delivery charges:", error);
+        if (isMounted) {
+          setFeeCalculationError("Using default delivery charge");
+          setDeliveryFee(50); // Fallback to default
+        }
+      } finally {
+        if (isMounted) {
+          setIsCalculatingFee(false);
+        }
+      }
+    };
+
+    // Debounce address changes to avoid excessive API calls
+    if (customerAddress.trim()) {
+      timeoutId = setTimeout(calculateDeliveryCharges, 800);
+    } else {
+      calculateDeliveryCharges();
+    }
+
+    return () => {
+      isMounted = false;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [orderType, branchId, subtotal, customerAddress, open]);
 
   const validatePhone = (phone: string): boolean => {
     // Pakistani phone number format: 03XX XXXXXXX or 03XXXXXXXXX
@@ -109,9 +175,9 @@ export default function OrderConfirmationDialog({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl">Confirm Your Order</DialogTitle>
-          <p className="text-sm text-muted-foreground">
+          <DialogDescription>
             Please review and confirm your order details
-          </p>
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
@@ -138,7 +204,21 @@ export default function OrderConfirmationDialog({
               {orderType === "delivery" && (
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Delivery Fee</span>
-                  <span className="font-medium">{formatCurrency(deliveryFee)}</span>
+                  {isCalculatingFee ? (
+                    <span className="flex items-center gap-1 text-muted-foreground">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Calculating...
+                    </span>
+                  ) : (
+                    <span className="font-medium">
+                      {deliveryFee === 0 ? "FREE" : formatCurrency(deliveryFee)}
+                    </span>
+                  )}
+                </div>
+              )}
+              {feeCalculationError && orderType === "delivery" && (
+                <div className="text-xs text-muted-foreground italic">
+                  {feeCalculationError}
                 </div>
               )}
               <Separator className="my-2" />

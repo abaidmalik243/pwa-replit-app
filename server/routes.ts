@@ -2902,6 +2902,239 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== Saved Customers Management ====================
+  
+  // Get all customers with aggregated data
+  app.get("/api/admin/customers", authenticate, requirePermission("loyalty.view_customers"), async (req, res) => {
+    try {
+      const { search, tier, sortBy, sortOrder } = req.query;
+      
+      // Get all users with role 'customer'
+      const allUsers = await storage.getAllUsers();
+      const customers = allUsers.filter(u => u.role === "customer");
+      
+      // Get aggregated data for each customer
+      const customersWithData = await Promise.all(
+        customers.map(async (customer) => {
+          const [addresses, loyalty, orders, favorites] = await Promise.all([
+            storage.getCustomerAddresses(customer.id),
+            storage.getLoyaltyPoints(customer.id),
+            storage.getAllOrders().then(orders => orders.filter(o => o.customerId === customer.id)),
+            storage.getCustomerFavorites(customer.id),
+          ]);
+          
+          const totalSpent = orders
+            .filter(o => o.status === "completed" || o.status === "delivered")
+            .reduce((sum, o) => sum + parseFloat(o.total || "0"), 0);
+          
+          return {
+            ...customer,
+            password: undefined, // Remove sensitive data
+            addressCount: addresses.length,
+            orderCount: orders.length,
+            totalSpent,
+            loyaltyPoints: loyalty?.availablePoints || 0,
+            loyaltyTier: loyalty?.tier || "bronze",
+            lifetimePoints: loyalty?.lifetimeEarned || 0,
+            favoriteCount: favorites.length,
+            lastOrderDate: orders.length > 0 
+              ? new Date(Math.max(...orders.map(o => new Date(o.createdAt!).getTime())))
+              : null,
+          };
+        })
+      );
+      
+      // Apply search filter
+      let filtered = customersWithData;
+      if (search && typeof search === "string") {
+        const searchLower = search.toLowerCase();
+        filtered = filtered.filter(c => 
+          c.fullName.toLowerCase().includes(searchLower) ||
+          c.email.toLowerCase().includes(searchLower) ||
+          (c.phone && c.phone.includes(search)) ||
+          c.username.toLowerCase().includes(searchLower)
+        );
+      }
+      
+      // Apply tier filter
+      if (tier && tier !== "all") {
+        filtered = filtered.filter(c => c.loyaltyTier === tier);
+      }
+      
+      // Apply sorting
+      if (sortBy) {
+        const order = sortOrder === "asc" ? 1 : -1;
+        filtered.sort((a, b) => {
+          switch (sortBy) {
+            case "name": return a.fullName.localeCompare(b.fullName) * order;
+            case "orders": return (a.orderCount - b.orderCount) * order;
+            case "spent": return (a.totalSpent - b.totalSpent) * order;
+            case "points": return (a.loyaltyPoints - b.loyaltyPoints) * order;
+            case "date": 
+              if (!a.lastOrderDate && !b.lastOrderDate) return 0;
+              if (!a.lastOrderDate) return order;
+              if (!b.lastOrderDate) return -order;
+              return (new Date(a.lastOrderDate).getTime() - new Date(b.lastOrderDate).getTime()) * order;
+            default: return 0;
+          }
+        });
+      }
+      
+      res.json(filtered);
+    } catch (error: any) {
+      console.error("Error fetching customers:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  // Get single customer with full details
+  app.get("/api/admin/customers/:customerId", authenticate, requirePermission("loyalty.view_customers"), async (req, res) => {
+    try {
+      const { customerId } = req.params;
+      const customer = await storage.getUser(customerId);
+      
+      if (!customer || customer.role !== "customer") {
+        return res.status(404).json({ error: "Customer not found" });
+      }
+      
+      const [addresses, loyalty, loyaltyTransactions, orders, favorites] = await Promise.all([
+        storage.getCustomerAddresses(customerId),
+        storage.getLoyaltyPoints(customerId),
+        storage.getLoyaltyTransactions(customerId),
+        storage.getAllOrders().then(orders => orders.filter(o => o.customerId === customerId)),
+        storage.getCustomerFavorites(customerId),
+      ]);
+      
+      // Get menu items for favorites
+      const menuItems = await storage.getMenuItems();
+      const favoriteItems = favorites.map(fav => {
+        const item = menuItems.find(m => m.id === fav.menuItemId);
+        return item ? { ...fav, menuItem: item } : null;
+      }).filter(Boolean);
+      
+      const totalSpent = orders
+        .filter(o => o.status === "completed" || o.status === "delivered")
+        .reduce((sum, o) => sum + parseFloat(o.total || "0"), 0);
+      
+      res.json({
+        ...customer,
+        password: undefined,
+        addresses,
+        orders: orders.sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime()),
+        loyalty: loyalty || { customerId, totalPoints: 0, availablePoints: 0, lifetimeEarned: 0, lifetimeRedeemed: 0, tier: "bronze" },
+        loyaltyTransactions: loyaltyTransactions.sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime()),
+        favorites: favoriteItems,
+        stats: {
+          totalOrders: orders.length,
+          completedOrders: orders.filter(o => o.status === "completed" || o.status === "delivered").length,
+          cancelledOrders: orders.filter(o => o.status === "cancelled").length,
+          totalSpent,
+          averageOrderValue: orders.length > 0 ? totalSpent / orders.filter(o => o.status === "completed" || o.status === "delivered").length : 0,
+        }
+      });
+    } catch (error: any) {
+      console.error("Error fetching customer details:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  // Update customer loyalty points (admin adjustment)
+  app.post("/api/admin/customers/:customerId/loyalty/adjust", authenticate, requirePermission("loyalty.manage_points"), async (req, res) => {
+    try {
+      const { customerId } = req.params;
+      const { points, reason } = req.body;
+      
+      if (!points || !reason) {
+        return res.status(400).json({ error: "Points and reason are required" });
+      }
+      
+      const customer = await storage.getUser(customerId);
+      if (!customer || customer.role !== "customer") {
+        return res.status(404).json({ error: "Customer not found" });
+      }
+      
+      const currentLoyalty = await storage.getLoyaltyPoints(customerId);
+      const currentAvailable = currentLoyalty?.availablePoints || 0;
+      const currentTotal = currentLoyalty?.totalPoints || 0;
+      const currentLifetimeEarned = currentLoyalty?.lifetimeEarned || 0;
+      
+      const newAvailable = Math.max(0, currentAvailable + points);
+      const newTotal = Math.max(0, currentTotal + points);
+      const newLifetimeEarned = points > 0 ? currentLifetimeEarned + points : currentLifetimeEarned;
+      
+      await storage.createOrUpdateLoyaltyPoints(customerId, {
+        availablePoints: newAvailable,
+        totalPoints: newTotal,
+        lifetimeEarned: newLifetimeEarned,
+      });
+      
+      await storage.createLoyaltyTransaction({
+        customerId,
+        transactionType: "adjustment",
+        points,
+        balanceAfter: newAvailable,
+        description: `Admin adjustment: ${reason}`,
+      });
+      
+      res.json({ success: true, newBalance: newAvailable });
+    } catch (error: any) {
+      console.error("Error adjusting loyalty points:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  // Get customer statistics overview
+  app.get("/api/admin/customers/stats/overview", authenticate, requirePermission("loyalty.view_customers"), async (req, res) => {
+    try {
+      const allUsers = await storage.getAllUsers();
+      const customers = allUsers.filter(u => u.role === "customer");
+      const allOrders = await storage.getAllOrders();
+      
+      // Get loyalty data for all customers
+      const loyaltyData = await Promise.all(
+        customers.map(c => storage.getLoyaltyPoints(c.id))
+      );
+      
+      const tierCounts = { bronze: 0, silver: 0, gold: 0, platinum: 0 };
+      let totalLoyaltyPoints = 0;
+      
+      loyaltyData.forEach(l => {
+        if (l) {
+          tierCounts[l.tier as keyof typeof tierCounts]++;
+          totalLoyaltyPoints += l.availablePoints;
+        } else {
+          tierCounts.bronze++;
+        }
+      });
+      
+      const customerOrders = allOrders.filter(o => o.customerId);
+      const completedOrders = customerOrders.filter(o => o.status === "completed" || o.status === "delivered");
+      const totalRevenue = completedOrders.reduce((sum, o) => sum + parseFloat(o.total || "0"), 0);
+      
+      // Active customers (ordered in last 30 days)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const activeCustomers = new Set(
+        customerOrders
+          .filter(o => new Date(o.createdAt!) >= thirtyDaysAgo)
+          .map(o => o.customerId)
+      ).size;
+      
+      res.json({
+        totalCustomers: customers.length,
+        activeCustomers,
+        totalOrders: customerOrders.length,
+        totalRevenue,
+        averageOrderValue: completedOrders.length > 0 ? totalRevenue / completedOrders.length : 0,
+        totalLoyaltyPoints,
+        tierDistribution: tierCounts,
+      });
+    } catch (error: any) {
+      console.error("Error fetching customer stats:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // ==================== Customer Addresses Routes ====================
   
   app.get("/api/customers/:customerId/addresses", authenticate, async (req, res) => {

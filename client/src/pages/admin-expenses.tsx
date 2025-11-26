@@ -16,7 +16,19 @@ import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Search, Calendar, DollarSign, User } from "lucide-react";
 import type { Expense, Branch, User as UserType } from "@shared/schema";
-import { format } from "date-fns";
+import { format, subDays } from "date-fns";
+
+// Calculate the minimum allowed date for expenses based on 24-hour window (5:00 AM cutoff)
+function getMinExpenseDate(): string {
+  const now = new Date();
+  const currentHour = now.getHours();
+  
+  // If before 5 AM, the window started yesterday at 5 AM
+  // If after 5 AM, the window started today at 5 AM
+  const windowStart = currentHour < 5 ? subDays(now, 1) : now;
+  
+  return format(windowStart, "yyyy-MM-dd");
+}
 
 const expenseSchema = z.object({
   branchId: z.string().min(1, "Branch is required"),
@@ -381,7 +393,13 @@ export default function AdminExpenses() {
                         <FormItem>
                           <FormLabel>Date</FormLabel>
                           <FormControl>
-                            <Input type="date" {...field} data-testid="input-date" />
+                            <Input 
+                              type="date" 
+                              min={getMinExpenseDate()}
+                              max={format(new Date(), "yyyy-MM-dd")}
+                              {...field} 
+                              data-testid="input-date" 
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>

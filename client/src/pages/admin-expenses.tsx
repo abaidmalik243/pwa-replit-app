@@ -15,7 +15,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Search, Calendar, DollarSign, User } from "lucide-react";
-import type { Expense, Branch, User as UserType } from "@shared/schema";
+import type { Expense, Branch, User as UserType, Supplier } from "@shared/schema";
 import { format, subDays } from "date-fns";
 
 // Calculate the minimum allowed date for expenses based on 24-hour window (5:00 AM cutoff)
@@ -34,6 +34,7 @@ const expenseSchema = z.object({
   branchId: z.string().min(1, "Branch is required"),
   category: z.string().min(2, "Category is required"),
   staffId: z.string().optional(),
+  supplierId: z.string().optional(),
   description: z.string().min(2, "Description is required"),
   amount: z.string().min(1, "Amount is required").refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
     message: "Amount must be a positive number",
@@ -47,6 +48,14 @@ const expenseSchema = z.object({
 }, {
   message: "Staff member is required when category is Staff",
   path: ["staffId"],
+}).refine((data) => {
+  if (data.category === "supplies" && !data.supplierId) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Supplier is required when category is Supplies",
+  path: ["supplierId"],
 });
 
 type ExpenseForm = z.infer<typeof expenseSchema>;
@@ -107,6 +116,7 @@ export default function AdminExpenses() {
       branchId: !isAdmin && userBranchId ? userBranchId : "",
       category: "",
       staffId: "",
+      supplierId: "",
       description: "",
       amount: "",
       date: format(new Date(), "yyyy-MM-dd"),
@@ -127,6 +137,17 @@ export default function AdminExpenses() {
     enabled: !!formBranchId && formCategory === "staff",
   });
 
+  // Fetch active suppliers from all branches when category is supplies
+  const { data: allSuppliers = [] } = useQuery<Supplier[]>({
+    queryKey: ["/api/suppliers", "active"],
+    queryFn: async () => {
+      const res = await fetch("/api/suppliers", { credentials: "include" });
+      const suppliers = await res.json();
+      return suppliers.filter((s: Supplier) => s.isActive);
+    },
+    enabled: formCategory === "supplies",
+  });
+
   useEffect(() => {
     if (!isAdmin && userBranchId) {
       form.setValue("branchId", userBranchId);
@@ -140,6 +161,13 @@ export default function AdminExpenses() {
     }
   }, [formCategory, form]);
 
+  // Clear supplierId when category changes from "supplies"
+  useEffect(() => {
+    if (formCategory !== "supplies") {
+      form.setValue("supplierId", "");
+    }
+  }, [formCategory, form]);
+
   // Reset form when dialog opens
   useEffect(() => {
     if (isAddDialogOpen) {
@@ -147,6 +175,7 @@ export default function AdminExpenses() {
         branchId: !isAdmin && userBranchId ? userBranchId : "",
         category: "",
         staffId: "",
+        supplierId: "",
         description: "",
         amount: "",
         date: format(new Date(), "yyyy-MM-dd"),
@@ -345,6 +374,42 @@ export default function AdminExpenses() {
                                 {branchStaff.length === 0 && (
                                   <div className="py-2 px-3 text-sm text-muted-foreground">
                                     No active staff found for this branch
+                                  </div>
+                                )}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
+                    {formCategory === "supplies" && (
+                      <FormField
+                        control={form.control}
+                        name="supplierId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Supplier</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value || ""}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-supplier">
+                                  <SelectValue placeholder="Select supplier" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {allSuppliers.map((supplier) => (
+                                  <SelectItem key={supplier.id} value={supplier.id}>
+                                    <div className="flex flex-col">
+                                      <span>{supplier.name}</span>
+                                      {supplier.contactPerson && (
+                                        <span className="text-xs text-muted-foreground">{supplier.contactPerson}</span>
+                                      )}
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                                {allSuppliers.length === 0 && (
+                                  <div className="py-2 px-3 text-sm text-muted-foreground">
+                                    No active suppliers found
                                   </div>
                                 )}
                               </SelectContent>

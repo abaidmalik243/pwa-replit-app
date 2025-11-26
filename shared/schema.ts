@@ -262,6 +262,7 @@ export const expenses = pgTable("expenses", {
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   date: timestamp("date").notNull(),
   staffId: varchar("staff_id").references(() => users.id), // Optional: links to staff member when category is 'staff'
+  supplierId: varchar("supplier_id").references(() => suppliers.id), // Optional: links to supplier when category is 'Supplies'
   addedBy: varchar("added_by").references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

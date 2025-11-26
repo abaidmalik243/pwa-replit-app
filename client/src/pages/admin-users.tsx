@@ -542,16 +542,16 @@ export default function AdminUsers() {
                   Add User
                 </Button>
               </DialogTrigger>
-              <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] sm:max-h-[85vh] flex flex-col p-4 sm:p-6">
-                <DialogHeader className="space-y-1 sm:space-y-2">
+              <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] sm:max-h-[85vh] flex flex-col overflow-hidden p-4 sm:p-6">
+                <DialogHeader className="space-y-1 sm:space-y-2 flex-shrink-0">
                   <DialogTitle className="text-lg sm:text-xl">{editingUser ? "Edit User" : "Add New User"}</DialogTitle>
                   <DialogDescription className="text-xs sm:text-sm">
                     {editingUser ? "Update user account details and permissions." : "Create a new user account with role and branch assignment."}
                   </DialogDescription>
                 </DialogHeader>
                 <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 overflow-hidden">
-                    <ScrollArea className="flex-1 pr-2 sm:pr-4 -mr-2 sm:-mr-4">
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0">
+                    <ScrollArea className="flex-1 pr-2 sm:pr-4 -mr-2 sm:-mr-4 min-h-0">
                       <div className="space-y-3 sm:space-y-4 pb-4 pr-2 sm:pr-0">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                           <FormField
@@ -719,7 +719,7 @@ export default function AdminUsers() {
                         )}
                       </div>
                     </ScrollArea>
-                    <DialogFooter className="pt-3 sm:pt-4 border-t mt-3 sm:mt-4 flex-col-reverse sm:flex-row gap-2 sm:gap-0">
+                    <DialogFooter className="pt-3 sm:pt-4 border-t mt-3 sm:mt-4 flex-col-reverse sm:flex-row gap-2 sm:gap-0 flex-shrink-0">
                       <Button
                         type="submit"
                         disabled={createMutation.isPending || updateMutation.isPending}

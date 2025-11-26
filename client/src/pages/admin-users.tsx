@@ -529,24 +529,24 @@ export default function AdminUsers() {
                   Add User
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
-                <DialogHeader>
-                  <DialogTitle>{editingUser ? "Edit User" : "Add New User"}</DialogTitle>
-                  <DialogDescription>
+              <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] sm:max-h-[85vh] flex flex-col p-4 sm:p-6">
+                <DialogHeader className="space-y-1 sm:space-y-2">
+                  <DialogTitle className="text-lg sm:text-xl">{editingUser ? "Edit User" : "Add New User"}</DialogTitle>
+                  <DialogDescription className="text-xs sm:text-sm">
                     {editingUser ? "Update user account details and permissions." : "Create a new user account with role and branch assignment."}
                   </DialogDescription>
                 </DialogHeader>
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 overflow-hidden">
-                    <ScrollArea className="flex-1 pr-4">
-                      <div className="space-y-4 pb-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <ScrollArea className="flex-1 pr-2 sm:pr-4 -mr-2 sm:-mr-4">
+                      <div className="space-y-3 sm:space-y-4 pb-4 pr-2 sm:pr-0">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                           <FormField
                             control={form.control}
                             name="fullName"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Full Name</FormLabel>
+                                <FormLabel className="text-sm">Full Name</FormLabel>
                                 <FormControl>
                                   <Input {...field} data-testid="input-fullname" />
                                 </FormControl>
@@ -559,7 +559,7 @@ export default function AdminUsers() {
                             name="username"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Username</FormLabel>
+                                <FormLabel className="text-sm">Username</FormLabel>
                                 <FormControl>
                                   <Input {...field} data-testid="input-username" />
                                 </FormControl>
@@ -568,13 +568,13 @@ export default function AdminUsers() {
                             )}
                           />
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                           <FormField
                             control={form.control}
                             name="email"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Email</FormLabel>
+                                <FormLabel className="text-sm">Email</FormLabel>
                                 <FormControl>
                                   <Input type="email" {...field} data-testid="input-email" />
                                 </FormControl>
@@ -587,7 +587,7 @@ export default function AdminUsers() {
                             name="password"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>{editingUser ? "New Password (optional)" : "Password"}</FormLabel>
+                                <FormLabel className="text-sm">{editingUser ? "New Password (optional)" : "Password"}</FormLabel>
                                 <FormControl>
                                   <Input type="password" {...field} data-testid="input-password" />
                                 </FormControl>
@@ -596,13 +596,13 @@ export default function AdminUsers() {
                             )}
                           />
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                           <FormField
                             control={form.control}
                             name="phone"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Phone (Optional)</FormLabel>
+                                <FormLabel className="text-sm">Phone (Optional)</FormLabel>
                                 <FormControl>
                                   <Input {...field} data-testid="input-phone" />
                                 </FormControl>
@@ -615,7 +615,7 @@ export default function AdminUsers() {
                             name="role"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Role</FormLabel>
+                                <FormLabel className="text-sm">Role</FormLabel>
                                 <Select 
                                   onValueChange={(value) => {
                                     field.onChange(value);
@@ -639,13 +639,13 @@ export default function AdminUsers() {
                             )}
                           />
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                           <FormField
                             control={form.control}
                             name="branchId"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Assigned Branch</FormLabel>
+                                <FormLabel className="text-sm">Assigned Branch</FormLabel>
                                 <Select 
                                   onValueChange={(value) => field.onChange(value === "none" ? "" : value)} 
                                   value={field.value || "none"}
@@ -672,9 +672,9 @@ export default function AdminUsers() {
                             control={form.control}
                             name="isActive"
                             render={({ field }) => (
-                              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 h-[72px]">
+                              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 min-h-[60px] sm:min-h-[72px]">
                                 <div className="space-y-0.5">
-                                  <FormLabel className="text-base">Active</FormLabel>
+                                  <FormLabel className="text-sm sm:text-base">Active</FormLabel>
                                   <div className="text-xs text-muted-foreground">
                                     User can access the system
                                   </div>
@@ -706,11 +706,12 @@ export default function AdminUsers() {
                         )}
                       </div>
                     </ScrollArea>
-                    <DialogFooter className="pt-4 border-t mt-4">
+                    <DialogFooter className="pt-3 sm:pt-4 border-t mt-3 sm:mt-4 flex-col-reverse sm:flex-row gap-2 sm:gap-0">
                       <Button
                         type="submit"
                         disabled={createMutation.isPending || updateMutation.isPending}
                         data-testid="button-save-user"
+                        className="w-full sm:w-auto"
                       >
                         {createMutation.isPending || updateMutation.isPending ? "Saving..." : editingUser ? "Update User" : "Create User"}
                       </Button>

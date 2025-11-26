@@ -462,9 +462,7 @@ export default function AdminCustomers() {
             <DialogHeader>
               <DialogTitle>Loading...</DialogTitle>
               <DialogDescription>
-                <div className="flex items-center justify-center py-12">
-                  <p className="text-muted-foreground">Loading customer details...</p>
-                </div>
+                Loading customer details...
               </DialogDescription>
             </DialogHeader>
           ) : customerDetails ? (

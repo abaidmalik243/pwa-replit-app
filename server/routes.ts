@@ -3006,7 +3006,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ]);
       
       // Get menu items for favorites
-      const menuItems = await storage.getMenuItems();
+      const menuItems = await storage.getAllMenuItems();
       const favoriteItems = favorites.map(fav => {
         const item = menuItems.find(m => m.id === fav.menuItemId);
         return item ? { ...fav, menuItem: item } : null;

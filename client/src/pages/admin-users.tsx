@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import AdminSidebar from "@/components/AdminSidebar";
@@ -163,6 +163,149 @@ const ROLE_DEFAULT_PERMISSIONS: Record<string, string[]> = {
   customer: [],
 };
 
+interface PermissionsSectionProps {
+  permissions: string[];
+  onPermissionsChange: (perms: string[]) => void;
+}
+
+function PermissionsSection({ permissions, onPermissionsChange }: PermissionsSectionProps) {
+  const [expandedModules, setExpandedModules] = useState<string[]>([]);
+  
+  const totalPerms = PERMISSION_MODULES.flatMap(m => m.permissions).length;
+  
+  const getModuleState = useCallback((moduleId: string): "none" | "partial" | "all" => {
+    const module = PERMISSION_MODULES.find(m => m.id === moduleId);
+    if (!module) return "none";
+    const modulePermIds = module.permissions.map(p => p.id);
+    const selectedCount = modulePermIds.filter(id => permissions.includes(id)).length;
+    if (selectedCount === 0) return "none";
+    if (selectedCount === modulePermIds.length) return "all";
+    return "partial";
+  }, [permissions]);
+  
+  const handleToggleModule = useCallback((moduleId: string) => {
+    const module = PERMISSION_MODULES.find(m => m.id === moduleId);
+    if (!module) return;
+    const modulePermIds = module.permissions.map(p => p.id);
+    const selectedCount = modulePermIds.filter(id => permissions.includes(id)).length;
+    const isAllSelected = selectedCount === modulePermIds.length;
+    
+    if (isAllSelected) {
+      onPermissionsChange(permissions.filter(p => !modulePermIds.includes(p)));
+    } else {
+      const newPerms = Array.from(new Set([...permissions, ...modulePermIds]));
+      onPermissionsChange(newPerms);
+    }
+  }, [permissions, onPermissionsChange]);
+  
+  const handleTogglePermission = useCallback((permId: string) => {
+    if (permissions.includes(permId)) {
+      onPermissionsChange(permissions.filter(p => p !== permId));
+    } else {
+      onPermissionsChange([...permissions, permId]);
+    }
+  }, [permissions, onPermissionsChange]);
+  
+  const handleSelectAll = useCallback(() => {
+    onPermissionsChange(PERMISSION_MODULES.flatMap(m => m.permissions.map(p => p.id)));
+  }, [onPermissionsChange]);
+  
+  const handleClearAll = useCallback(() => {
+    onPermissionsChange([]);
+  }, [onPermissionsChange]);
+  
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Label className="text-base font-semibold">Permissions</Label>
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary" className="text-xs">
+            {permissions.length}/{totalPerms} selected
+          </Badge>
+          <Button 
+            type="button" 
+            variant="outline" 
+            size="sm"
+            onClick={handleSelectAll}
+            data-testid="button-select-all-perms"
+          >
+            Select All
+          </Button>
+          <Button 
+            type="button" 
+            variant="outline" 
+            size="sm"
+            onClick={handleClearAll}
+            data-testid="button-clear-all-perms"
+          >
+            Clear All
+          </Button>
+        </div>
+      </div>
+      <div className="rounded-lg border">
+        <Accordion 
+          type="multiple" 
+          className="w-full"
+          value={expandedModules}
+          onValueChange={setExpandedModules}
+        >
+          {PERMISSION_MODULES.map((module) => {
+            const moduleState = getModuleState(module.id);
+            const selectedCount = module.permissions.filter(p => permissions.includes(p.id)).length;
+            const Icon = module.icon;
+            
+            return (
+              <AccordionItem key={module.id} value={module.id} className="border-b last:border-b-0">
+                <div className="flex items-center px-4 py-2 hover:bg-muted/50">
+                  <Checkbox
+                    checked={moduleState === "all"}
+                    onCheckedChange={() => handleToggleModule(module.id)}
+                    className={`mr-3 ${moduleState === "partial" ? "opacity-50" : ""}`}
+                    data-testid={`checkbox-module-${module.id}`}
+                  />
+                  <AccordionTrigger className="flex-1 hover:no-underline py-0">
+                    <div className="flex items-center gap-2">
+                      <Icon className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">{module.label}</span>
+                      <Badge variant="outline" className="ml-2 text-xs">
+                        {selectedCount}/{module.permissions.length}
+                      </Badge>
+                    </div>
+                  </AccordionTrigger>
+                </div>
+                <AccordionContent className="pb-0">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-1 px-4 pb-3 pt-1">
+                    {module.permissions.map((perm) => (
+                      <label 
+                        key={perm.id} 
+                        className="flex items-start gap-2 p-2 rounded hover:bg-muted/30 cursor-pointer"
+                      >
+                        <Checkbox
+                          checked={permissions.includes(perm.id)}
+                          onCheckedChange={() => handleTogglePermission(perm.id)}
+                          data-testid={`checkbox-perm-${perm.id}`}
+                        />
+                        <div className="grid gap-0.5 leading-none">
+                          <span className="text-sm">
+                            {perm.label}
+                          </span>
+                          <p className="text-xs text-muted-foreground">
+                            {perm.description}
+                          </p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            );
+          })}
+        </Accordion>
+      </div>
+    </div>
+  );
+}
+
 const userFormSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters"),
   email: z.string().email("Invalid email address"),
@@ -190,6 +333,7 @@ export default function AdminUsers() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showPermissions, setShowPermissions] = useState(false);
   const { toast } = useToast();
   const { logout } = useAuth();
 
@@ -275,12 +419,14 @@ export default function AdminUsers() {
     const dbUser = dbUsers.find((u) => u.id === user.id);
     if (dbUser) {
       setEditingUser(dbUser);
+      const role = dbUser.role as "admin" | "staff" | "customer";
+      setShowPermissions(role === "admin" || role === "staff");
       form.reset({
         username: dbUser.username,
         email: dbUser.email,
         fullName: dbUser.fullName,
         phone: dbUser.phone || "",
-        role: dbUser.role as "admin" | "staff" | "customer",
+        role,
         branchId: dbUser.branchId || "",
         isActive: dbUser.isActive,
         permissions: dbUser.permissions || [],
@@ -350,10 +496,14 @@ export default function AdminUsers() {
                 setIsAddDialogOpen(false);
                 setEditingUser(null);
                 form.reset();
+                setShowPermissions(true);
               }
             }}>
               <DialogTrigger asChild>
-                <Button onClick={() => setIsAddDialogOpen(true)} data-testid="button-add-user">
+                <Button onClick={() => {
+                  setIsAddDialogOpen(true);
+                  setShowPermissions(true);
+                }} data-testid="button-add-user">
                   <Plus className="h-4 w-4 mr-2" />
                   Add User
                 </Button>
@@ -448,8 +598,7 @@ export default function AdminUsers() {
                                 <Select 
                                   onValueChange={(value) => {
                                     field.onChange(value);
-                                    const defaultPerms = ROLE_DEFAULT_PERMISSIONS[value] || [];
-                                    form.setValue("permissions", defaultPerms);
+                                    setShowPermissions(value === "admin" || value === "staff");
                                   }} 
                                   value={field.value}
                                 >
@@ -521,149 +670,17 @@ export default function AdminUsers() {
                           />
                         </div>
                         
-                        {/* Permissions Section */}
-                        {(form.watch("role") === "admin" || form.watch("role") === "staff") && (
+                        {/* Permissions Section - rendered for admin/staff only */}
+                        {showPermissions && (
                           <FormField
                             control={form.control}
                             name="permissions"
-                            render={({ field }) => {
-                              const selectedPerms = field.value || [];
-                              const totalPerms = PERMISSION_MODULES.flatMap(m => m.permissions).length;
-                              
-                              const getModuleState = (moduleId: string) => {
-                                const module = PERMISSION_MODULES.find(m => m.id === moduleId);
-                                if (!module) return "none";
-                                const modulePermIds = module.permissions.map(p => p.id);
-                                const selectedCount = modulePermIds.filter(id => selectedPerms.includes(id)).length;
-                                if (selectedCount === 0) return "none";
-                                if (selectedCount === modulePermIds.length) return "all";
-                                return "partial";
-                              };
-                              
-                              const toggleModule = (moduleId: string) => {
-                                const module = PERMISSION_MODULES.find(m => m.id === moduleId);
-                                if (!module) return;
-                                const modulePermIds = module.permissions.map(p => p.id);
-                                const state = getModuleState(moduleId);
-                                
-                                if (state === "all") {
-                                  field.onChange(selectedPerms.filter(p => !modulePermIds.includes(p)));
-                                } else {
-                                  const newPerms = Array.from(new Set([...selectedPerms, ...modulePermIds]));
-                                  field.onChange(newPerms);
-                                }
-                              };
-                              
-                              const togglePermission = (permId: string) => {
-                                if (selectedPerms.includes(permId)) {
-                                  field.onChange(selectedPerms.filter(p => p !== permId));
-                                } else {
-                                  field.onChange([...selectedPerms, permId]);
-                                }
-                              };
-                              
-                              const selectAll = () => {
-                                field.onChange(PERMISSION_MODULES.flatMap(m => m.permissions.map(p => p.id)));
-                              };
-                              
-                              const clearAll = () => {
-                                field.onChange([]);
-                              };
-                              
-                              return (
-                                <FormItem>
-                                  <div className="flex items-center justify-between mb-2">
-                                    <FormLabel className="text-base font-semibold">Permissions</FormLabel>
-                                    <div className="flex items-center gap-2">
-                                      <Badge variant="secondary" className="text-xs">
-                                        {selectedPerms.length}/{totalPerms} selected
-                                      </Badge>
-                                      <Button 
-                                        type="button" 
-                                        variant="outline" 
-                                        size="sm"
-                                        onClick={selectAll}
-                                        data-testid="button-select-all-perms"
-                                      >
-                                        Select All
-                                      </Button>
-                                      <Button 
-                                        type="button" 
-                                        variant="outline" 
-                                        size="sm"
-                                        onClick={clearAll}
-                                        data-testid="button-clear-all-perms"
-                                      >
-                                        Clear All
-                                      </Button>
-                                    </div>
-                                  </div>
-                                  <div className="rounded-lg border">
-                                    <Accordion type="multiple" className="w-full">
-                                      {PERMISSION_MODULES.map((module) => {
-                                        const moduleState = getModuleState(module.id);
-                                        const selectedCount = module.permissions.filter(p => selectedPerms.includes(p.id)).length;
-                                        const Icon = module.icon;
-                                        
-                                        return (
-                                          <AccordionItem key={module.id} value={module.id} className="border-b last:border-b-0">
-                                            <div className="flex items-center px-4 py-2 hover:bg-muted/50">
-                                              <Checkbox
-                                                checked={moduleState === "all"}
-                                                ref={(el) => {
-                                                  if (el) {
-                                                    (el as HTMLButtonElement).dataset.state = moduleState === "partial" ? "indeterminate" : moduleState === "all" ? "checked" : "unchecked";
-                                                  }
-                                                }}
-                                                onCheckedChange={() => toggleModule(module.id)}
-                                                className="mr-3"
-                                                data-testid={`checkbox-module-${module.id}`}
-                                              />
-                                              <AccordionTrigger className="flex-1 hover:no-underline py-0">
-                                                <div className="flex items-center gap-2">
-                                                  <Icon className="h-4 w-4 text-muted-foreground" />
-                                                  <span className="font-medium">{module.label}</span>
-                                                  <Badge variant="outline" className="ml-2 text-xs">
-                                                    {selectedCount}/{module.permissions.length}
-                                                  </Badge>
-                                                </div>
-                                              </AccordionTrigger>
-                                            </div>
-                                            <AccordionContent className="pb-0">
-                                              <div className="grid grid-cols-1 md:grid-cols-2 gap-1 px-4 pb-3 pt-1">
-                                                {module.permissions.map((perm) => (
-                                                  <div 
-                                                    key={perm.id} 
-                                                    className="flex items-start gap-2 p-2 rounded hover:bg-muted/30 cursor-pointer"
-                                                    onClick={() => togglePermission(perm.id)}
-                                                  >
-                                                    <Checkbox
-                                                      checked={selectedPerms.includes(perm.id)}
-                                                      onCheckedChange={() => togglePermission(perm.id)}
-                                                      onClick={(e) => e.stopPropagation()}
-                                                      data-testid={`checkbox-perm-${perm.id}`}
-                                                    />
-                                                    <div className="grid gap-0.5 leading-none">
-                                                      <Label className="text-sm cursor-pointer">
-                                                        {perm.label}
-                                                      </Label>
-                                                      <p className="text-xs text-muted-foreground">
-                                                        {perm.description}
-                                                      </p>
-                                                    </div>
-                                                  </div>
-                                                ))}
-                                              </div>
-                                            </AccordionContent>
-                                          </AccordionItem>
-                                        );
-                                      })}
-                                    </Accordion>
-                                  </div>
-                                  <FormMessage />
-                                </FormItem>
-                              );
-                            }}
+                            render={({ field }) => (
+                              <PermissionsSection 
+                                permissions={field.value || []} 
+                                onPermissionsChange={(perms) => field.onChange(perms)}
+                              />
+                            )}
                           />
                         )}
                       </div>

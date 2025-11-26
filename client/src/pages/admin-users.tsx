@@ -21,7 +21,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
-import { ShoppingCart, UtensilsCrossed, Users, BarChart3, Package, Truck, Megaphone, Settings, CreditCard, Heart } from "lucide-react";
+import { ShoppingCart, UtensilsCrossed, Users, BarChart3, Package, Truck, Megaphone, Settings, CreditCard, Heart, Receipt } from "lucide-react";
 import type { User, Branch } from "@shared/schema";
 
 const PERMISSION_MODULES = [
@@ -137,6 +137,19 @@ const PERMISSION_MODULES = [
     ],
   },
   {
+    id: "expenses",
+    label: "Expense Management",
+    icon: Receipt,
+    permissions: [
+      { id: "expenses.view", label: "View Expenses", description: "View all expenses" },
+      { id: "expenses.create", label: "Create Expenses", description: "Add new expenses" },
+      { id: "expenses.edit", label: "Edit Expenses", description: "Modify expense records" },
+      { id: "expenses.delete", label: "Delete Expenses", description: "Remove expenses" },
+      { id: "expenses.approve", label: "Approve Expenses", description: "Approve pending expenses" },
+      { id: "expenses.view_reports", label: "Expense Reports", description: "View expense reports" },
+    ],
+  },
+  {
     id: "settings",
     label: "System Settings",
     icon: Settings,
@@ -215,19 +228,23 @@ function PermissionsSection({ permissions, onPermissionsChange }: PermissionsSec
   }, [onPermissionsChange]);
   
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Label className="text-base font-semibold">Permissions</Label>
+    <div className="space-y-3">
+      {/* Header - Stacks on mobile */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div className="flex items-center gap-2">
+          <Label className="text-base font-semibold">Permissions</Label>
           <Badge variant="secondary" className="text-xs">
-            {permissions.length}/{totalPerms} selected
+            {permissions.length}/{totalPerms}
           </Badge>
+        </div>
+        <div className="flex items-center gap-2">
           <Button 
             type="button" 
             variant="outline" 
             size="sm"
             onClick={handleSelectAll}
             data-testid="button-select-all-perms"
+            className="flex-1 sm:flex-none"
           >
             Select All
           </Button>
@@ -237,12 +254,15 @@ function PermissionsSection({ permissions, onPermissionsChange }: PermissionsSec
             size="sm"
             onClick={handleClearAll}
             data-testid="button-clear-all-perms"
+            className="flex-1 sm:flex-none"
           >
             Clear All
           </Button>
         </div>
       </div>
-      <div className="rounded-lg border">
+      
+      {/* Permissions Accordion */}
+      <div className="rounded-lg border overflow-hidden">
         <Accordion 
           type="multiple" 
           className="w-full"
@@ -256,40 +276,41 @@ function PermissionsSection({ permissions, onPermissionsChange }: PermissionsSec
             
             return (
               <AccordionItem key={module.id} value={module.id} className="border-b last:border-b-0">
-                <div className="flex items-center px-4 py-2 hover:bg-muted/50">
+                <div className="flex items-center px-3 sm:px-4 py-2 hover:bg-muted/50 gap-2">
                   <Checkbox
                     checked={moduleState === "all"}
                     onCheckedChange={() => handleToggleModule(module.id)}
-                    className={`mr-3 ${moduleState === "partial" ? "opacity-50" : ""}`}
+                    className={`shrink-0 ${moduleState === "partial" ? "opacity-50" : ""}`}
                     data-testid={`checkbox-module-${module.id}`}
                   />
-                  <AccordionTrigger className="flex-1 hover:no-underline py-0">
-                    <div className="flex items-center gap-2">
-                      <Icon className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium">{module.label}</span>
-                      <Badge variant="outline" className="ml-2 text-xs">
+                  <AccordionTrigger className="flex-1 hover:no-underline py-0 min-w-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <span className="font-medium text-sm sm:text-base truncate">{module.label}</span>
+                      <Badge variant="outline" className="text-xs shrink-0 ml-auto">
                         {selectedCount}/{module.permissions.length}
                       </Badge>
                     </div>
                   </AccordionTrigger>
                 </div>
                 <AccordionContent className="pb-0">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-1 px-4 pb-3 pt-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-1 px-3 sm:px-4 pb-3 pt-1">
                     {module.permissions.map((perm) => (
                       <label 
                         key={perm.id} 
-                        className="flex items-start gap-2 p-2 rounded hover:bg-muted/30 cursor-pointer"
+                        className="flex items-start gap-2 p-2 rounded hover:bg-muted/30 cursor-pointer transition-colors"
                       >
                         <Checkbox
                           checked={permissions.includes(perm.id)}
                           onCheckedChange={() => handleTogglePermission(perm.id)}
                           data-testid={`checkbox-perm-${perm.id}`}
+                          className="mt-0.5 shrink-0"
                         />
-                        <div className="grid gap-0.5 leading-none">
-                          <span className="text-sm">
+                        <div className="grid gap-0.5 leading-none min-w-0">
+                          <span className="text-sm font-medium">
                             {perm.label}
                           </span>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-muted-foreground line-clamp-2">
                             {perm.description}
                           </p>
                         </div>

@@ -54,6 +54,8 @@ The application features a dual interface: a visual-first Customer Interface and
 
 **Multi-Language & Localization System**: Internationalization infrastructure supporting English, Urdu, and Arabic with RTL text, and multiple currencies (PKR, USD, AED, SAR). User preferences are stored in the backend and synchronized with local storage.
 
+**Hierarchical Permissions System**: Granular role-based access control with 12 permission modules (Orders, Menu, Users & Roles, POS, Deliveries & Riders, Inventory & Suppliers, Marketing, Analytics & Reports, Loyalty & Customers, Expense Management, System Settings) containing 60+ individual permissions. Features accordion-based UI with module-level checkboxes, Select All/Clear All functionality, and responsive design for mobile devices. Permissions stored as text arrays using module.action format (e.g., "orders.view", "expenses.approve").
+
 ## External Dependencies
 
 -   **UI Component Libraries**: Radix UI, shadcn/ui

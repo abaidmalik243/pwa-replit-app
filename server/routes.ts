@@ -138,6 +138,25 @@ function getEffectiveBranchId(req: Request, queryBranchId?: string): string | nu
   return req.user?.branchId || null;
 }
 
+// Helper to enforce branch-based access for non-admin users
+// Returns the effective branchId or throws an error if non-admin user has no branch assigned
+function requireBranchAccess(req: Request, queryBranchId?: string): { branchId: string | null; requiresFilter: boolean } {
+  if (req.user?.role === "admin") {
+    // Admins can access any branch or all branches
+    return { branchId: queryBranchId || null, requiresFilter: !!queryBranchId };
+  }
+  
+  // Non-admin users MUST have a branchId assigned
+  if (!req.user?.branchId) {
+    const error = new Error("Access denied: User has no branch assigned");
+    (error as any).statusCode = 403;
+    throw error;
+  }
+  
+  // Non-admin users always filtered to their branch
+  return { branchId: req.user.branchId, requiresFilter: true };
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication routes
   app.post("/api/auth/signup", async (req, res) => {
@@ -802,10 +821,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/orders", authenticate, requirePermission("orders.view"), async (req, res) => {
     try {
       const { branchId, status } = req.query;
-      const effectiveBranchId = getEffectiveBranchId(req, branchId as string | undefined);
+      const { branchId: effectiveBranchId, requiresFilter } = requireBranchAccess(req, branchId as string | undefined);
       let orders;
       
-      if (effectiveBranchId) {
+      if (requiresFilter && effectiveBranchId) {
         orders = await storage.getOrdersByBranch(effectiveBranchId);
         // Further filter by status if provided
         if (status) {
@@ -819,7 +838,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json(orders);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      const statusCode = (error as any).statusCode || 500;
+      res.status(statusCode).json({ error: error.message });
     }
   });
 
@@ -1176,10 +1196,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/expenses", authenticate, requirePermission("expenses.view"), async (req, res) => {
     try {
       const { branchId } = req.query;
-      const effectiveBranchId = getEffectiveBranchId(req, branchId as string | undefined);
+      const { branchId: effectiveBranchId, requiresFilter } = requireBranchAccess(req, branchId as string | undefined);
       let expenses;
       
-      if (effectiveBranchId) {
+      if (requiresFilter && effectiveBranchId) {
         expenses = await storage.getExpensesByBranch(effectiveBranchId);
       } else {
         expenses = await storage.getAllExpenses();
@@ -1187,7 +1207,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json(expenses);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      const statusCode = (error as any).statusCode || 500;
+      res.status(statusCode).json({ error: error.message });
     }
   });
 
@@ -1225,13 +1246,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/pos/tables", authenticate, async (req, res) => {
     try {
       const { branchId } = req.query;
-      const effectiveBranchId = getEffectiveBranchId(req, branchId as string | undefined);
-      const tables = effectiveBranchId
+      const { branchId: effectiveBranchId, requiresFilter } = requireBranchAccess(req, branchId as string | undefined);
+      const tables = requiresFilter && effectiveBranchId
         ? await storage.getPosTablesByBranch(effectiveBranchId)
         : await storage.getAllPosTables();
       res.json(tables);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      const statusCode = (error as any).statusCode || 400;
+      res.status(statusCode).json({ error: error.message });
     }
   });
 
@@ -1281,13 +1303,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/pos/sessions", authenticate, async (req, res) => {
     try {
       const { branchId } = req.query;
-      const effectiveBranchId = getEffectiveBranchId(req, branchId as string | undefined);
-      const sessions = effectiveBranchId
+      const { branchId: effectiveBranchId, requiresFilter } = requireBranchAccess(req, branchId as string | undefined);
+      const sessions = requiresFilter && effectiveBranchId
         ? await storage.getPosSessionsByBranch(effectiveBranchId)
         : await storage.getAllPosSessions();
       res.json(sessions);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      const statusCode = (error as any).statusCode || 400;
+      res.status(statusCode).json({ error: error.message });
     }
   });
 
@@ -1721,14 +1744,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/riders", authenticate, authorize("admin", "staff"), async (req, res) => {
     try {
       const { branchId } = req.query;
-      const effectiveBranchId = getEffectiveBranchId(req, branchId as string | undefined);
-      const riders = effectiveBranchId
+      const { branchId: effectiveBranchId, requiresFilter } = requireBranchAccess(req, branchId as string | undefined);
+      const riders = requiresFilter && effectiveBranchId
         ? await storage.getRidersByBranch(effectiveBranchId)
         : await storage.getAllRiders();
       res.json(riders);
     } catch (error: any) {
       console.error("Error fetching riders:", error);
-      res.status(500).json({ error: error.message });
+      const statusCode = (error as any).statusCode || 500;
+      res.status(statusCode).json({ error: error.message });
     }
   });
 
@@ -1955,14 +1979,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/deliveries", authenticate, authorize("admin", "staff"), async (req, res) => {
     try {
       const { branchId } = req.query;
-      const effectiveBranchId = getEffectiveBranchId(req, branchId as string | undefined);
-      const deliveries = effectiveBranchId
+      const { branchId: effectiveBranchId, requiresFilter } = requireBranchAccess(req, branchId as string | undefined);
+      const deliveries = requiresFilter && effectiveBranchId
         ? await storage.getDeliveriesByBranch(effectiveBranchId)
         : await storage.getAllDeliveries();
       res.json(deliveries);
     } catch (error: any) {
       console.error("Error fetching deliveries:", error);
-      res.status(500).json({ error: error.message });
+      const statusCode = (error as any).statusCode || 500;
+      res.status(statusCode).json({ error: error.message });
     }
   });
 
@@ -3240,13 +3265,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/inventory/transactions", authenticate, authorize("admin", "staff"), async (req, res) => {
     try {
       const { branchId } = req.query;
-      const effectiveBranchId = getEffectiveBranchId(req, branchId as string | undefined);
-      const transactions = effectiveBranchId
+      const { branchId: effectiveBranchId, requiresFilter } = requireBranchAccess(req, branchId as string | undefined);
+      const transactions = requiresFilter && effectiveBranchId
         ? await storage.getInventoryTransactionsByBranch(effectiveBranchId)
         : await storage.getAllInventoryTransactions();
       res.json(transactions);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      const statusCode = (error as any).statusCode || 500;
+      res.status(statusCode).json({ error: error.message });
     }
   });
 
@@ -3937,13 +3963,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/shifts", authenticate, authorize("admin", "staff"), async (req, res) => {
     try {
       const { branchId } = req.query;
-      const effectiveBranchId = getEffectiveBranchId(req, branchId as string | undefined);
-      const shifts = effectiveBranchId 
+      const { branchId: effectiveBranchId, requiresFilter } = requireBranchAccess(req, branchId as string | undefined);
+      const shifts = requiresFilter && effectiveBranchId 
         ? await storage.getStaffShiftsByBranch(effectiveBranchId)
         : await storage.getAllStaffShifts();
       res.json(shifts);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      const statusCode = (error as any).statusCode || 500;
+      res.status(statusCode).json({ error: error.message });
     }
   });
 

@@ -42,7 +42,7 @@ export default function AdminSidebar({ soundEnabled = true, onToggleSound, onLog
     { icon: Package, label: "Inventory", path: "/admin/inventory", permissions: ["inventory.view"] },
     { icon: Store, label: "Suppliers", path: "/admin/suppliers", permissions: ["inventory.view"] },
     { icon: Trash2, label: "Wastage", path: "/admin/wastage", permissions: ["inventory.view"] },
-    { icon: RefreshCcw, label: "Refunds", path: "/admin/refunds", permissions: ["orders.view"] },
+    { icon: RefreshCcw, label: "Refunds", path: "/admin/refunds", permissions: ["refunds.view"] },
     { icon: Smartphone, label: "JazzCash Monitoring", path: "/admin/jazzcash", permissions: ["settings.view"] },
     { icon: Bike, label: "Riders", path: "/admin/riders", permissions: ["deliveries.view"] },
     { icon: Truck, label: "Deliveries", path: "/admin/deliveries", permissions: ["deliveries.view"] },

@@ -21,7 +21,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
-import { ShoppingCart, UtensilsCrossed, Users, BarChart3, Package, Truck, Megaphone, Settings, CreditCard, Heart, Receipt } from "lucide-react";
+import { ShoppingCart, UtensilsCrossed, Users, BarChart3, Package, Truck, Megaphone, Settings, CreditCard, Heart, Receipt, RefreshCcw } from "lucide-react";
 import type { User, Branch } from "@shared/schema";
 
 const PERMISSION_MODULES = [
@@ -147,6 +147,19 @@ const PERMISSION_MODULES = [
       { id: "expenses.delete", label: "Delete Expenses", description: "Remove expenses" },
       { id: "expenses.approve", label: "Approve Expenses", description: "Approve pending expenses" },
       { id: "expenses.view_reports", label: "Expense Reports", description: "View expense reports" },
+    ],
+  },
+  {
+    id: "refunds",
+    label: "Refund Management",
+    icon: RefreshCcw,
+    permissions: [
+      { id: "refunds.view", label: "View Refunds", description: "View all refund requests" },
+      { id: "refunds.create", label: "Request Refunds", description: "Create new refund requests" },
+      { id: "refunds.approve", label: "Approve Refunds", description: "Approve refund requests" },
+      { id: "refunds.process", label: "Process Refunds", description: "Execute refund transactions" },
+      { id: "refunds.reject", label: "Reject Refunds", description: "Reject refund requests" },
+      { id: "refunds.view_reports", label: "Refund Reports", description: "View refund analytics" },
     ],
   },
   {

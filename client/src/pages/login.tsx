@@ -57,7 +57,8 @@ export default function Login() {
         description: error.message || "Invalid credentials",
         variant: "destructive",
       });
-      setIsLoading(false); // Only reset on error to allow retry
+    } finally {
+      setIsLoading(false);
     }
   };
 

@@ -18,19 +18,150 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Badge } from "@/components/ui/badge";
+import { ShoppingCart, UtensilsCrossed, Users, BarChart3, Package, Truck, Megaphone, Settings, CreditCard, Heart } from "lucide-react";
 import type { User, Branch } from "@shared/schema";
 
-const AVAILABLE_PERMISSIONS = [
-  { id: "manage_menu", label: "Manage Menu", description: "Add, edit, and delete menu items" },
-  { id: "manage_orders", label: "Manage Orders", description: "View and update order status" },
-  { id: "manage_users", label: "Manage Users", description: "Add, edit, and delete users" },
-  { id: "view_reports", label: "View Reports", description: "Access analytics and reports" },
-  { id: "manage_inventory", label: "Manage Inventory", description: "Track stock and suppliers" },
-  { id: "manage_riders", label: "Manage Riders", description: "Assign and track deliveries" },
-  { id: "access_pos", label: "Access POS", description: "Use point of sale system" },
-  { id: "manage_promo_codes", label: "Manage Promo Codes", description: "Create and edit promotions" },
-  { id: "manage_settings", label: "Manage Settings", description: "Change system settings" },
+const PERMISSION_MODULES = [
+  {
+    id: "orders",
+    label: "Orders Management",
+    icon: ShoppingCart,
+    permissions: [
+      { id: "orders.view", label: "View Orders", description: "View all orders" },
+      { id: "orders.create", label: "Create Orders", description: "Create new orders" },
+      { id: "orders.update_status", label: "Update Status", description: "Change order status" },
+      { id: "orders.assign", label: "Assign Orders", description: "Assign orders to riders" },
+      { id: "orders.cancel", label: "Cancel Orders", description: "Cancel orders" },
+      { id: "orders.refund", label: "Process Refunds", description: "Process order refunds" },
+    ],
+  },
+  {
+    id: "menu",
+    label: "Menu Management",
+    icon: UtensilsCrossed,
+    permissions: [
+      { id: "menu.view", label: "View Menu", description: "View menu items" },
+      { id: "menu.create", label: "Create Items", description: "Add new menu items" },
+      { id: "menu.edit", label: "Edit Items", description: "Modify menu items" },
+      { id: "menu.delete", label: "Delete Items", description: "Remove menu items" },
+      { id: "menu.manage_categories", label: "Manage Categories", description: "Create/edit categories" },
+      { id: "menu.manage_variants", label: "Manage Variants", description: "Configure item variants" },
+    ],
+  },
+  {
+    id: "users",
+    label: "Users & Roles",
+    icon: Users,
+    permissions: [
+      { id: "users.view", label: "View Users", description: "View user list" },
+      { id: "users.create", label: "Create Users", description: "Add new users" },
+      { id: "users.edit", label: "Edit Users", description: "Modify user details" },
+      { id: "users.delete", label: "Delete Users", description: "Remove users" },
+      { id: "users.manage_permissions", label: "Manage Permissions", description: "Assign user permissions" },
+    ],
+  },
+  {
+    id: "pos",
+    label: "Point of Sale",
+    icon: CreditCard,
+    permissions: [
+      { id: "pos.access", label: "Access POS", description: "Use POS terminal" },
+      { id: "pos.manage_tables", label: "Manage Tables", description: "Configure table layout" },
+      { id: "pos.apply_discounts", label: "Apply Discounts", description: "Apply order discounts" },
+      { id: "pos.void_items", label: "Void Items", description: "Remove items from orders" },
+      { id: "pos.manage_cash", label: "Cash Management", description: "Handle cash drawer" },
+      { id: "pos.view_kitchen", label: "Kitchen Display", description: "Access kitchen display" },
+    ],
+  },
+  {
+    id: "delivery",
+    label: "Deliveries & Riders",
+    icon: Truck,
+    permissions: [
+      { id: "delivery.view_riders", label: "View Riders", description: "View rider list" },
+      { id: "delivery.manage_riders", label: "Manage Riders", description: "Add/edit riders" },
+      { id: "delivery.assign_orders", label: "Assign Deliveries", description: "Assign orders to riders" },
+      { id: "delivery.track_riders", label: "Track Riders", description: "View rider locations" },
+      { id: "delivery.manage_zones", label: "Manage Zones", description: "Configure delivery zones" },
+    ],
+  },
+  {
+    id: "inventory",
+    label: "Inventory & Suppliers",
+    icon: Package,
+    permissions: [
+      { id: "inventory.view_stock", label: "View Stock", description: "View stock levels" },
+      { id: "inventory.adjust_stock", label: "Adjust Stock", description: "Modify stock quantities" },
+      { id: "inventory.manage_suppliers", label: "Manage Suppliers", description: "Add/edit suppliers" },
+      { id: "inventory.receive_stock", label: "Receive Stock", description: "Record stock receipts" },
+      { id: "inventory.view_audit", label: "View Audit Logs", description: "View stock history" },
+      { id: "inventory.manage_wastage", label: "Manage Wastage", description: "Record wastage" },
+    ],
+  },
+  {
+    id: "marketing",
+    label: "Marketing & Promos",
+    icon: Megaphone,
+    permissions: [
+      { id: "marketing.view_campaigns", label: "View Campaigns", description: "View marketing campaigns" },
+      { id: "marketing.manage_campaigns", label: "Manage Campaigns", description: "Create/edit campaigns" },
+      { id: "marketing.view_promos", label: "View Promo Codes", description: "View promotional codes" },
+      { id: "marketing.manage_promos", label: "Manage Promo Codes", description: "Create/edit promo codes" },
+      { id: "marketing.send_notifications", label: "Send Notifications", description: "Send push notifications" },
+    ],
+  },
+  {
+    id: "reports",
+    label: "Analytics & Reports",
+    icon: BarChart3,
+    permissions: [
+      { id: "reports.view_sales", label: "View Sales Reports", description: "Access sales data" },
+      { id: "reports.view_analytics", label: "View Analytics", description: "Access analytics dashboard" },
+      { id: "reports.view_customer", label: "Customer Reports", description: "View customer insights" },
+      { id: "reports.view_inventory", label: "Inventory Reports", description: "View stock reports" },
+      { id: "reports.export_data", label: "Export Data", description: "Export report data" },
+    ],
+  },
+  {
+    id: "loyalty",
+    label: "Loyalty & Customers",
+    icon: Heart,
+    permissions: [
+      { id: "loyalty.view_customers", label: "View Customers", description: "View customer list" },
+      { id: "loyalty.manage_points", label: "Manage Points", description: "Adjust loyalty points" },
+      { id: "loyalty.view_rewards", label: "View Rewards", description: "View reward redemptions" },
+      { id: "loyalty.manage_tiers", label: "Manage Tiers", description: "Configure loyalty tiers" },
+    ],
+  },
+  {
+    id: "settings",
+    label: "System Settings",
+    icon: Settings,
+    permissions: [
+      { id: "settings.view", label: "View Settings", description: "View system settings" },
+      { id: "settings.general", label: "General Settings", description: "Modify general settings" },
+      { id: "settings.branches", label: "Manage Branches", description: "Add/edit branches" },
+      { id: "settings.payments", label: "Payment Settings", description: "Configure payments" },
+      { id: "settings.integrations", label: "Integrations", description: "Manage integrations" },
+      { id: "settings.backup", label: "Backup & Clone", description: "Database operations" },
+    ],
+  },
 ];
+
+const ROLE_DEFAULT_PERMISSIONS: Record<string, string[]> = {
+  admin: PERMISSION_MODULES.flatMap(m => m.permissions.map(p => p.id)),
+  staff: [
+    "orders.view", "orders.create", "orders.update_status",
+    "menu.view",
+    "pos.access", "pos.apply_discounts", "pos.view_kitchen",
+    "inventory.view_stock",
+    "reports.view_sales",
+  ],
+  customer: [],
+};
 
 const userFormSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters"),
@@ -227,7 +358,7 @@ export default function AdminUsers() {
                   Add User
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-md">
+              <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
                 <DialogHeader>
                   <DialogTitle>{editingUser ? "Edit User" : "Add New User"}</DialogTitle>
                   <DialogDescription>
@@ -235,194 +366,315 @@ export default function AdminUsers() {
                   </DialogDescription>
                 </DialogHeader>
                 <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="fullName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Full Name</FormLabel>
-                          <FormControl>
-                            <Input {...field} data-testid="input-fullname" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="username"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Username</FormLabel>
-                          <FormControl>
-                            <Input {...field} data-testid="input-username" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email</FormLabel>
-                          <FormControl>
-                            <Input type="email" {...field} data-testid="input-email" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="password"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{editingUser ? "New Password (leave blank to keep current)" : "Password"}</FormLabel>
-                          <FormControl>
-                            <Input type="password" {...field} data-testid="input-password" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="phone"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Phone (Optional)</FormLabel>
-                          <FormControl>
-                            <Input {...field} data-testid="input-phone" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="role"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Role</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger data-testid="select-role">
-                                <SelectValue placeholder="Select role" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="admin">Admin</SelectItem>
-                              <SelectItem value="staff">Staff</SelectItem>
-                              <SelectItem value="customer">Customer</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="branchId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Assigned Branch (Optional)</FormLabel>
-                          <Select 
-                            onValueChange={(value) => field.onChange(value === "none" ? "" : value)} 
-                            value={field.value || "none"}
-                          >
-                            <FormControl>
-                              <SelectTrigger data-testid="select-branch">
-                                <SelectValue placeholder="Select branch" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="none">No branch assignment</SelectItem>
-                              {branches.map((branch) => (
-                                <SelectItem key={branch.id} value={branch.id}>
-                                  {branch.name} - {branch.city}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="isActive"
-                      render={({ field }) => (
-                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                          <div className="space-y-0.5">
-                            <FormLabel className="text-base">Active</FormLabel>
-                            <div className="text-sm text-muted-foreground">
-                              User can access the system
-                            </div>
-                          </div>
-                          <FormControl>
-                            <Switch
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                              data-testid="switch-active"
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    
-                    {/* Permissions Section */}
-                    {(form.watch("role") === "admin" || form.watch("role") === "staff") && (
-                      <FormField
-                        control={form.control}
-                        name="permissions"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Permissions</FormLabel>
-                            <div className="rounded-lg border p-4 space-y-3 max-h-48 overflow-y-auto">
-                              {AVAILABLE_PERMISSIONS.map((permission) => (
-                                <div key={permission.id} className="flex items-start space-x-3">
-                                  <Checkbox
-                                    id={`perm-${permission.id}`}
-                                    checked={field.value?.includes(permission.id)}
-                                    onCheckedChange={(checked) => {
-                                      const currentPerms = field.value || [];
-                                      if (checked) {
-                                        field.onChange([...currentPerms, permission.id]);
-                                      } else {
-                                        field.onChange(currentPerms.filter((p: string) => p !== permission.id));
-                                      }
-                                    }}
-                                    data-testid={`checkbox-perm-${permission.id}`}
-                                  />
-                                  <div className="grid gap-1 leading-none">
-                                    <Label
-                                      htmlFor={`perm-${permission.id}`}
-                                      className="text-sm font-medium cursor-pointer"
-                                    >
-                                      {permission.label}
-                                    </Label>
-                                    <p className="text-xs text-muted-foreground">
-                                      {permission.description}
-                                    </p>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 overflow-hidden">
+                    <ScrollArea className="flex-1 pr-4">
+                      <div className="space-y-4 pb-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField
+                            control={form.control}
+                            name="fullName"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Full Name</FormLabel>
+                                <FormControl>
+                                  <Input {...field} data-testid="input-fullname" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="username"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Username</FormLabel>
+                                <FormControl>
+                                  <Input {...field} data-testid="input-username" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField
+                            control={form.control}
+                            name="email"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Email</FormLabel>
+                                <FormControl>
+                                  <Input type="email" {...field} data-testid="input-email" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="password"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>{editingUser ? "New Password (optional)" : "Password"}</FormLabel>
+                                <FormControl>
+                                  <Input type="password" {...field} data-testid="input-password" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField
+                            control={form.control}
+                            name="phone"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Phone (Optional)</FormLabel>
+                                <FormControl>
+                                  <Input {...field} data-testid="input-phone" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="role"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Role</FormLabel>
+                                <Select 
+                                  onValueChange={(value) => {
+                                    field.onChange(value);
+                                    const defaultPerms = ROLE_DEFAULT_PERMISSIONS[value] || [];
+                                    form.setValue("permissions", defaultPerms);
+                                  }} 
+                                  value={field.value}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger data-testid="select-role">
+                                      <SelectValue placeholder="Select role" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="admin">Admin</SelectItem>
+                                    <SelectItem value="staff">Staff</SelectItem>
+                                    <SelectItem value="customer">Customer</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField
+                            control={form.control}
+                            name="branchId"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Assigned Branch</FormLabel>
+                                <Select 
+                                  onValueChange={(value) => field.onChange(value === "none" ? "" : value)} 
+                                  value={field.value || "none"}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger data-testid="select-branch">
+                                      <SelectValue placeholder="Select branch" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="none">No branch assignment</SelectItem>
+                                    {branches.map((branch) => (
+                                      <SelectItem key={branch.id} value={branch.id}>
+                                        {branch.name} - {branch.city}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="isActive"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 h-[72px]">
+                                <div className="space-y-0.5">
+                                  <FormLabel className="text-base">Active</FormLabel>
+                                  <div className="text-xs text-muted-foreground">
+                                    User can access the system
                                   </div>
                                 </div>
-                              ))}
-                            </div>
-                            <FormMessage />
-                          </FormItem>
+                                <FormControl>
+                                  <Switch
+                                    checked={field.value}
+                                    onCheckedChange={field.onChange}
+                                    data-testid="switch-active"
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        
+                        {/* Permissions Section */}
+                        {(form.watch("role") === "admin" || form.watch("role") === "staff") && (
+                          <FormField
+                            control={form.control}
+                            name="permissions"
+                            render={({ field }) => {
+                              const selectedPerms = field.value || [];
+                              const totalPerms = PERMISSION_MODULES.flatMap(m => m.permissions).length;
+                              
+                              const getModuleState = (moduleId: string) => {
+                                const module = PERMISSION_MODULES.find(m => m.id === moduleId);
+                                if (!module) return "none";
+                                const modulePermIds = module.permissions.map(p => p.id);
+                                const selectedCount = modulePermIds.filter(id => selectedPerms.includes(id)).length;
+                                if (selectedCount === 0) return "none";
+                                if (selectedCount === modulePermIds.length) return "all";
+                                return "partial";
+                              };
+                              
+                              const toggleModule = (moduleId: string) => {
+                                const module = PERMISSION_MODULES.find(m => m.id === moduleId);
+                                if (!module) return;
+                                const modulePermIds = module.permissions.map(p => p.id);
+                                const state = getModuleState(moduleId);
+                                
+                                if (state === "all") {
+                                  field.onChange(selectedPerms.filter(p => !modulePermIds.includes(p)));
+                                } else {
+                                  const newPerms = Array.from(new Set([...selectedPerms, ...modulePermIds]));
+                                  field.onChange(newPerms);
+                                }
+                              };
+                              
+                              const togglePermission = (permId: string) => {
+                                if (selectedPerms.includes(permId)) {
+                                  field.onChange(selectedPerms.filter(p => p !== permId));
+                                } else {
+                                  field.onChange([...selectedPerms, permId]);
+                                }
+                              };
+                              
+                              const selectAll = () => {
+                                field.onChange(PERMISSION_MODULES.flatMap(m => m.permissions.map(p => p.id)));
+                              };
+                              
+                              const clearAll = () => {
+                                field.onChange([]);
+                              };
+                              
+                              return (
+                                <FormItem>
+                                  <div className="flex items-center justify-between mb-2">
+                                    <FormLabel className="text-base font-semibold">Permissions</FormLabel>
+                                    <div className="flex items-center gap-2">
+                                      <Badge variant="secondary" className="text-xs">
+                                        {selectedPerms.length}/{totalPerms} selected
+                                      </Badge>
+                                      <Button 
+                                        type="button" 
+                                        variant="outline" 
+                                        size="sm"
+                                        onClick={selectAll}
+                                        data-testid="button-select-all-perms"
+                                      >
+                                        Select All
+                                      </Button>
+                                      <Button 
+                                        type="button" 
+                                        variant="outline" 
+                                        size="sm"
+                                        onClick={clearAll}
+                                        data-testid="button-clear-all-perms"
+                                      >
+                                        Clear All
+                                      </Button>
+                                    </div>
+                                  </div>
+                                  <div className="rounded-lg border">
+                                    <Accordion type="multiple" className="w-full">
+                                      {PERMISSION_MODULES.map((module) => {
+                                        const moduleState = getModuleState(module.id);
+                                        const selectedCount = module.permissions.filter(p => selectedPerms.includes(p.id)).length;
+                                        const Icon = module.icon;
+                                        
+                                        return (
+                                          <AccordionItem key={module.id} value={module.id} className="border-b last:border-b-0">
+                                            <div className="flex items-center px-4 py-2 hover:bg-muted/50">
+                                              <Checkbox
+                                                checked={moduleState === "all"}
+                                                ref={(el) => {
+                                                  if (el) {
+                                                    (el as HTMLButtonElement).dataset.state = moduleState === "partial" ? "indeterminate" : moduleState === "all" ? "checked" : "unchecked";
+                                                  }
+                                                }}
+                                                onCheckedChange={() => toggleModule(module.id)}
+                                                className="mr-3"
+                                                data-testid={`checkbox-module-${module.id}`}
+                                              />
+                                              <AccordionTrigger className="flex-1 hover:no-underline py-0">
+                                                <div className="flex items-center gap-2">
+                                                  <Icon className="h-4 w-4 text-muted-foreground" />
+                                                  <span className="font-medium">{module.label}</span>
+                                                  <Badge variant="outline" className="ml-2 text-xs">
+                                                    {selectedCount}/{module.permissions.length}
+                                                  </Badge>
+                                                </div>
+                                              </AccordionTrigger>
+                                            </div>
+                                            <AccordionContent className="pb-0">
+                                              <div className="grid grid-cols-1 md:grid-cols-2 gap-1 px-4 pb-3 pt-1">
+                                                {module.permissions.map((perm) => (
+                                                  <div 
+                                                    key={perm.id} 
+                                                    className="flex items-start gap-2 p-2 rounded hover:bg-muted/30 cursor-pointer"
+                                                    onClick={() => togglePermission(perm.id)}
+                                                  >
+                                                    <Checkbox
+                                                      checked={selectedPerms.includes(perm.id)}
+                                                      onCheckedChange={() => togglePermission(perm.id)}
+                                                      onClick={(e) => e.stopPropagation()}
+                                                      data-testid={`checkbox-perm-${perm.id}`}
+                                                    />
+                                                    <div className="grid gap-0.5 leading-none">
+                                                      <Label className="text-sm cursor-pointer">
+                                                        {perm.label}
+                                                      </Label>
+                                                      <p className="text-xs text-muted-foreground">
+                                                        {perm.description}
+                                                      </p>
+                                                    </div>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            </AccordionContent>
+                                          </AccordionItem>
+                                        );
+                                      })}
+                                    </Accordion>
+                                  </div>
+                                  <FormMessage />
+                                </FormItem>
+                              );
+                            }}
+                          />
                         )}
-                      />
-                    )}
-                    <DialogFooter>
+                      </div>
+                    </ScrollArea>
+                    <DialogFooter className="pt-4 border-t mt-4">
                       <Button
                         type="submit"
                         disabled={createMutation.isPending || updateMutation.isPending}
                         data-testid="button-save-user"
                       >
-                        {editingUser ? "Update User" : "Create User"}
+                        {createMutation.isPending || updateMutation.isPending ? "Saving..." : editingUser ? "Update User" : "Create User"}
                       </Button>
                     </DialogFooter>
                   </form>

@@ -56,6 +56,8 @@ The application features a dual interface: a visual-first Customer Interface and
 
 **Hierarchical Permissions System**: Granular role-based access control with 12 permission modules (Orders, Menu, Users & Roles, POS, Deliveries & Riders, Inventory & Suppliers, Marketing, Analytics & Reports, Loyalty & Customers, Expense Management, System Settings) containing 60+ individual permissions. Features accordion-based UI with module-level checkboxes, Select All/Clear All functionality, and responsive design for mobile devices. Permissions stored as text arrays using module.action format (e.g., "orders.view", "expenses.approve").
 
+**Branch-Based Access Control**: Comprehensive branch filtering across all modules. Non-admin users (staff, riders) are automatically restricted to viewing only data from their assigned branch. Backend uses `requireBranchAccess()` helper which enforces branch access - throws 403 if non-admin user has no branchId assigned. Routes using branch filtering: orders, expenses, POS tables/sessions, shifts, riders, deliveries, inventory transactions. Admins can access all branches or filter by specific branchId.
+
 ## External Dependencies
 
 -   **UI Component Libraries**: Radix UI, shadcn/ui

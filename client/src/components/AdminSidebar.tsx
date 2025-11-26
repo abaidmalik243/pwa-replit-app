@@ -1,4 +1,4 @@
-import { LayoutDashboard, ShoppingBag, UtensilsCrossed, Users, Settings, LogOut, Volume2, VolumeX, FolderOpen, Receipt, TrendingUp, Building2, CreditCard, Table2, ChefHat, Calculator, BarChart3, Bike, Truck, MapPin, Tag, DollarSign, Layers, Package, Store, Trash2, RefreshCcw, Calendar, Clock, FileText, MessageSquare, Mail, Target, Smartphone, PieChart } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, UtensilsCrossed, Users, Settings, LogOut, Volume2, VolumeX, FolderOpen, Receipt, TrendingUp, Building2, CreditCard, Table2, ChefHat, Calculator, BarChart3, Bike, Truck, MapPin, Tag, DollarSign, Layers, Package, Store, Trash2, RefreshCcw, Calendar, Clock, FileText, MessageSquare, Mail, Target, Smartphone, PieChart, Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Link, useLocation } from "wouter";
@@ -48,6 +48,7 @@ export default function AdminSidebar({ soundEnabled = true, onToggleSound, onLog
     { icon: Truck, label: "Deliveries", path: "/admin/deliveries", permissions: ["deliveries.view"] },
     { icon: MapPin, label: "Rider Tracking", path: "/admin/rider-tracking", permissions: ["deliveries.view"] },
     { icon: Tag, label: "Promo Codes", path: "/admin/promo-codes", permissions: ["loyalty.view"] },
+    { icon: Heart, label: "Saved Customers", path: "/admin/customers", permissions: ["loyalty.view_customers"] },
     { icon: DollarSign, label: "Delivery Charges", path: "/admin/delivery-charges", permissions: ["settings.view"] },
     { icon: Users, label: "Users & Roles", path: "/admin/users", permissions: ["users.view"] },
     { icon: Calendar, label: "Shift Schedule", path: "/admin/shifts", permissions: ["users.view"] },

@@ -59,6 +59,7 @@ import AdminMessageTemplates from "@/pages/admin-message-templates";
 import AdminCustomerSegments from "@/pages/admin-customer-segments";
 import AdminSeedData from "@/pages/admin-seed-data";
 import AdminCloneToProduction from "@/pages/admin-clone-to-production";
+import AdminCustomers from "@/pages/admin-customers";
 
 function Router() {
   return (
@@ -180,6 +181,11 @@ function Router() {
       <Route path="/admin/settings">
         <ProtectedRoute requireRole={["admin"]}>
           <AdminSettings />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/customers">
+        <ProtectedRoute requireRole={["admin", "staff"]}>
+          <AdminCustomers />
         </ProtectedRoute>
       </Route>
       <Route path="/admin/seed-data">

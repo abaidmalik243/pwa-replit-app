@@ -127,6 +127,17 @@ function requirePermission(...requiredPermissions: string[]) {
   };
 }
 
+// Helper function to get effective branch ID for filtering
+// For admins: use query param branchId if provided, otherwise return null (all branches)
+// For non-admins: always use their assigned branchId regardless of query param
+function getEffectiveBranchId(req: Request, queryBranchId?: string): string | null {
+  if (req.user?.role === "admin") {
+    return queryBranchId || null;
+  }
+  // Non-admin users always see only their assigned branch
+  return req.user?.branchId || null;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication routes
   app.post("/api/auth/signup", async (req, res) => {
@@ -791,10 +802,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/orders", authenticate, requirePermission("orders.view"), async (req, res) => {
     try {
       const { branchId, status } = req.query;
+      const effectiveBranchId = getEffectiveBranchId(req, branchId as string | undefined);
       let orders;
       
-      if (branchId) {
-        orders = await storage.getOrdersByBranch(branchId as string);
+      if (effectiveBranchId) {
+        orders = await storage.getOrdersByBranch(effectiveBranchId);
+        // Further filter by status if provided
+        if (status) {
+          orders = orders.filter((order: any) => order.status === status);
+        }
       } else if (status) {
         orders = await storage.getOrdersByStatus(status as string);
       } else {
@@ -1160,10 +1176,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/expenses", authenticate, requirePermission("expenses.view"), async (req, res) => {
     try {
       const { branchId } = req.query;
+      const effectiveBranchId = getEffectiveBranchId(req, branchId as string | undefined);
       let expenses;
       
-      if (branchId) {
-        expenses = await storage.getExpensesByBranch(branchId as string);
+      if (effectiveBranchId) {
+        expenses = await storage.getExpensesByBranch(effectiveBranchId);
       } else {
         expenses = await storage.getAllExpenses();
       }
@@ -1205,11 +1222,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POS Tables routes
-  app.get("/api/pos/tables", async (req, res) => {
+  app.get("/api/pos/tables", authenticate, async (req, res) => {
     try {
       const { branchId } = req.query;
-      const tables = branchId
-        ? await storage.getPosTablesByBranch(branchId as string)
+      const effectiveBranchId = getEffectiveBranchId(req, branchId as string | undefined);
+      const tables = effectiveBranchId
+        ? await storage.getPosTablesByBranch(effectiveBranchId)
         : await storage.getAllPosTables();
       res.json(tables);
     } catch (error: any) {
@@ -1260,11 +1278,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POS Sessions routes
-  app.get("/api/pos/sessions", async (req, res) => {
+  app.get("/api/pos/sessions", authenticate, async (req, res) => {
     try {
       const { branchId } = req.query;
-      const sessions = branchId
-        ? await storage.getPosSessionsByBranch(branchId as string)
+      const effectiveBranchId = getEffectiveBranchId(req, branchId as string | undefined);
+      const sessions = effectiveBranchId
+        ? await storage.getPosSessionsByBranch(effectiveBranchId)
         : await storage.getAllPosSessions();
       res.json(sessions);
     } catch (error: any) {
@@ -1701,7 +1720,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all riders (admin/staff only)
   app.get("/api/riders", authenticate, authorize("admin", "staff"), async (req, res) => {
     try {
-      const riders = await storage.getAllRiders();
+      const { branchId } = req.query;
+      const effectiveBranchId = getEffectiveBranchId(req, branchId as string | undefined);
+      const riders = effectiveBranchId
+        ? await storage.getRidersByBranch(effectiveBranchId)
+        : await storage.getAllRiders();
       res.json(riders);
     } catch (error: any) {
       console.error("Error fetching riders:", error);
@@ -1931,7 +1954,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all deliveries (admin/staff only)
   app.get("/api/deliveries", authenticate, authorize("admin", "staff"), async (req, res) => {
     try {
-      const deliveries = await storage.getAllDeliveries();
+      const { branchId } = req.query;
+      const effectiveBranchId = getEffectiveBranchId(req, branchId as string | undefined);
+      const deliveries = effectiveBranchId
+        ? await storage.getDeliveriesByBranch(effectiveBranchId)
+        : await storage.getAllDeliveries();
       res.json(deliveries);
     } catch (error: any) {
       console.error("Error fetching deliveries:", error);
@@ -3212,7 +3239,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.get("/api/inventory/transactions", authenticate, authorize("admin", "staff"), async (req, res) => {
     try {
-      const transactions = await storage.getAllInventoryTransactions();
+      const { branchId } = req.query;
+      const effectiveBranchId = getEffectiveBranchId(req, branchId as string | undefined);
+      const transactions = effectiveBranchId
+        ? await storage.getInventoryTransactionsByBranch(effectiveBranchId)
+        : await storage.getAllInventoryTransactions();
       res.json(transactions);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -3906,8 +3937,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/shifts", authenticate, authorize("admin", "staff"), async (req, res) => {
     try {
       const { branchId } = req.query;
-      const shifts = branchId 
-        ? await storage.getStaffShiftsByBranch(branchId as string)
+      const effectiveBranchId = getEffectiveBranchId(req, branchId as string | undefined);
+      const shifts = effectiveBranchId 
+        ? await storage.getStaffShiftsByBranch(effectiveBranchId)
         : await storage.getAllStaffShifts();
       res.json(shifts);
     } catch (error: any) {

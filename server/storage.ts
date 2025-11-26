@@ -122,6 +122,7 @@ export interface IStorage {
   getAllDeliveries(): Promise<schema.Delivery[]>;
   getDelivery(id: string): Promise<schema.Delivery | undefined>;
   getDeliveriesByRider(riderId: string): Promise<schema.Delivery[]>;
+  getDeliveriesByBranch(branchId: string): Promise<schema.Delivery[]>;
   getActiveDeliveriesByRider(riderId: string): Promise<schema.Delivery[]>;
   getDeliveryByOrder(orderId: string): Promise<schema.Delivery | undefined>;
   createDelivery(delivery: schema.InsertDelivery): Promise<schema.Delivery>;
@@ -211,6 +212,7 @@ export interface IStorage {
   // Inventory Transactions
   getInventoryTransactions(menuItemId: string, branchId: string): Promise<schema.InventoryTransaction[]>;
   getAllInventoryTransactions(): Promise<schema.InventoryTransaction[]>;
+  getInventoryTransactionsByBranch(branchId: string): Promise<schema.InventoryTransaction[]>;
   createInventoryTransaction(transaction: schema.InsertInventoryTransaction): Promise<schema.InventoryTransaction>;
   
   // Stock Wastage
@@ -837,6 +839,10 @@ export class DbStorage implements IStorage {
     return await db.select().from(schema.deliveries).where(eq(schema.deliveries.riderId, riderId)).orderBy(desc(schema.deliveries.assignedAt));
   }
 
+  async getDeliveriesByBranch(branchId: string) {
+    return await db.select().from(schema.deliveries).where(eq(schema.deliveries.branchId, branchId)).orderBy(desc(schema.deliveries.assignedAt));
+  }
+
   async getActiveDeliveriesByRider(riderId: string) {
     return await db.select().from(schema.deliveries).where(
       and(
@@ -1229,6 +1235,12 @@ export class DbStorage implements IStorage {
 
   async getAllInventoryTransactions() {
     return await db.select().from(schema.inventoryTransactions)
+      .orderBy(desc(schema.inventoryTransactions.createdAt));
+  }
+
+  async getInventoryTransactionsByBranch(branchId: string) {
+    return await db.select().from(schema.inventoryTransactions)
+      .where(eq(schema.inventoryTransactions.branchId, branchId))
       .orderBy(desc(schema.inventoryTransactions.createdAt));
   }
 

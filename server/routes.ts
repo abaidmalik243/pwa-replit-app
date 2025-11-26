@@ -778,7 +778,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paymentMethodBreakdown = Object.entries(paymentBreakdown).map(([method, amount]) => ({
         method: method.charAt(0).toUpperCase() + method.slice(1),
         amount,
+        count: filteredOrders.filter(o => (o.paymentMethod || "cash") === method).length,
       }));
+
+      // Expense breakdown by category
+      const expenseByCategory = filteredExpenses.reduce((acc, expense) => {
+        const category = expense.category || "other";
+        acc[category] = (acc[category] || 0) + Number(expense.amount);
+        return acc;
+      }, {} as Record<string, number>);
+
+      const expenseCategoryBreakdown = Object.entries(expenseByCategory)
+        .map(([category, amount]) => ({
+          category: category.charAt(0).toUpperCase() + category.slice(1),
+          amount,
+          count: filteredExpenses.filter(e => (e.category || "other") === category).length,
+        }))
+        .sort((a, b) => b.amount - a.amount);
+
+      // Daily expense trends
+      const dailyExpenseMap = new Map<string, number>();
+      filteredExpenses.forEach(expense => {
+        const dateKey = new Date(expense.date).toISOString().split('T')[0];
+        dailyExpenseMap.set(dateKey, (dailyExpenseMap.get(dateKey) || 0) + Number(expense.amount));
+      });
+
+      const dailyExpenses = Array.from(dailyExpenseMap.entries())
+        .map(([date, amount]) => ({ date, amount }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      // Expense statistics
+      const expenseStats = {
+        totalExpenses,
+        expenseCount: filteredExpenses.length,
+        averageExpense: filteredExpenses.length > 0 ? totalExpenses / filteredExpenses.length : 0,
+        highestExpense: filteredExpenses.length > 0 ? Math.max(...filteredExpenses.map(e => Number(e.amount))) : 0,
+        topCategory: expenseCategoryBreakdown[0]?.category || "N/A",
+      };
 
       // Response data structure matching the frontend expectations
       res.json({
@@ -801,6 +837,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         paymentMethodBreakdown,
         dailySales,
         orderSourceCounts,
+        expenseCategoryBreakdown,
+        dailyExpenses,
+        expenseStats,
       });
     } catch (error: any) {
       console.error("Error fetching reports:", error);

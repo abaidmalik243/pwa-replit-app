@@ -1192,18 +1192,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Expense routes
+  // Expense routes - returns daily expenses (5 AM today to 4:59 AM tomorrow)
   app.get("/api/expenses", authenticate, requirePermission("expenses.view"), async (req, res) => {
     try {
       const { branchId } = req.query;
       const { branchId: effectiveBranchId, requiresFilter } = requireBranchAccess(req, branchId as string | undefined);
-      let expenses;
       
-      if (requiresFilter && effectiveBranchId) {
-        expenses = await storage.getExpensesByBranch(effectiveBranchId);
-      } else {
-        expenses = await storage.getAllExpenses();
-      }
+      // Use getDailyExpenses to filter to 24-hour window (5 AM - 4:59 AM)
+      const expenses = await storage.getDailyExpenses(
+        requiresFilter && effectiveBranchId ? effectiveBranchId : (branchId as string | undefined)
+      );
       
       res.json(expenses);
     } catch (error: any) {

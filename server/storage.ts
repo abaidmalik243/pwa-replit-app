@@ -51,6 +51,7 @@ export interface IStorage {
   getAllExpenses(): Promise<schema.Expense[]>;
   getExpense(id: string): Promise<schema.Expense | undefined>;
   getExpensesByBranch(branchId: string): Promise<schema.Expense[]>;
+  getDailyExpenses(branchId?: string): Promise<schema.Expense[]>;
   createExpense(expense: schema.InsertExpense): Promise<schema.Expense>;
   updateExpense(id: string, expense: Partial<schema.InsertExpense>): Promise<schema.Expense | undefined>;
   deleteExpense(id: string): Promise<boolean>;
@@ -532,6 +533,35 @@ export class DbStorage implements IStorage {
 
   async getExpensesByBranch(branchId: string) {
     return await db.select().from(schema.expenses).where(eq(schema.expenses.branchId, branchId)).orderBy(desc(schema.expenses.date));
+  }
+
+  async getDailyExpenses(branchId?: string) {
+    // Calculate the 24-hour window: 5:00 AM today to 4:59 AM tomorrow
+    const now = new Date();
+    const today5AM = new Date(now);
+    today5AM.setHours(5, 0, 0, 0);
+    
+    // If current time is before 5 AM, the window started yesterday at 5 AM
+    if (now.getHours() < 5) {
+      today5AM.setDate(today5AM.getDate() - 1);
+    }
+    
+    const tomorrow459AM = new Date(today5AM);
+    tomorrow459AM.setDate(tomorrow459AM.getDate() + 1);
+    tomorrow459AM.setHours(4, 59, 59, 999);
+    
+    const conditions = [
+      gte(schema.expenses.date, today5AM),
+      lte(schema.expenses.date, tomorrow459AM)
+    ];
+    
+    if (branchId) {
+      conditions.push(eq(schema.expenses.branchId, branchId));
+    }
+    
+    return await db.select().from(schema.expenses)
+      .where(and(...conditions))
+      .orderBy(desc(schema.expenses.date));
   }
 
   async createExpense(expense: schema.InsertExpense) {

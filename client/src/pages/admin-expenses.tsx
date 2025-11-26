@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/context/AuthContext";
 import AdminSidebar from "@/components/AdminSidebar";
 import AdminHeader from "@/components/AdminHeader";
 import { Button } from "@/components/ui/button";
@@ -46,10 +47,27 @@ export default function AdminExpenses() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
 
-  const { data: branches = [] } = useQuery<Branch[]>({
+  const isAdmin = user?.role === "admin";
+  const userBranchId = user?.branchId;
+
+  const { data: allBranches = [] } = useQuery<Branch[]>({
     queryKey: ["/api/branches"],
   });
+
+  const allowedBranches = useMemo(() => {
+    if (isAdmin) {
+      return allBranches;
+    }
+    return allBranches.filter(branch => branch.id === userBranchId);
+  }, [allBranches, isAdmin, userBranchId]);
+
+  useEffect(() => {
+    if (!isAdmin && userBranchId && selectedBranch === "all") {
+      setSelectedBranch(userBranchId);
+    }
+  }, [isAdmin, userBranchId, selectedBranch]);
 
   const { data: expenses = [], isLoading } = useQuery<Expense[]>({
     queryKey: ["/api/expenses", selectedBranch],
@@ -57,20 +75,28 @@ export default function AdminExpenses() {
       const url = selectedBranch === "all" 
         ? "/api/expenses" 
         : `/api/expenses?branchId=${selectedBranch}`;
-      return await fetch(url).then(res => res.json());
+      return await fetch(url, { credentials: "include" }).then(res => res.json());
     },
   });
 
   const form = useForm<ExpenseForm>({
     resolver: zodResolver(expenseSchema),
     defaultValues: {
-      branchId: "",
+      branchId: !isAdmin && userBranchId ? userBranchId : "",
       category: "",
       description: "",
       amount: "",
       date: format(new Date(), "yyyy-MM-dd"),
     },
   });
+
+  useEffect(() => {
+    if (!isAdmin && userBranchId) {
+      form.setValue("branchId", userBranchId);
+    }
+  }, [isAdmin, userBranchId, form]);
+
+  const canAddExpense = isAdmin || !!userBranchId;
 
   const createMutation = useMutation({
     mutationFn: async (data: ExpenseForm) => {
@@ -108,7 +134,7 @@ export default function AdminExpenses() {
   );
 
   const getBranchName = (branchId: string) => {
-    const branch = branches.find((b) => b.id === branchId);
+    const branch = allBranches.find((b) => b.id === branchId);
     return branch?.name || "Unknown Branch";
   };
 
@@ -142,13 +168,20 @@ export default function AdminExpenses() {
             <div>
               <h1 className="text-3xl font-bold mb-2">Daily Expenses</h1>
               <p className="text-muted-foreground">
-                Track and manage expenses across all branches
+                {isAdmin 
+                  ? "Track and manage expenses across all branches"
+                  : `Track and manage expenses for ${getBranchName(userBranchId || "")}`
+                }
               </p>
             </div>
 
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
               <DialogTrigger asChild>
-                <Button data-testid="button-add-expense">
+                <Button 
+                  data-testid="button-add-expense"
+                  disabled={!canAddExpense}
+                  title={!canAddExpense ? "You need a branch assignment to add expenses" : undefined}
+                >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Expense
                 </Button>
@@ -168,14 +201,18 @@ export default function AdminExpenses() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Branch</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
+                          <Select 
+                            onValueChange={field.onChange} 
+                            value={field.value}
+                            disabled={!isAdmin && allowedBranches.length === 1}
+                          >
                             <FormControl>
                               <SelectTrigger data-testid="select-branch">
                                 <SelectValue placeholder="Select branch" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {branches.map((branch) => (
+                              {allowedBranches.map((branch) => (
                                 <SelectItem key={branch.id} value={branch.id}>
                                   {branch.name}
                                 </SelectItem>
@@ -299,8 +336,8 @@ export default function AdminExpenses() {
                 <SelectValue placeholder="All Branches" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Branches</SelectItem>
-                {branches.map((branch) => (
+                {isAdmin && <SelectItem value="all">All Branches</SelectItem>}
+                {allowedBranches.map((branch) => (
                   <SelectItem key={branch.id} value={branch.id}>
                     {branch.name}
                   </SelectItem>

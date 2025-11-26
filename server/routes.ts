@@ -19,8 +19,10 @@ declare global {
         id: string;
         email: string;
         username: string;
+        fullName: string;
         role: string;
         branchId: string | null;
+        permissions: string[];
       };
     }
   }
@@ -53,9 +55,12 @@ async function authenticate(req: Request, res: Response, next: NextFunction) {
       return res.status(401).json({ error: "User not found" });
     }
 
-    // Attach user to request (without password)
+    // Attach user to request (without password, with permissions)
     const { password: _, ...userWithoutPassword } = user;
-    req.user = userWithoutPassword;
+    req.user = {
+      ...userWithoutPassword,
+      permissions: user.permissions || [],
+    };
     next();
   } catch (error) {
     if (error instanceof jwt.JsonWebTokenError) {
@@ -78,6 +83,44 @@ function authorize(...allowedRoles: string[]) {
 
     if (!allowedRoles.includes(req.user.role)) {
       return res.status(403).json({ error: "Insufficient permissions" });
+    }
+
+    next();
+  };
+}
+
+// Permission-based authorization middleware
+function requirePermission(...requiredPermissions: string[]) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    // Admin users have all permissions by default
+    if (req.user.role === "admin") {
+      // Check if admin has the specific permission or if they have full admin access
+      const adminHasPermission = requiredPermissions.some(perm => 
+        req.user!.permissions.includes(perm) || 
+        req.user!.permissions.length === 0 // Legacy admin with no explicit permissions has all
+      );
+      
+      // For backwards compatibility, if admin has no permissions array set, allow all
+      if (req.user.permissions.length === 0 || adminHasPermission) {
+        return next();
+      }
+    }
+
+    // Check if user has any of the required permissions
+    const hasPermission = requiredPermissions.some(perm => 
+      req.user!.permissions.includes(perm)
+    );
+
+    if (!hasPermission) {
+      return res.status(403).json({ 
+        error: "Insufficient permissions",
+        required: requiredPermissions,
+        userPermissions: req.user.permissions
+      });
     }
 
     next();
@@ -745,7 +788,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Order routes
-  app.get("/api/orders", async (req, res) => {
+  app.get("/api/orders", authenticate, requirePermission("orders.view"), async (req, res) => {
     try {
       const { branchId, status } = req.query;
       let orders;
@@ -1114,7 +1157,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Expense routes
-  app.get("/api/expenses", async (req, res) => {
+  app.get("/api/expenses", authenticate, requirePermission("expenses.view"), async (req, res) => {
     try {
       const { branchId } = req.query;
       let expenses;
@@ -1131,7 +1174,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/expenses", async (req, res) => {
+  app.post("/api/expenses", authenticate, requirePermission("expenses.create"), async (req, res) => {
     try {
       const expense = await storage.createExpense(req.body);
       res.json(expense);
@@ -1140,7 +1183,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/expenses/:id", async (req, res) => {
+  app.put("/api/expenses/:id", authenticate, requirePermission("expenses.edit"), async (req, res) => {
     try {
       const expense = await storage.updateExpense(req.params.id, req.body);
       if (!expense) {
@@ -1152,7 +1195,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/expenses/:id", async (req, res) => {
+  app.delete("/api/expenses/:id", authenticate, requirePermission("expenses.delete"), async (req, res) => {
     try {
       await storage.deleteExpense(req.params.id);
       res.json({ success: true });

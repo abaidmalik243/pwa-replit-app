@@ -9,6 +9,7 @@ type User = {
   fullName: string;
   role: string;
   branchId: string | null;
+  permissions: string[];
 };
 
 type AuthContextType = {
@@ -17,6 +18,7 @@ type AuthContextType = {
   login: (email: string, password: string) => Promise<User>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
+  hasPermission: (permission: string | string[]) => boolean;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -118,12 +120,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Check if user has a specific permission (or any of multiple permissions)
+  const hasPermission = (permission: string | string[]): boolean => {
+    if (!user) return false;
+    
+    // Admin users with no explicit permissions have all permissions (backwards compatibility)
+    if (user.role === "admin" && (!user.permissions || user.permissions.length === 0)) {
+      return true;
+    }
+    
+    const permissions = Array.isArray(permission) ? permission : [permission];
+    
+    // Check if user has any of the required permissions
+    return permissions.some(perm => user.permissions?.includes(perm));
+  };
+
   const value = {
     user,
     isLoading,
     login,
     logout,
     isAuthenticated: !!user,
+    hasPermission,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

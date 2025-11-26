@@ -459,9 +459,14 @@ export default function AdminCustomers() {
       <Dialog open={!!selectedCustomer} onOpenChange={(open) => !open && setSelectedCustomer(null)}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
           {detailsLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <p className="text-muted-foreground">Loading customer details...</p>
-            </div>
+            <DialogHeader>
+              <DialogTitle>Loading...</DialogTitle>
+              <DialogDescription>
+                <div className="flex items-center justify-center py-12">
+                  <p className="text-muted-foreground">Loading customer details...</p>
+                </div>
+              </DialogDescription>
+            </DialogHeader>
           ) : customerDetails ? (
             <>
               <DialogHeader>

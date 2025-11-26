@@ -16,7 +16,21 @@ import { z } from "zod";
 import { Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import type { User, Branch } from "@shared/schema";
+
+const AVAILABLE_PERMISSIONS = [
+  { id: "manage_menu", label: "Manage Menu", description: "Add, edit, and delete menu items" },
+  { id: "manage_orders", label: "Manage Orders", description: "View and update order status" },
+  { id: "manage_users", label: "Manage Users", description: "Add, edit, and delete users" },
+  { id: "view_reports", label: "View Reports", description: "Access analytics and reports" },
+  { id: "manage_inventory", label: "Manage Inventory", description: "Track stock and suppliers" },
+  { id: "manage_riders", label: "Manage Riders", description: "Assign and track deliveries" },
+  { id: "access_pos", label: "Access POS", description: "Use point of sale system" },
+  { id: "manage_promo_codes", label: "Manage Promo Codes", description: "Create and edit promotions" },
+  { id: "manage_settings", label: "Manage Settings", description: "Change system settings" },
+];
 
 const userFormSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters"),
@@ -27,6 +41,7 @@ const userFormSchema = z.object({
   role: z.enum(["admin", "staff", "customer"]),
   branchId: z.string().optional(),
   isActive: z.boolean().default(true),
+  permissions: z.array(z.string()).default([]),
 }).refine((data) => {
   if (data.role === "staff" && !data.branchId) {
     return false;
@@ -59,7 +74,7 @@ export default function AdminUsers() {
     id: u.id,
     name: u.fullName,
     email: u.email,
-    role: u.role,
+    role: u.role as "admin" | "manager" | "staff",
     isActive: u.isActive,
   }));
 
@@ -74,6 +89,7 @@ export default function AdminUsers() {
       role: "staff",
       branchId: "",
       isActive: true,
+      permissions: [],
     },
   });
 
@@ -136,6 +152,7 @@ export default function AdminUsers() {
         role: dbUser.role as "admin" | "staff" | "customer",
         branchId: dbUser.branchId || "",
         isActive: dbUser.isActive,
+        permissions: dbUser.permissions || [],
       });
     }
   };
@@ -355,6 +372,50 @@ export default function AdminUsers() {
                         </FormItem>
                       )}
                     />
+                    
+                    {/* Permissions Section */}
+                    {(form.watch("role") === "admin" || form.watch("role") === "staff") && (
+                      <FormField
+                        control={form.control}
+                        name="permissions"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Permissions</FormLabel>
+                            <div className="rounded-lg border p-4 space-y-3 max-h-48 overflow-y-auto">
+                              {AVAILABLE_PERMISSIONS.map((permission) => (
+                                <div key={permission.id} className="flex items-start space-x-3">
+                                  <Checkbox
+                                    id={`perm-${permission.id}`}
+                                    checked={field.value?.includes(permission.id)}
+                                    onCheckedChange={(checked) => {
+                                      const currentPerms = field.value || [];
+                                      if (checked) {
+                                        field.onChange([...currentPerms, permission.id]);
+                                      } else {
+                                        field.onChange(currentPerms.filter((p: string) => p !== permission.id));
+                                      }
+                                    }}
+                                    data-testid={`checkbox-perm-${permission.id}`}
+                                  />
+                                  <div className="grid gap-1 leading-none">
+                                    <Label
+                                      htmlFor={`perm-${permission.id}`}
+                                      className="text-sm font-medium cursor-pointer"
+                                    >
+                                      {permission.label}
+                                    </Label>
+                                    <p className="text-xs text-muted-foreground">
+                                      {permission.description}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
                     <DialogFooter>
                       <Button
                         type="submit"

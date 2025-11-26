@@ -33,6 +33,7 @@ export default function Login() {
   });
 
   const onSubmit = async (data: LoginForm) => {
+    if (isLoading) return; // Prevent double submission
     setIsLoading(true);
     try {
       const userData = await login(data.email, data.password);
@@ -56,8 +57,7 @@ export default function Login() {
         description: error.message || "Invalid credentials",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
+      setIsLoading(false); // Only reset on error to allow retry
     }
   };
 

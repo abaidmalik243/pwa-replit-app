@@ -550,9 +550,9 @@ export default function AdminUsers() {
                   </DialogDescription>
                 </DialogHeader>
                 <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0">
-                    <ScrollArea className="flex-1 pr-2 sm:pr-4 -mr-2 sm:-mr-4 min-h-0">
-                      <div className="space-y-3 sm:space-y-4 pb-4 pr-2 sm:pr-0">
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+                    <div className="flex-1 overflow-y-auto pr-2 sm:pr-4">
+                      <div className="space-y-3 sm:space-y-4 pb-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                           <FormField
                             control={form.control}
@@ -718,7 +718,7 @@ export default function AdminUsers() {
                           />
                         )}
                       </div>
-                    </ScrollArea>
+                    </div>
                     <DialogFooter className="pt-3 sm:pt-4 border-t mt-3 sm:mt-4 flex-col-reverse sm:flex-row gap-2 sm:gap-0 flex-shrink-0">
                       <Button
                         type="submit"

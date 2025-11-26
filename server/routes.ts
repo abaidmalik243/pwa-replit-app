@@ -96,18 +96,9 @@ function requirePermission(...requiredPermissions: string[]) {
       return res.status(401).json({ error: "Authentication required" });
     }
 
-    // Admin users have all permissions by default
+    // Admin users have all permissions by default - bypass permission checks entirely
     if (req.user.role === "admin") {
-      // Check if admin has the specific permission or if they have full admin access
-      const adminHasPermission = requiredPermissions.some(perm => 
-        req.user!.permissions.includes(perm) || 
-        req.user!.permissions.length === 0 // Legacy admin with no explicit permissions has all
-      );
-      
-      // For backwards compatibility, if admin has no permissions array set, allow all
-      if (req.user.permissions.length === 0 || adminHasPermission) {
-        return next();
-      }
+      return next();
     }
 
     // Check if user has any of the required permissions
@@ -1122,10 +1113,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // User routes
-  app.get("/api/users", async (req, res) => {
+  // User routes - with branch-based access control
+  app.get("/api/users", authenticate, async (req, res) => {
     try {
-      const users = await storage.getAllUsers();
+      const { branchId, role, isActive } = req.query;
+      const user = (req as any).user;
+      const isAdmin = user?.role === "admin";
+      
+      let users = await storage.getAllUsers();
+      
+      // Non-admin users can only see users from their own branch
+      if (!isAdmin) {
+        const userBranchId = user?.branchId;
+        if (!userBranchId) {
+          return res.status(403).json({ error: "No branch assigned" });
+        }
+        // Force filter to user's branch, ignoring any branchId query param
+        users = users.filter(u => u.branchId === userBranchId);
+      } else {
+        // Admin can filter by branchId if provided
+        if (branchId && typeof branchId === 'string') {
+          users = users.filter(u => u.branchId === branchId);
+        }
+      }
+      
+      // Filter by role if provided
+      if (role && typeof role === 'string') {
+        users = users.filter(u => u.role === role);
+      }
+      
+      // Filter by isActive if provided (for staff dropdown in expense form)
+      if (isActive === 'true') {
+        users = users.filter(u => u.isActive !== false);
+      }
+      
       // Remove passwords from response
       const usersWithoutPasswords = users.map(({ password, ...user }) => user);
       res.json(usersWithoutPasswords);
@@ -1212,7 +1233,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/expenses", authenticate, requirePermission("expenses.create"), async (req, res) => {
     try {
-      const expense = await storage.createExpense(req.body);
+      // Parse the date string to a Date object if it's a string
+      const expenseData = {
+        ...req.body,
+        date: typeof req.body.date === 'string' ? new Date(req.body.date) : req.body.date,
+      };
+      const expense = await storage.createExpense(expenseData);
       res.json(expense);
     } catch (error: any) {
       res.status(400).json({ error: error.message });

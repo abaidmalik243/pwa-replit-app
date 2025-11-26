@@ -58,6 +58,8 @@ The application features a dual interface: a visual-first Customer Interface and
 
 **Branch-Based Access Control**: Comprehensive branch filtering across all modules. Non-admin users (staff, riders) are automatically restricted to viewing only data from their assigned branch. Backend uses `requireBranchAccess()` helper which enforces branch access - throws 403 if non-admin user has no branchId assigned. Routes using branch filtering: orders, expenses, POS tables/sessions, shifts, riders, deliveries, inventory transactions. Admins can access all branches or filter by specific branchId.
 
+**Expense Management System**: Daily expense tracking with 24-hour window filter (5:00 AM today to 4:59 AM tomorrow). Supports multiple categories including Rent, Utilities, Supplies, Salaries, Marketing, Maintenance, Transportation, Staff, and Other. When category is "Staff", a Staff Member dropdown appears populated with active staff from the selected branch. Expenses can link to staff members via optional `staffId` field. Admins bypass all permission checks and can manage expenses across all branches. Staff users are restricted to their assigned branch only.
+
 ## External Dependencies
 
 -   **UI Component Libraries**: Radix UI, shadcn/ui

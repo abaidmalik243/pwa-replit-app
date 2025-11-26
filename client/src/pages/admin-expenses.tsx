@@ -14,18 +14,27 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Search, Calendar, DollarSign } from "lucide-react";
-import type { Expense, Branch } from "@shared/schema";
+import { Plus, Search, Calendar, DollarSign, User } from "lucide-react";
+import type { Expense, Branch, User as UserType } from "@shared/schema";
 import { format } from "date-fns";
 
 const expenseSchema = z.object({
   branchId: z.string().min(1, "Branch is required"),
   category: z.string().min(2, "Category is required"),
+  staffId: z.string().optional(),
   description: z.string().min(2, "Description is required"),
   amount: z.string().min(1, "Amount is required").refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
     message: "Amount must be a positive number",
   }),
   date: z.string().min(1, "Date is required"),
+}).refine((data) => {
+  if (data.category === "staff" && !data.staffId) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Staff member is required when category is Staff",
+  path: ["staffId"],
 });
 
 type ExpenseForm = z.infer<typeof expenseSchema>;
@@ -38,6 +47,7 @@ const EXPENSE_CATEGORIES = [
   "Marketing",
   "Maintenance",
   "Transportation",
+  "Staff",
   "Other",
 ];
 
@@ -84,10 +94,25 @@ export default function AdminExpenses() {
     defaultValues: {
       branchId: !isAdmin && userBranchId ? userBranchId : "",
       category: "",
+      staffId: "",
       description: "",
       amount: "",
       date: format(new Date(), "yyyy-MM-dd"),
     },
+  });
+
+  const formBranchId = form.watch("branchId");
+  const formCategory = form.watch("category");
+
+  // Fetch active staff members for the selected branch in the form
+  const { data: branchStaff = [] } = useQuery<UserType[]>({
+    queryKey: ["/api/users", formBranchId, "staff", "active"],
+    queryFn: async () => {
+      if (!formBranchId) return [];
+      const res = await fetch(`/api/users?branchId=${formBranchId}&role=staff&isActive=true`, { credentials: "include" });
+      return res.json();
+    },
+    enabled: !!formBranchId && formCategory === "staff",
   });
 
   useEffect(() => {
@@ -96,14 +121,40 @@ export default function AdminExpenses() {
     }
   }, [isAdmin, userBranchId, form]);
 
+  // Clear staffId when category changes from "staff"
+  useEffect(() => {
+    if (formCategory !== "staff") {
+      form.setValue("staffId", "");
+    }
+  }, [formCategory, form]);
+
+  // Reset form when dialog opens
+  useEffect(() => {
+    if (isAddDialogOpen) {
+      form.reset({
+        branchId: !isAdmin && userBranchId ? userBranchId : "",
+        category: "",
+        staffId: "",
+        description: "",
+        amount: "",
+        date: format(new Date(), "yyyy-MM-dd"),
+      });
+    }
+  }, [isAddDialogOpen, isAdmin, userBranchId, form]);
+
   const canAddExpense = isAdmin || !!userBranchId;
 
   const createMutation = useMutation({
     mutationFn: async (data: ExpenseForm) => {
+      // Parse the date string and convert to ISO format
+      const dateValue = data.date ? new Date(data.date + "T12:00:00").toISOString() : new Date().toISOString();
       const res = await apiRequest("/api/expenses", "POST", {
-        ...data,
+        branchId: data.branchId,
+        category: data.category,
+        staffId: data.staffId || null,
+        description: data.description,
         amount: data.amount,
-        date: new Date(data.date).toISOString(),
+        date: dateValue,
       });
       return await res.json();
     },
@@ -120,12 +171,22 @@ export default function AdminExpenses() {
   });
 
   const onSubmit = (data: ExpenseForm) => {
+    // Double-check staff validation before submission
+    if (data.category === "staff" && !data.staffId) {
+      form.setError("staffId", { 
+        type: "manual", 
+        message: "Staff member is required when category is Staff" 
+      });
+      return;
+    }
     createMutation.mutate(data);
   };
 
-  const filteredExpenses = expenses.filter((expense) =>
-    expense.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    expense.category.toLowerCase().includes(searchTerm.toLowerCase())
+  const expensesArray = Array.isArray(expenses) ? expenses : [];
+  
+  const filteredExpenses = expensesArray.filter((expense) =>
+    expense.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    expense.category?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const totalExpenses = filteredExpenses.reduce(
@@ -247,6 +308,40 @@ export default function AdminExpenses() {
                         </FormItem>
                       )}
                     />
+                    {formCategory === "staff" && (
+                      <FormField
+                        control={form.control}
+                        name="staffId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Staff Member</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value || ""}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-staff">
+                                  <SelectValue placeholder="Select staff member" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {branchStaff.map((staff) => (
+                                  <SelectItem key={staff.id} value={staff.id}>
+                                    <div className="flex items-center gap-2">
+                                      <User className="h-4 w-4" />
+                                      <span>{staff.fullName}</span>
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                                {branchStaff.length === 0 && (
+                                  <div className="py-2 px-3 text-sm text-muted-foreground">
+                                    No active staff found for this branch
+                                  </div>
+                                )}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
                     <FormField
                       control={form.control}
                       name="description"

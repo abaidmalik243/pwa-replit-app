@@ -257,10 +257,11 @@ export const DEFAULT_DELIVERY_CONFIG = {
 export const expenses = pgTable("expenses", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   branchId: varchar("branch_id").references(() => branches.id).notNull(),
-  category: text("category").notNull(), // rent, utilities, supplies, salaries, etc.
+  category: text("category").notNull(), // rent, utilities, supplies, salaries, staff, etc.
   description: text("description").notNull(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   date: timestamp("date").notNull(),
+  staffId: varchar("staff_id").references(() => users.id), // Optional: links to staff member when category is 'staff'
   addedBy: varchar("added_by").references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

@@ -13,7 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus } from "lucide-react";
+import { Plus, Search, X, Building2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -21,7 +21,8 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
-import { ShoppingCart, UtensilsCrossed, Users, BarChart3, Package, Truck, Megaphone, Settings, CreditCard, Heart, Receipt, RefreshCcw } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { ShoppingCart, UtensilsCrossed, Users, BarChart3, Package, Truck, Megaphone, Settings, CreditCard, Heart, Receipt, RefreshCcw, Clock, MapPin, MessageSquare, Smartphone, UserCircle } from "lucide-react";
 import type { User, Branch } from "@shared/schema";
 
 // Singleton AudioContext for delete notification sounds
@@ -129,7 +130,7 @@ const PERMISSION_MODULES = [
       { id: "delivery.manage_riders", label: "Manage Riders", description: "Add/edit riders" },
       { id: "delivery.assign_orders", label: "Assign Deliveries", description: "Assign orders to riders" },
       { id: "delivery.track_riders", label: "Track Riders", description: "View rider locations" },
-      { id: "delivery.manage_zones", label: "Manage Zones", description: "Configure delivery zones" },
+      { id: "delivery.view_deliveries", label: "View Deliveries", description: "View all deliveries" },
     ],
   },
   {
@@ -217,6 +218,65 @@ const PERMISSION_MODULES = [
       { id: "settings.payments", label: "Payment Settings", description: "Configure payments" },
       { id: "settings.integrations", label: "Integrations", description: "Manage integrations" },
       { id: "settings.backup", label: "Backup & Clone", description: "Database operations" },
+    ],
+  },
+  {
+    id: "shifts",
+    label: "Staff & Shifts",
+    icon: Clock,
+    permissions: [
+      { id: "shifts.view", label: "View Shifts", description: "View shift schedules" },
+      { id: "shifts.create", label: "Create Shifts", description: "Create new shifts" },
+      { id: "shifts.edit", label: "Edit Shifts", description: "Modify shift schedules" },
+      { id: "shifts.delete", label: "Delete Shifts", description: "Remove shifts" },
+      { id: "shifts.view_attendance", label: "View Attendance", description: "View attendance records" },
+      { id: "shifts.manage_attendance", label: "Manage Attendance", description: "Clock in/out staff" },
+      { id: "shifts.view_reports", label: "Shift Reports", description: "View shift analytics" },
+    ],
+  },
+  {
+    id: "delivery_zones",
+    label: "Delivery Zones & Charges",
+    icon: MapPin,
+    permissions: [
+      { id: "delivery_zones.view", label: "View Zones", description: "View delivery zones" },
+      { id: "delivery_zones.create", label: "Create Zones", description: "Add new delivery zones" },
+      { id: "delivery_zones.edit", label: "Edit Zones", description: "Modify zone settings" },
+      { id: "delivery_zones.delete", label: "Delete Zones", description: "Remove delivery zones" },
+      { id: "delivery_zones.manage_charges", label: "Manage Charges", description: "Set delivery pricing" },
+    ],
+  },
+  {
+    id: "segments",
+    label: "Customer Segments",
+    icon: UserCircle,
+    permissions: [
+      { id: "segments.view", label: "View Segments", description: "View customer segments" },
+      { id: "segments.create", label: "Create Segments", description: "Create new segments" },
+      { id: "segments.edit", label: "Edit Segments", description: "Modify segment rules" },
+      { id: "segments.delete", label: "Delete Segments", description: "Remove segments" },
+    ],
+  },
+  {
+    id: "templates",
+    label: "Message Templates",
+    icon: MessageSquare,
+    permissions: [
+      { id: "templates.view", label: "View Templates", description: "View message templates" },
+      { id: "templates.create", label: "Create Templates", description: "Create new templates" },
+      { id: "templates.edit", label: "Edit Templates", description: "Modify templates" },
+      { id: "templates.delete", label: "Delete Templates", description: "Remove templates" },
+    ],
+  },
+  {
+    id: "jazzcash",
+    label: "JazzCash Monitoring",
+    icon: Smartphone,
+    permissions: [
+      { id: "jazzcash.view", label: "View Transactions", description: "View JazzCash transactions" },
+      { id: "jazzcash.view_config", label: "View Config", description: "View JazzCash settings" },
+      { id: "jazzcash.manage_config", label: "Manage Config", description: "Configure JazzCash" },
+      { id: "jazzcash.view_stats", label: "View Statistics", description: "View payment analytics" },
     ],
   },
 ];
@@ -413,7 +473,13 @@ export default function AdminUsers() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showPermissions, setShowPermissions] = useState(false);
   const { toast } = useToast();
-  const { logout } = useAuth();
+  const { logout, user: authUser } = useAuth();
+
+  // Filter states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [branchFilter, setBranchFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   const { data: dbUsers = [], isLoading } = useQuery<User[]>({
     queryKey: ["/api/users"],
@@ -423,13 +489,60 @@ export default function AdminUsers() {
     queryKey: ["/api/branches"],
   });
 
-  const users: UserData[] = dbUsers.map((u) => ({
+  // Create branch lookup map
+  const branchMap = branches.reduce((acc, branch) => {
+    acc[branch.id] = branch.name;
+    return acc;
+  }, {} as Record<string, string>);
+
+  // Map and filter users
+  const allUsers: UserData[] = dbUsers.map((u) => ({
     id: u.id,
     name: u.fullName,
     email: u.email,
-    role: u.role as "admin" | "manager" | "staff",
+    phone: u.phone || undefined,
+    role: u.role as "admin" | "manager" | "staff" | "customer" | "rider",
     isActive: u.isActive,
+    branchId: u.branchId || undefined,
+    branchName: u.branchId ? branchMap[u.branchId] : undefined,
   }));
+
+  // Apply filters
+  const users = allUsers.filter((user) => {
+    // Search filter (name, email, phone)
+    const searchLower = searchQuery.toLowerCase();
+    const matchesSearch = !searchQuery || 
+      user.name.toLowerCase().includes(searchLower) ||
+      user.email.toLowerCase().includes(searchLower) ||
+      (user.phone && user.phone.toLowerCase().includes(searchLower));
+
+    // Role filter
+    const matchesRole = roleFilter === "all" || user.role === roleFilter;
+
+    // Branch filter
+    const matchesBranch = branchFilter === "all" || 
+      (branchFilter === "no-branch" ? !user.branchId : user.branchId === branchFilter);
+
+    // Status filter
+    const matchesStatus = statusFilter === "all" || 
+      (statusFilter === "active" ? user.isActive : !user.isActive);
+
+    return matchesSearch && matchesRole && matchesBranch && matchesStatus;
+  });
+
+  // Count active filters
+  const activeFilterCount = [
+    roleFilter !== "all",
+    branchFilter !== "all",
+    statusFilter !== "all",
+  ].filter(Boolean).length;
+
+  const clearFilters = () => {
+    setSearchQuery("");
+    setRoleFilter("all");
+    setBranchFilter("all");
+    setStatusFilter("all");
+  };
 
   const form = useForm<UserForm>({
     resolver: zodResolver(userFormSchema),
@@ -563,7 +676,7 @@ export default function AdminUsers() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <AdminHeader 
           breadcrumbs={["Admin", "Users & Roles"]} 
-          userName="Admin User"
+          userName={authUser?.fullName || "Admin User"}
           onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
         />
 
@@ -572,7 +685,7 @@ export default function AdminUsers() {
             <div>
               <h1 className="text-2xl md:text-3xl font-bold mb-2">Users & Roles</h1>
               <p className="text-muted-foreground text-sm md:text-base">
-                Manage user accounts and role assignments
+                Manage user accounts and role assignments ({users.length} of {allUsers.length})
               </p>
             </div>
             <Dialog open={isAddDialogOpen || !!editingUser} onOpenChange={(open) => {
@@ -783,6 +896,92 @@ export default function AdminUsers() {
               </DialogContent>
             </Dialog>
           </div>
+
+          {/* Filters Section */}
+          <Card className="mb-6">
+            <CardContent className="pt-4 pb-4">
+              <div className="flex flex-col gap-4">
+                {/* Search Input */}
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by name, email, or phone..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                    data-testid="input-search-users"
+                  />
+                </div>
+
+                {/* Filter Dropdowns */}
+                <div className="flex flex-wrap gap-3 items-center">
+                  {/* Role Filter */}
+                  <Select value={roleFilter} onValueChange={setRoleFilter}>
+                    <SelectTrigger className="w-[140px]" data-testid="select-filter-role">
+                      <SelectValue placeholder="Role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Roles</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="staff">Staff</SelectItem>
+                      <SelectItem value="customer">Customer</SelectItem>
+                      <SelectItem value="rider">Rider</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {/* Branch Filter */}
+                  <Select value={branchFilter} onValueChange={setBranchFilter}>
+                    <SelectTrigger className="w-[180px]" data-testid="select-filter-branch">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4 text-muted-foreground" />
+                        <SelectValue placeholder="Branch" />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Branches</SelectItem>
+                      <SelectItem value="no-branch">No Branch</SelectItem>
+                      {branches.map((branch) => (
+                        <SelectItem key={branch.id} value={branch.id}>
+                          {branch.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {/* Status Filter */}
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-[140px]" data-testid="select-filter-status">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {/* Clear Filters Button */}
+                  {(searchQuery || activeFilterCount > 0) && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={clearFilters}
+                      className="text-muted-foreground"
+                      data-testid="button-clear-filters"
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      Clear
+                      {activeFilterCount > 0 && (
+                        <Badge variant="secondary" className="ml-1 h-5 px-1.5">
+                          {activeFilterCount}
+                        </Badge>
+                      )}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {isLoading ? (
             <div className="text-center py-12 text-muted-foreground">

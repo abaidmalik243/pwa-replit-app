@@ -62,6 +62,18 @@ The application features a dual interface: a visual-first Customer Interface and
 
 **Saved Customers Module**: Admin dashboard at `/admin/customers` for comprehensive customer relationship management. Features include customer statistics overview (total customers, active customers, orders, revenue, tier distribution), searchable customer list with tier filtering and sorting options (by name, spent, orders). Detailed customer view dialog with tabs for Overview (stats, member info), Orders (order history), Addresses (saved addresses), Loyalty (points, tier, transactions, admin point adjustments), and Favorites (favorite menu items). Requires `loyalty.view_customers` permission for viewing and `loyalty.manage_points` for adjusting loyalty points. Accessible via Heart icon in sidebar navigation.
 
+## Reusable UI Components
+
+**PasswordInput** (`client/src/components/ui/password-input.tsx`): Input field with show/hide password toggle using Eye/EyeOff icons. Extends standard Input component with visibility toggle functionality.
+
+**PaginationControls** (`client/src/components/ui/pagination-controls.tsx`): Reusable pagination component with page size selector, first/prev/next/last navigation buttons, and "Showing X to Y of Z items" display. Auto-handles edge cases when filtered data shrinks. Props: currentPage, totalPages, totalItems, pageSize, onPageChange, onPageSizeChange, pageSizeOptions, showPageSizeSelector.
+
+**PageLoader** (`client/src/components/ui/page-loader.tsx`): Multiple loading state components:
+- `PageLoader`: Full-page loading with optional message
+- `TableLoader`: Table skeleton with configurable rows/columns
+- `CardLoader`: Card grid skeleton
+- `InlineLoader`: Inline spinner with text
+
 ## External Dependencies
 
 -   **UI Component Libraries**: Radix UI, shadcn/ui

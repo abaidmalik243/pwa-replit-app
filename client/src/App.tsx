@@ -60,6 +60,7 @@ import AdminCustomerSegments from "@/pages/admin-customer-segments";
 import AdminSeedData from "@/pages/admin-seed-data";
 import AdminCloneToProduction from "@/pages/admin-clone-to-production";
 import AdminCustomers from "@/pages/admin-customers";
+import StaffDashboard from "@/pages/staff-dashboard";
 
 function Router() {
   return (
@@ -104,8 +105,13 @@ function Router() {
         </ProtectedRoute>
       </Route>
       <Route path="/admin">
-        <ProtectedRoute requireRole={["admin", "staff"]}>
+        <ProtectedRoute requireRole={["admin"]}>
           <AdminDashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/staff-dashboard">
+        <ProtectedRoute requireRole={["admin", "staff"]}>
+          <StaffDashboard />
         </ProtectedRoute>
       </Route>
       <Route path="/admin/orders">
@@ -174,7 +180,7 @@ function Router() {
         </ProtectedRoute>
       </Route>
       <Route path="/rider">
-        <ProtectedRoute requireRole={["rider"]}>
+        <ProtectedRoute requireRole={["rider", "admin"]}>
           <RiderDashboard />
         </ProtectedRoute>
       </Route>

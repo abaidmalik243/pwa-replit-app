@@ -1,4 +1,4 @@
-import { LayoutDashboard, ShoppingBag, UtensilsCrossed, Users, Settings, LogOut, Volume2, VolumeX, FolderOpen, Receipt, TrendingUp, Building2, CreditCard, Table2, ChefHat, Calculator, BarChart3, Bike, Truck, MapPin, Tag, DollarSign, Layers, Package, Store, Trash2, RefreshCcw, Calendar, Clock, FileText, MessageSquare, Mail, Target, Smartphone, PieChart, Heart } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, UtensilsCrossed, Users, Settings, LogOut, Volume2, VolumeX, FolderOpen, Receipt, TrendingUp, Building2, CreditCard, Table2, ChefHat, Calculator, BarChart3, Bike, Truck, MapPin, Tag, DollarSign, Layers, Package, Store, Trash2, RefreshCcw, Calendar, Clock, FileText, MessageSquare, Mail, Target, Smartphone, PieChart, Heart, UserCircle, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Link, useLocation } from "wouter";
@@ -18,6 +18,7 @@ interface MenuItem {
   label: string;
   path: string;
   permissions?: string[];
+  roles?: string[];
 }
 
 export default function AdminSidebar({ soundEnabled = true, onToggleSound, onLogout, onNavigate }: AdminSidebarProps) {
@@ -25,7 +26,10 @@ export default function AdminSidebar({ soundEnabled = true, onToggleSound, onLog
   const { user, hasPermission } = useAuth();
 
   const menuItems: MenuItem[] = [
-    { icon: LayoutDashboard, label: "Dashboard", path: "/admin" },
+    // Role-specific dashboards - Admin can access all dashboards
+    { icon: LayoutDashboard, label: "Admin Dashboard", path: "/admin", permissions: [], roles: ["admin"] },
+    { icon: ClipboardList, label: "Staff Dashboard", path: "/admin/staff-dashboard", permissions: [], roles: ["staff", "admin"] },
+    { icon: Bike, label: "Rider Dashboard", path: "/rider", permissions: [], roles: ["rider", "admin"] },
     { icon: BarChart3, label: "Advanced Analytics", path: "/admin/analytics", permissions: ["analytics.view"] },
     { icon: ShoppingBag, label: "Orders", path: "/admin/orders", permissions: ["orders.view"] },
     { icon: CreditCard, label: "POS", path: "/admin/pos", permissions: ["pos.view"] },
@@ -62,12 +66,23 @@ export default function AdminSidebar({ soundEnabled = true, onToggleSound, onLog
   ];
 
   const canAccessItem = (item: MenuItem): boolean => {
+    // Check role-based access first
+    if (item.roles && item.roles.length > 0) {
+      if (!user?.role || !item.roles.includes(user.role)) {
+        return false;
+      }
+    }
+    
+    // If no permissions required, user can access
     if (!item.permissions || item.permissions.length === 0) {
       return true;
     }
+    
+    // Admin bypasses permission checks
     if (user?.role === 'admin') {
       return true;
     }
+    
     return hasPermission(item.permissions);
   };
 

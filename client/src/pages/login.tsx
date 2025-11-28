@@ -10,6 +10,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { Loader2 } from "lucide-react";
+import logoImage from "@assets/logo_1764330678819.jfif";
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -67,9 +68,14 @@ export default function Login() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <div className="flex justify-center mb-4">
-            <div className="text-4xl font-bold text-primary">🍕</div>
+            <img 
+              src={logoImage} 
+              alt="Kebabish Pizza" 
+              className="h-16 w-auto object-contain" 
+              data-testid="img-login-logo"
+            />
           </div>
-          <CardTitle className="text-2xl text-center">Welcome to Kebabish Pizza</CardTitle>
+          <CardTitle className="text-2xl text-center">Welcome Back</CardTitle>
           <CardDescription className="text-center">
             Sign in to your account to place orders
           </CardDescription>

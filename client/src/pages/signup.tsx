@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import logoImage from "@assets/logo_1764330678819.jfif";
 
 const signupSchema = z.object({
   fullName: z.string().min(2, "Name must be at least 2 characters"),
@@ -80,9 +81,14 @@ export default function Signup() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <div className="flex justify-center mb-4">
-            <div className="text-4xl font-bold text-primary">🍕</div>
+            <img 
+              src={logoImage} 
+              alt="Kebabish Pizza" 
+              className="h-16 w-auto object-contain" 
+              data-testid="img-signup-logo"
+            />
           </div>
-          <CardTitle className="text-2xl text-center">Join Kebabish Pizza</CardTitle>
+          <CardTitle className="text-2xl text-center">Create Account</CardTitle>
           <CardDescription className="text-center">
             Create an account to start ordering delicious food
           </CardDescription>

@@ -4,6 +4,7 @@ import { Separator } from "@/components/ui/separator";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/context/AuthContext";
 import { LucideIcon } from "lucide-react";
+import logoImage from "@assets/logo_1764330678819.jfif";
 
 interface AdminSidebarProps {
   soundEnabled?: boolean;
@@ -74,9 +75,13 @@ export default function AdminSidebar({ soundEnabled = true, onToggleSound, onLog
 
   return (
     <div className="flex flex-col h-full w-64 bg-sidebar border-r border-sidebar-border">
-      <div className="p-6 flex items-center gap-2 flex-shrink-0">
-        <span className="text-2xl">🍕</span>
-        <h2 className="text-xl font-bold text-sidebar-primary" data-testid="text-admin-logo">Kebabish Pizza</h2>
+      <div className="p-4 flex items-center gap-2 flex-shrink-0">
+        <img 
+          src={logoImage} 
+          alt="Kebabish Pizza" 
+          className="h-10 w-auto object-contain" 
+          data-testid="img-admin-logo"
+        />
       </div>
 
       <div className="flex-1 overflow-y-auto">

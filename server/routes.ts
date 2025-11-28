@@ -1286,7 +1286,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/expenses/:id", authenticate, requirePermission("expenses.edit"), async (req, res) => {
     try {
-      const expense = await storage.updateExpense(req.params.id, req.body);
+      // Parse the date string to a Date object if it's a string
+      const updateData = {
+        ...req.body,
+        date: typeof req.body.date === 'string' ? new Date(req.body.date) : req.body.date,
+      };
+      const expense = await storage.updateExpense(req.params.id, updateData);
       if (!expense) {
         return res.status(404).json({ error: "Expense not found" });
       }

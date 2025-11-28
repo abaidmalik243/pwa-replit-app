@@ -14,7 +14,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Search, Calendar, DollarSign, User } from "lucide-react";
+import { Plus, Search, Calendar, DollarSign, User, Pencil, Trash2 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import type { Expense, Branch, User as UserType, Supplier } from "@shared/schema";
 import { format, subDays } from "date-fns";
 
@@ -76,6 +77,7 @@ export default function AdminExpenses() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedBranch, setSelectedBranch] = useState<string>("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
@@ -211,6 +213,60 @@ export default function AdminExpenses() {
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: ExpenseForm }) => {
+      const dateValue = data.date ? new Date(data.date + "T12:00:00").toISOString() : new Date().toISOString();
+      const res = await apiRequest(`/api/expenses/${id}`, "PUT", {
+        branchId: data.branchId,
+        category: data.category,
+        staffId: data.staffId || null,
+        supplierId: data.supplierId || null,
+        description: data.description,
+        amount: data.amount,
+        date: dateValue,
+      });
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/expenses", selectedBranch] });
+      queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
+      setEditingExpense(null);
+      form.reset();
+      toast({ title: "Expense updated successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest(`/api/expenses/${id}`, "DELETE");
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/expenses", selectedBranch] });
+      queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
+      toast({ title: "Expense deleted successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleEdit = (expense: Expense) => {
+    setEditingExpense(expense);
+    form.reset({
+      branchId: expense.branchId,
+      category: expense.category,
+      staffId: expense.staffId || "",
+      supplierId: expense.supplierId || "",
+      description: expense.description,
+      amount: expense.amount,
+      date: format(new Date(expense.date), "yyyy-MM-dd"),
+    });
+  };
+
   const onSubmit = (data: ExpenseForm) => {
     // Double-check staff validation before submission
     if (data.category === "staff" && !data.staffId) {
@@ -220,7 +276,12 @@ export default function AdminExpenses() {
       });
       return;
     }
-    createMutation.mutate(data);
+    
+    if (editingExpense) {
+      updateMutation.mutate({ id: editingExpense.id, data });
+    } else {
+      createMutation.mutate(data);
+    }
   };
 
   const expensesArray = Array.isArray(expenses) ? expenses : [];
@@ -277,12 +338,19 @@ export default function AdminExpenses() {
               </p>
             </div>
 
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <Dialog open={isAddDialogOpen || !!editingExpense} onOpenChange={(open) => {
+              if (!open) {
+                setIsAddDialogOpen(false);
+                setEditingExpense(null);
+                form.reset();
+              }
+            }}>
               <DialogTrigger asChild>
                 <Button 
                   data-testid="button-add-expense"
                   disabled={!canAddExpense}
                   title={!canAddExpense ? "You need a branch assignment to add expenses" : undefined}
+                  onClick={() => setIsAddDialogOpen(true)}
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Expense
@@ -290,9 +358,9 @@ export default function AdminExpenses() {
               </DialogTrigger>
               <DialogContent className="max-h-[85vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>Add New Expense</DialogTitle>
+                  <DialogTitle>{editingExpense ? "Edit Expense" : "Add New Expense"}</DialogTitle>
                   <DialogDescription>
-                    Record a daily expense for one of your branches
+                    {editingExpense ? "Update the expense details" : "Record a daily expense for one of your branches"}
                   </DialogDescription>
                 </DialogHeader>
                 <Form {...form}>
@@ -471,8 +539,12 @@ export default function AdminExpenses() {
                       )}
                     />
                     <DialogFooter>
-                      <Button type="submit" disabled={createMutation.isPending} data-testid="button-save-expense">
-                        {createMutation.isPending ? "Saving..." : "Save Expense"}
+                      <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-save-expense">
+                        {(createMutation.isPending || updateMutation.isPending) 
+                          ? "Saving..." 
+                          : editingExpense 
+                            ? "Update Expense" 
+                            : "Save Expense"}
                       </Button>
                     </DialogFooter>
                   </form>
@@ -537,7 +609,7 @@ export default function AdminExpenses() {
               filteredExpenses.map((expense) => (
                 <Card key={expense.id} data-testid={`card-expense-${expense.id}`}>
                   <CardContent className="p-6">
-                    <div className="flex items-start justify-between">
+                    <div className="flex items-start justify-between gap-4">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
                           <h3 className="font-semibold">{expense.description}</h3>
@@ -553,9 +625,49 @@ export default function AdminExpenses() {
                           </div>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-2xl font-bold text-primary">
-                          PKR {parseFloat(expense.amount).toLocaleString()}
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <div className="text-2xl font-bold text-primary">
+                            PKR {parseFloat(expense.amount).toLocaleString()}
+                          </div>
+                        </div>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleEdit(expense)}
+                            data-testid={`button-edit-expense-${expense.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                data-testid={`button-delete-expense-${expense.id}`}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Expense</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete this expense? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => deleteMutation.mutate(expense.id)}
+                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       </div>
                     </div>

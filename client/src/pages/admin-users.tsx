@@ -660,18 +660,17 @@ export default function AdminUsers() {
                               <FormItem>
                                 <FormLabel className="text-sm">Assigned Branch</FormLabel>
                                 <Select 
-                                  onValueChange={(value) => field.onChange(value === "none" ? "" : value)} 
-                                  value={field.value || "none"}
+                                  onValueChange={field.onChange} 
+                                  value={field.value}
                                 >
                                   <FormControl>
                                     <SelectTrigger data-testid="select-branch">
-                                      <SelectValue placeholder="Select branch" />
+                                      <SelectValue placeholder="No branch assignment" />
                                     </SelectTrigger>
                                   </FormControl>
                                   <SelectContent>
-                                    <SelectItem value="none">No branch assignment</SelectItem>
                                     {branches.map((branch) => (
-                                      <SelectItem key={branch.id} value={branch.id}>
+                                      <SelectItem key={branch.id} value={branch.id} data-testid={`select-branch-option-${branch.id}`}>
                                         {branch.name} - {branch.city}
                                       </SelectItem>
                                     ))}

@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Link } from "wouter";
 import { ShoppingCart, UserCog, Utensils, Clock, Star, Phone } from "lucide-react";
 import { HeroSlider } from "@/components/HeroSlider";
+import logoImage from "@assets/logo_1764330678819.jfif";
 
 export default function Landing() {
   return (
@@ -10,8 +11,12 @@ export default function Landing() {
       <header className="border-b">
         <div className="container flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-2">
-            <span className="text-3xl">🍕</span>
-            <h1 className="text-2xl font-bold text-primary">Kebabish Pizza</h1>
+            <img 
+              src={logoImage} 
+              alt="Kebabish Pizza" 
+              className="h-12 sm:h-14 md:h-16 w-auto object-contain" 
+              data-testid="img-landing-logo"
+            />
           </div>
           <div className="flex items-center gap-4">
             <div className="hidden md:flex items-center gap-2 text-sm">

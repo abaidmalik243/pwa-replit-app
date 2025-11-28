@@ -51,6 +51,7 @@ export interface IStorage {
   getAllExpenses(): Promise<schema.Expense[]>;
   getExpense(id: string): Promise<schema.Expense | undefined>;
   getExpensesByBranch(branchId: string): Promise<schema.Expense[]>;
+  getDailyExpenses(branchId?: string): Promise<schema.Expense[]>;
   createExpense(expense: schema.InsertExpense): Promise<schema.Expense>;
   updateExpense(id: string, expense: Partial<schema.InsertExpense>): Promise<schema.Expense | undefined>;
   deleteExpense(id: string): Promise<boolean>;
@@ -122,6 +123,7 @@ export interface IStorage {
   getAllDeliveries(): Promise<schema.Delivery[]>;
   getDelivery(id: string): Promise<schema.Delivery | undefined>;
   getDeliveriesByRider(riderId: string): Promise<schema.Delivery[]>;
+  getDeliveriesByBranch(branchId: string): Promise<schema.Delivery[]>;
   getActiveDeliveriesByRider(riderId: string): Promise<schema.Delivery[]>;
   getDeliveryByOrder(orderId: string): Promise<schema.Delivery | undefined>;
   createDelivery(delivery: schema.InsertDelivery): Promise<schema.Delivery>;
@@ -211,6 +213,7 @@ export interface IStorage {
   // Inventory Transactions
   getInventoryTransactions(menuItemId: string, branchId: string): Promise<schema.InventoryTransaction[]>;
   getAllInventoryTransactions(): Promise<schema.InventoryTransaction[]>;
+  getInventoryTransactionsByBranch(branchId: string): Promise<schema.InventoryTransaction[]>;
   createInventoryTransaction(transaction: schema.InsertInventoryTransaction): Promise<schema.InventoryTransaction>;
   
   // Stock Wastage
@@ -326,7 +329,9 @@ export class DbStorage implements IStorage {
   }
 
   async getAllUsers() {
-    return await db.select().from(schema.users).orderBy(desc(schema.users.createdAt));
+    return await db.select().from(schema.users)
+      .where(eq(schema.users.isDeleted, false))
+      .orderBy(desc(schema.users.createdAt));
   }
 
   async createUser(user: schema.InsertUser) {
@@ -340,7 +345,10 @@ export class DbStorage implements IStorage {
   }
 
   async deleteUser(id: string) {
-    await db.delete(schema.users).where(eq(schema.users.id, id));
+    // Soft delete - mark as deleted instead of actually deleting
+    await db.update(schema.users)
+      .set({ isDeleted: true, deletedAt: new Date() })
+      .where(eq(schema.users.id, id));
     return true;
   }
 
@@ -520,7 +528,9 @@ export class DbStorage implements IStorage {
 
   // Expenses
   async getAllExpenses() {
-    return await db.select().from(schema.expenses).orderBy(desc(schema.expenses.date));
+    return await db.select().from(schema.expenses)
+      .where(eq(schema.expenses.isDeleted, false))
+      .orderBy(desc(schema.expenses.date));
   }
 
   async getExpense(id: string) {
@@ -529,7 +539,42 @@ export class DbStorage implements IStorage {
   }
 
   async getExpensesByBranch(branchId: string) {
-    return await db.select().from(schema.expenses).where(eq(schema.expenses.branchId, branchId)).orderBy(desc(schema.expenses.date));
+    return await db.select().from(schema.expenses)
+      .where(and(
+        eq(schema.expenses.branchId, branchId),
+        eq(schema.expenses.isDeleted, false)
+      ))
+      .orderBy(desc(schema.expenses.date));
+  }
+
+  async getDailyExpenses(branchId?: string) {
+    // Calculate the 24-hour window: 5:00 AM today to 4:59 AM tomorrow
+    const now = new Date();
+    const today5AM = new Date(now);
+    today5AM.setHours(5, 0, 0, 0);
+    
+    // If current time is before 5 AM, the window started yesterday at 5 AM
+    if (now.getHours() < 5) {
+      today5AM.setDate(today5AM.getDate() - 1);
+    }
+    
+    const tomorrow459AM = new Date(today5AM);
+    tomorrow459AM.setDate(tomorrow459AM.getDate() + 1);
+    tomorrow459AM.setHours(4, 59, 59, 999);
+    
+    const conditions = [
+      gte(schema.expenses.date, today5AM),
+      lte(schema.expenses.date, tomorrow459AM),
+      eq(schema.expenses.isDeleted, false)
+    ];
+    
+    if (branchId) {
+      conditions.push(eq(schema.expenses.branchId, branchId));
+    }
+    
+    return await db.select().from(schema.expenses)
+      .where(and(...conditions))
+      .orderBy(desc(schema.expenses.date));
   }
 
   async createExpense(expense: schema.InsertExpense) {
@@ -543,7 +588,10 @@ export class DbStorage implements IStorage {
   }
 
   async deleteExpense(id: string) {
-    await db.delete(schema.expenses).where(eq(schema.expenses.id, id));
+    // Soft delete - mark as deleted instead of actually deleting
+    await db.update(schema.expenses)
+      .set({ isDeleted: true, deletedAt: new Date() })
+      .where(eq(schema.expenses.id, id));
     return true;
   }
 
@@ -835,6 +883,10 @@ export class DbStorage implements IStorage {
 
   async getDeliveriesByRider(riderId: string) {
     return await db.select().from(schema.deliveries).where(eq(schema.deliveries.riderId, riderId)).orderBy(desc(schema.deliveries.assignedAt));
+  }
+
+  async getDeliveriesByBranch(branchId: string) {
+    return await db.select().from(schema.deliveries).where(eq(schema.deliveries.branchId, branchId)).orderBy(desc(schema.deliveries.assignedAt));
   }
 
   async getActiveDeliveriesByRider(riderId: string) {
@@ -1229,6 +1281,12 @@ export class DbStorage implements IStorage {
 
   async getAllInventoryTransactions() {
     return await db.select().from(schema.inventoryTransactions)
+      .orderBy(desc(schema.inventoryTransactions.createdAt));
+  }
+
+  async getInventoryTransactionsByBranch(branchId: string) {
+    return await db.select().from(schema.inventoryTransactions)
+      .where(eq(schema.inventoryTransactions.branchId, branchId))
       .orderBy(desc(schema.inventoryTransactions.createdAt));
   }
 

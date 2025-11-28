@@ -1,10 +1,11 @@
-import { Bell, User, Menu, Building2 } from "lucide-react";
+import { Bell, User, Menu, Building2, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useQuery } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import type { Branch } from "@shared/schema";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -16,21 +17,26 @@ interface AdminHeaderProps {
   onMenuToggle?: () => void;
 }
 
-export default function AdminHeader({ breadcrumbs, notificationCount = 0, userName = "Admin", onMenuToggle }: AdminHeaderProps) {
+export default function AdminHeader({ breadcrumbs, notificationCount = 0, userName, onMenuToggle }: AdminHeaderProps) {
   const { toast } = useToast();
   const [selectedBranchId, setSelectedBranchId] = useState<string>("");
 
-  // Get user from localStorage
-  const user = (() => {
+  // Get user from localStorage - memoize to avoid recalculating on every render
+  const user = useMemo(() => {
     try {
       const stored = localStorage.getItem("user");
-      return stored ? JSON.parse(stored) : {};
+      return stored ? JSON.parse(stored) : null;
     } catch {
-      return {};
+      return null;
     }
-  })();
+  }, []);
 
-  const isAdmin = user.role === "admin";
+  // Use prop if provided, otherwise get from localStorage user object
+  const displayName = userName || user?.fullName || user?.username || "User";
+  const userRole = user?.role || "user";
+  const userEmail = user?.email || "";
+
+  const isAdmin = user?.role === "admin";
 
   // Fetch all branches for admin users
   const { data: branches = [] } = useQuery<Branch[]>({
@@ -132,14 +138,34 @@ export default function AdminHeader({ breadcrumbs, notificationCount = 0, userNa
             )}
           </Button>
 
-          <div className="flex items-center gap-2 md:gap-3">
-            <Avatar className="h-7 w-7 md:h-9 md:w-9">
-              <AvatarFallback data-testid="avatar-user">
-                {userName.split(' ').map(n => n[0]).join('')}
-              </AvatarFallback>
-            </Avatar>
-            <span className="font-medium text-sm md:text-base hidden sm:inline" data-testid="text-user-name">{userName}</span>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="flex items-center gap-2 md:gap-3 px-2" data-testid="button-user-menu">
+                <Avatar className="h-7 w-7 md:h-9 md:w-9">
+                  <AvatarFallback data-testid="avatar-user">
+                    {displayName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="hidden sm:flex flex-col items-start">
+                  <span className="font-medium text-sm" data-testid="text-user-name">{displayName}</span>
+                  <span className="text-xs text-muted-foreground capitalize" data-testid="text-user-role">{userRole}</span>
+                </div>
+                <ChevronDown className="h-4 w-4 text-muted-foreground hidden sm:block" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-medium">{displayName}</p>
+                  <p className="text-xs text-muted-foreground">{userEmail}</p>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-xs text-muted-foreground cursor-default">
+                Role: <span className="capitalize ml-1 font-medium">{userRole}</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </header>

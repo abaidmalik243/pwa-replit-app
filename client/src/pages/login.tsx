@@ -5,11 +5,13 @@ import { z } from "zod";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { Loader2 } from "lucide-react";
+import logoImage from "@assets/logo_1764330678819.jfif";
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -33,6 +35,7 @@ export default function Login() {
   });
 
   const onSubmit = async (data: LoginForm) => {
+    if (isLoading) return; // Prevent double submission
     setIsLoading(true);
     try {
       const userData = await login(data.email, data.password);
@@ -66,9 +69,14 @@ export default function Login() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <div className="flex justify-center mb-4">
-            <div className="text-4xl font-bold text-primary">🍕</div>
+            <img 
+              src={logoImage} 
+              alt="Kebabish Pizza" 
+              className="h-20 sm:h-24 md:h-28 w-auto object-contain" 
+              data-testid="img-login-logo"
+            />
           </div>
-          <CardTitle className="text-2xl text-center">Welcome to Kebabish Pizza</CardTitle>
+          <CardTitle className="text-2xl text-center">Welcome Back</CardTitle>
           <CardDescription className="text-center">
             Sign in to your account to place orders
           </CardDescription>
@@ -102,9 +110,8 @@ export default function Login() {
                   <FormItem>
                     <FormLabel>Password</FormLabel>
                     <FormControl>
-                      <Input
+                      <PasswordInput
                         placeholder="••••••••"
-                        type="password"
                         autoComplete="current-password"
                         data-testid="input-password"
                         {...field}

@@ -6,6 +6,7 @@ import jwt from "jsonwebtoken";
 import { z } from "zod";
 import crypto from "crypto";
 import { insertUserSchema, insertOrderSchema, insertBranchSchema, insertRiderSchema, insertDeliverySchema, DEFAULT_DELIVERY_CONFIG } from "@shared/schema";
+import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 
 // JWT secret - in production, this should be in environment variables
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
@@ -19,8 +20,10 @@ declare global {
         id: string;
         email: string;
         username: string;
+        fullName: string;
         role: string;
         branchId: string | null;
+        permissions: string[];
       };
     }
   }
@@ -53,9 +56,12 @@ async function authenticate(req: Request, res: Response, next: NextFunction) {
       return res.status(401).json({ error: "User not found" });
     }
 
-    // Attach user to request (without password)
+    // Attach user to request (without password, with permissions)
     const { password: _, ...userWithoutPassword } = user;
-    req.user = userWithoutPassword;
+    req.user = {
+      ...userWithoutPassword,
+      permissions: user.permissions || [],
+    };
     next();
   } catch (error) {
     if (error instanceof jwt.JsonWebTokenError) {
@@ -82,6 +88,65 @@ function authorize(...allowedRoles: string[]) {
 
     next();
   };
+}
+
+// Permission-based authorization middleware
+function requirePermission(...requiredPermissions: string[]) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    // Admin users have all permissions by default - bypass permission checks entirely
+    if (req.user.role === "admin") {
+      return next();
+    }
+
+    // Check if user has any of the required permissions
+    const hasPermission = requiredPermissions.some(perm => 
+      req.user!.permissions.includes(perm)
+    );
+
+    if (!hasPermission) {
+      return res.status(403).json({ 
+        error: "Insufficient permissions",
+        required: requiredPermissions,
+        userPermissions: req.user.permissions
+      });
+    }
+
+    next();
+  };
+}
+
+// Helper function to get effective branch ID for filtering
+// For admins: use query param branchId if provided, otherwise return null (all branches)
+// For non-admins: always use their assigned branchId regardless of query param
+function getEffectiveBranchId(req: Request, queryBranchId?: string): string | null {
+  if (req.user?.role === "admin") {
+    return queryBranchId || null;
+  }
+  // Non-admin users always see only their assigned branch
+  return req.user?.branchId || null;
+}
+
+// Helper to enforce branch-based access for non-admin users
+// Returns the effective branchId or throws an error if non-admin user has no branch assigned
+function requireBranchAccess(req: Request, queryBranchId?: string): { branchId: string | null; requiresFilter: boolean } {
+  if (req.user?.role === "admin") {
+    // Admins can access any branch or all branches
+    return { branchId: queryBranchId || null, requiresFilter: !!queryBranchId };
+  }
+  
+  // Non-admin users MUST have a branchId assigned
+  if (!req.user?.branchId) {
+    const error = new Error("Access denied: User has no branch assigned");
+    (error as any).statusCode = 403;
+    throw error;
+  }
+  
+  // Non-admin users always filtered to their branch
+  return { branchId: req.user.branchId, requiresFilter: true };
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -236,6 +301,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/logout", (req, res) => {
     res.clearCookie('authToken');
     res.json({ message: "Logged out successfully" });
+  });
+
+  // Object Storage Routes
+  // Get upload URL for file uploads (protected - requires authentication)
+  app.post("/api/objects/upload", authenticate, async (req, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      const storagePath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+      res.json({ uploadURL, storagePath });
+    } catch (error) {
+      console.error("Error getting upload URL:", error);
+      res.status(500).json({ error: "Failed to get upload URL" });
+    }
+  });
+
+  // Set ACL policy for uploaded object (protected - requires authentication)
+  app.post("/api/objects/acl", authenticate, async (req, res) => {
+    try {
+      const { storagePath } = req.body;
+      if (!storagePath || typeof storagePath !== 'string') {
+        return res.status(400).json({ error: "storagePath is required" });
+      }
+      
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      
+      const objectStorageService = new ObjectStorageService();
+      await objectStorageService.trySetObjectEntityAclPolicy(storagePath, {
+        owner: userId,
+        visibility: 'private'
+      });
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error setting ACL:", error);
+      res.status(500).json({ error: "Failed to set ACL policy" });
+    }
+  });
+
+  // Serve uploaded objects (publicly accessible for receipts)
+  app.get("/objects/:objectPath(*)", async (req, res) => {
+    const objectStorageService = new ObjectStorageService();
+    try {
+      const objectFile = await objectStorageService.getObjectEntityFile(req.path);
+      objectStorageService.downloadObject(objectFile, res);
+    } catch (error) {
+      console.error("Error serving object:", error);
+      if (error instanceof ObjectNotFoundError) {
+        return res.sendStatus(404);
+      }
+      return res.sendStatus(500);
+    }
   });
 
   // Forgot password - generate reset token and send email
@@ -714,7 +834,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paymentMethodBreakdown = Object.entries(paymentBreakdown).map(([method, amount]) => ({
         method: method.charAt(0).toUpperCase() + method.slice(1),
         amount,
+        count: filteredOrders.filter(o => (o.paymentMethod || "cash") === method).length,
       }));
+
+      // Expense breakdown by category
+      const expenseByCategory = filteredExpenses.reduce((acc, expense) => {
+        const category = expense.category || "other";
+        acc[category] = (acc[category] || 0) + Number(expense.amount);
+        return acc;
+      }, {} as Record<string, number>);
+
+      const expenseCategoryBreakdown = Object.entries(expenseByCategory)
+        .map(([category, amount]) => ({
+          category: category.charAt(0).toUpperCase() + category.slice(1),
+          amount,
+          count: filteredExpenses.filter(e => (e.category || "other") === category).length,
+        }))
+        .sort((a, b) => b.amount - a.amount);
+
+      // Daily expense trends
+      const dailyExpenseMap = new Map<string, number>();
+      filteredExpenses.forEach(expense => {
+        const dateKey = new Date(expense.date).toISOString().split('T')[0];
+        dailyExpenseMap.set(dateKey, (dailyExpenseMap.get(dateKey) || 0) + Number(expense.amount));
+      });
+
+      const dailyExpenses = Array.from(dailyExpenseMap.entries())
+        .map(([date, amount]) => ({ date, amount }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      // Expense statistics
+      const expenseStats = {
+        totalExpenses,
+        expenseCount: filteredExpenses.length,
+        averageExpense: filteredExpenses.length > 0 ? totalExpenses / filteredExpenses.length : 0,
+        highestExpense: filteredExpenses.length > 0 ? Math.max(...filteredExpenses.map(e => Number(e.amount))) : 0,
+        topCategory: expenseCategoryBreakdown[0]?.category || "N/A",
+      };
 
       // Response data structure matching the frontend expectations
       res.json({
@@ -737,6 +893,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         paymentMethodBreakdown,
         dailySales,
         orderSourceCounts,
+        expenseCategoryBreakdown,
+        dailyExpenses,
+        expenseStats,
       });
     } catch (error: any) {
       console.error("Error fetching reports:", error);
@@ -745,13 +904,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Order routes
-  app.get("/api/orders", async (req, res) => {
+  app.get("/api/orders", authenticate, requirePermission("orders.view"), async (req, res) => {
     try {
       const { branchId, status } = req.query;
+      const { branchId: effectiveBranchId, requiresFilter } = requireBranchAccess(req, branchId as string | undefined);
       let orders;
       
-      if (branchId) {
-        orders = await storage.getOrdersByBranch(branchId as string);
+      if (requiresFilter && effectiveBranchId) {
+        orders = await storage.getOrdersByBranch(effectiveBranchId);
+        // Further filter by status if provided
+        if (status) {
+          orders = orders.filter((order: any) => order.status === status);
+        }
       } else if (status) {
         orders = await storage.getOrdersByStatus(status as string);
       } else {
@@ -760,7 +924,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json(orders);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      const statusCode = (error as any).statusCode || 500;
+      res.status(statusCode).json({ error: error.message });
     }
   });
 
@@ -1043,10 +1208,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // User routes
-  app.get("/api/users", async (req, res) => {
+  // User routes - with branch-based access control
+  app.get("/api/users", authenticate, async (req, res) => {
     try {
-      const users = await storage.getAllUsers();
+      const { branchId, role, isActive } = req.query;
+      const user = (req as any).user;
+      const isAdmin = user?.role === "admin";
+      
+      let users = await storage.getAllUsers();
+      
+      // Non-admin users can only see users from their own branch
+      if (!isAdmin) {
+        const userBranchId = user?.branchId;
+        if (!userBranchId) {
+          return res.status(403).json({ error: "No branch assigned" });
+        }
+        // Force filter to user's branch, ignoring any branchId query param
+        users = users.filter(u => u.branchId === userBranchId);
+      } else {
+        // Admin can filter by branchId if provided
+        if (branchId && typeof branchId === 'string') {
+          users = users.filter(u => u.branchId === branchId);
+        }
+      }
+      
+      // Filter by role if provided
+      if (role && typeof role === 'string') {
+        users = users.filter(u => u.role === role);
+      }
+      
+      // Filter by isActive if provided (for staff dropdown in expense form)
+      if (isActive === 'true') {
+        users = users.filter(u => u.isActive !== false);
+      }
+      
       // Remove passwords from response
       const usersWithoutPasswords = users.map(({ password, ...user }) => user);
       res.json(usersWithoutPasswords);
@@ -1113,36 +1308,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Expense routes
-  app.get("/api/expenses", async (req, res) => {
+  // Expense routes - returns daily expenses (5 AM today to 4:59 AM tomorrow)
+  app.get("/api/expenses", authenticate, requirePermission("expenses.view"), async (req, res) => {
     try {
       const { branchId } = req.query;
-      let expenses;
+      const { branchId: effectiveBranchId, requiresFilter } = requireBranchAccess(req, branchId as string | undefined);
       
-      if (branchId) {
-        expenses = await storage.getExpensesByBranch(branchId as string);
-      } else {
-        expenses = await storage.getAllExpenses();
-      }
+      // Use getDailyExpenses to filter to 24-hour window (5 AM - 4:59 AM)
+      const expenses = await storage.getDailyExpenses(
+        requiresFilter && effectiveBranchId ? effectiveBranchId : (branchId as string | undefined)
+      );
       
       res.json(expenses);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      const statusCode = (error as any).statusCode || 500;
+      res.status(statusCode).json({ error: error.message });
     }
   });
 
-  app.post("/api/expenses", async (req, res) => {
+  app.post("/api/expenses", authenticate, requirePermission("expenses.create"), async (req, res) => {
     try {
-      const expense = await storage.createExpense(req.body);
+      // Parse the date string to a Date object if it's a string
+      const expenseData = {
+        ...req.body,
+        date: typeof req.body.date === 'string' ? new Date(req.body.date) : req.body.date,
+      };
+      const expense = await storage.createExpense(expenseData);
       res.json(expense);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
     }
   });
 
-  app.put("/api/expenses/:id", async (req, res) => {
+  app.put("/api/expenses/:id", authenticate, requirePermission("expenses.edit"), async (req, res) => {
     try {
-      const expense = await storage.updateExpense(req.params.id, req.body);
+      // Parse the date string to a Date object if it's a string
+      const updateData = {
+        ...req.body,
+        date: typeof req.body.date === 'string' ? new Date(req.body.date) : req.body.date,
+      };
+      const expense = await storage.updateExpense(req.params.id, updateData);
       if (!expense) {
         return res.status(404).json({ error: "Expense not found" });
       }
@@ -1152,7 +1357,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/expenses/:id", async (req, res) => {
+  app.delete("/api/expenses/:id", authenticate, requirePermission("expenses.delete"), async (req, res) => {
     try {
       await storage.deleteExpense(req.params.id);
       res.json({ success: true });
@@ -1162,15 +1367,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POS Tables routes
-  app.get("/api/pos/tables", async (req, res) => {
+  app.get("/api/pos/tables", authenticate, async (req, res) => {
     try {
       const { branchId } = req.query;
-      const tables = branchId
-        ? await storage.getPosTablesByBranch(branchId as string)
+      const { branchId: effectiveBranchId, requiresFilter } = requireBranchAccess(req, branchId as string | undefined);
+      const tables = requiresFilter && effectiveBranchId
+        ? await storage.getPosTablesByBranch(effectiveBranchId)
         : await storage.getAllPosTables();
       res.json(tables);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      const statusCode = (error as any).statusCode || 400;
+      res.status(statusCode).json({ error: error.message });
     }
   });
 
@@ -1217,15 +1424,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POS Sessions routes
-  app.get("/api/pos/sessions", async (req, res) => {
+  app.get("/api/pos/sessions", authenticate, async (req, res) => {
     try {
       const { branchId } = req.query;
-      const sessions = branchId
-        ? await storage.getPosSessionsByBranch(branchId as string)
+      const { branchId: effectiveBranchId, requiresFilter } = requireBranchAccess(req, branchId as string | undefined);
+      const sessions = requiresFilter && effectiveBranchId
+        ? await storage.getPosSessionsByBranch(effectiveBranchId)
         : await storage.getAllPosSessions();
       res.json(sessions);
     } catch (error: any) {
-      res.status(400).json({ error: error.message });
+      const statusCode = (error as any).statusCode || 400;
+      res.status(statusCode).json({ error: error.message });
     }
   });
 
@@ -1658,11 +1867,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all riders (admin/staff only)
   app.get("/api/riders", authenticate, authorize("admin", "staff"), async (req, res) => {
     try {
-      const riders = await storage.getAllRiders();
+      const { branchId } = req.query;
+      const { branchId: effectiveBranchId, requiresFilter } = requireBranchAccess(req, branchId as string | undefined);
+      const riders = requiresFilter && effectiveBranchId
+        ? await storage.getRidersByBranch(effectiveBranchId)
+        : await storage.getAllRiders();
       res.json(riders);
     } catch (error: any) {
       console.error("Error fetching riders:", error);
-      res.status(500).json({ error: error.message });
+      const statusCode = (error as any).statusCode || 500;
+      res.status(statusCode).json({ error: error.message });
     }
   });
 
@@ -1888,11 +2102,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all deliveries (admin/staff only)
   app.get("/api/deliveries", authenticate, authorize("admin", "staff"), async (req, res) => {
     try {
-      const deliveries = await storage.getAllDeliveries();
+      const { branchId } = req.query;
+      const { branchId: effectiveBranchId, requiresFilter } = requireBranchAccess(req, branchId as string | undefined);
+      const deliveries = requiresFilter && effectiveBranchId
+        ? await storage.getDeliveriesByBranch(effectiveBranchId)
+        : await storage.getAllDeliveries();
       res.json(deliveries);
     } catch (error: any) {
       console.error("Error fetching deliveries:", error);
-      res.status(500).json({ error: error.message });
+      const statusCode = (error as any).statusCode || 500;
+      res.status(statusCode).json({ error: error.message });
     }
   });
 
@@ -2744,6 +2963,239 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== Saved Customers Management ====================
+  
+  // Get all customers with aggregated data
+  app.get("/api/admin/customers", authenticate, requirePermission("loyalty.view_customers"), async (req, res) => {
+    try {
+      const { search, tier, sortBy, sortOrder } = req.query;
+      
+      // Get all users with role 'customer'
+      const allUsers = await storage.getAllUsers();
+      const customers = allUsers.filter(u => u.role === "customer");
+      
+      // Get aggregated data for each customer
+      const customersWithData = await Promise.all(
+        customers.map(async (customer) => {
+          const [addresses, loyalty, orders, favorites] = await Promise.all([
+            storage.getCustomerAddresses(customer.id),
+            storage.getLoyaltyPoints(customer.id),
+            storage.getAllOrders().then(orders => orders.filter(o => o.customerId === customer.id)),
+            storage.getCustomerFavorites(customer.id),
+          ]);
+          
+          const totalSpent = orders
+            .filter(o => o.status === "completed" || o.status === "delivered")
+            .reduce((sum, o) => sum + parseFloat(o.total || "0"), 0);
+          
+          return {
+            ...customer,
+            password: undefined, // Remove sensitive data
+            addressCount: addresses.length,
+            orderCount: orders.length,
+            totalSpent,
+            loyaltyPoints: loyalty?.availablePoints || 0,
+            loyaltyTier: loyalty?.tier || "bronze",
+            lifetimePoints: loyalty?.lifetimeEarned || 0,
+            favoriteCount: favorites.length,
+            lastOrderDate: orders.length > 0 
+              ? new Date(Math.max(...orders.map(o => new Date(o.createdAt!).getTime())))
+              : null,
+          };
+        })
+      );
+      
+      // Apply search filter
+      let filtered = customersWithData;
+      if (search && typeof search === "string") {
+        const searchLower = search.toLowerCase();
+        filtered = filtered.filter(c => 
+          c.fullName.toLowerCase().includes(searchLower) ||
+          c.email.toLowerCase().includes(searchLower) ||
+          (c.phone && c.phone.includes(search)) ||
+          c.username.toLowerCase().includes(searchLower)
+        );
+      }
+      
+      // Apply tier filter
+      if (tier && tier !== "all") {
+        filtered = filtered.filter(c => c.loyaltyTier === tier);
+      }
+      
+      // Apply sorting
+      if (sortBy) {
+        const order = sortOrder === "asc" ? 1 : -1;
+        filtered.sort((a, b) => {
+          switch (sortBy) {
+            case "name": return a.fullName.localeCompare(b.fullName) * order;
+            case "orders": return (a.orderCount - b.orderCount) * order;
+            case "spent": return (a.totalSpent - b.totalSpent) * order;
+            case "points": return (a.loyaltyPoints - b.loyaltyPoints) * order;
+            case "date": 
+              if (!a.lastOrderDate && !b.lastOrderDate) return 0;
+              if (!a.lastOrderDate) return order;
+              if (!b.lastOrderDate) return -order;
+              return (new Date(a.lastOrderDate).getTime() - new Date(b.lastOrderDate).getTime()) * order;
+            default: return 0;
+          }
+        });
+      }
+      
+      res.json(filtered);
+    } catch (error: any) {
+      console.error("Error fetching customers:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  // Get single customer with full details
+  app.get("/api/admin/customers/:customerId", authenticate, requirePermission("loyalty.view_customers"), async (req, res) => {
+    try {
+      const { customerId } = req.params;
+      const customer = await storage.getUser(customerId);
+      
+      if (!customer || customer.role !== "customer") {
+        return res.status(404).json({ error: "Customer not found" });
+      }
+      
+      const [addresses, loyalty, loyaltyTransactions, orders, favorites] = await Promise.all([
+        storage.getCustomerAddresses(customerId),
+        storage.getLoyaltyPoints(customerId),
+        storage.getLoyaltyTransactions(customerId),
+        storage.getAllOrders().then(orders => orders.filter(o => o.customerId === customerId)),
+        storage.getCustomerFavorites(customerId),
+      ]);
+      
+      // Get menu items for favorites
+      const menuItems = await storage.getAllMenuItems();
+      const favoriteItems = favorites.map(fav => {
+        const item = menuItems.find(m => m.id === fav.menuItemId);
+        return item ? { ...fav, menuItem: item } : null;
+      }).filter(Boolean);
+      
+      const totalSpent = orders
+        .filter(o => o.status === "completed" || o.status === "delivered")
+        .reduce((sum, o) => sum + parseFloat(o.total || "0"), 0);
+      
+      res.json({
+        ...customer,
+        password: undefined,
+        addresses,
+        orders: orders.sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime()),
+        loyalty: loyalty || { customerId, totalPoints: 0, availablePoints: 0, lifetimeEarned: 0, lifetimeRedeemed: 0, tier: "bronze" },
+        loyaltyTransactions: loyaltyTransactions.sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime()),
+        favorites: favoriteItems,
+        stats: {
+          totalOrders: orders.length,
+          completedOrders: orders.filter(o => o.status === "completed" || o.status === "delivered").length,
+          cancelledOrders: orders.filter(o => o.status === "cancelled").length,
+          totalSpent,
+          averageOrderValue: orders.length > 0 ? totalSpent / orders.filter(o => o.status === "completed" || o.status === "delivered").length : 0,
+        }
+      });
+    } catch (error: any) {
+      console.error("Error fetching customer details:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  // Update customer loyalty points (admin adjustment)
+  app.post("/api/admin/customers/:customerId/loyalty/adjust", authenticate, requirePermission("loyalty.manage_points"), async (req, res) => {
+    try {
+      const { customerId } = req.params;
+      const { points, reason } = req.body;
+      
+      if (!points || !reason) {
+        return res.status(400).json({ error: "Points and reason are required" });
+      }
+      
+      const customer = await storage.getUser(customerId);
+      if (!customer || customer.role !== "customer") {
+        return res.status(404).json({ error: "Customer not found" });
+      }
+      
+      const currentLoyalty = await storage.getLoyaltyPoints(customerId);
+      const currentAvailable = currentLoyalty?.availablePoints || 0;
+      const currentTotal = currentLoyalty?.totalPoints || 0;
+      const currentLifetimeEarned = currentLoyalty?.lifetimeEarned || 0;
+      
+      const newAvailable = Math.max(0, currentAvailable + points);
+      const newTotal = Math.max(0, currentTotal + points);
+      const newLifetimeEarned = points > 0 ? currentLifetimeEarned + points : currentLifetimeEarned;
+      
+      await storage.createOrUpdateLoyaltyPoints(customerId, {
+        availablePoints: newAvailable,
+        totalPoints: newTotal,
+        lifetimeEarned: newLifetimeEarned,
+      });
+      
+      await storage.createLoyaltyTransaction({
+        customerId,
+        transactionType: "adjustment",
+        points,
+        balanceAfter: newAvailable,
+        description: `Admin adjustment: ${reason}`,
+      });
+      
+      res.json({ success: true, newBalance: newAvailable });
+    } catch (error: any) {
+      console.error("Error adjusting loyalty points:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  // Get customer statistics overview
+  app.get("/api/admin/customers/stats/overview", authenticate, requirePermission("loyalty.view_customers"), async (req, res) => {
+    try {
+      const allUsers = await storage.getAllUsers();
+      const customers = allUsers.filter(u => u.role === "customer");
+      const allOrders = await storage.getAllOrders();
+      
+      // Get loyalty data for all customers
+      const loyaltyData = await Promise.all(
+        customers.map(c => storage.getLoyaltyPoints(c.id))
+      );
+      
+      const tierCounts = { bronze: 0, silver: 0, gold: 0, platinum: 0 };
+      let totalLoyaltyPoints = 0;
+      
+      loyaltyData.forEach(l => {
+        if (l) {
+          tierCounts[l.tier as keyof typeof tierCounts]++;
+          totalLoyaltyPoints += l.availablePoints;
+        } else {
+          tierCounts.bronze++;
+        }
+      });
+      
+      const customerOrders = allOrders.filter(o => o.customerId);
+      const completedOrders = customerOrders.filter(o => o.status === "completed" || o.status === "delivered");
+      const totalRevenue = completedOrders.reduce((sum, o) => sum + parseFloat(o.total || "0"), 0);
+      
+      // Active customers (ordered in last 30 days)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const activeCustomers = new Set(
+        customerOrders
+          .filter(o => new Date(o.createdAt!) >= thirtyDaysAgo)
+          .map(o => o.customerId)
+      ).size;
+      
+      res.json({
+        totalCustomers: customers.length,
+        activeCustomers,
+        totalOrders: customerOrders.length,
+        totalRevenue,
+        averageOrderValue: completedOrders.length > 0 ? totalRevenue / completedOrders.length : 0,
+        totalLoyaltyPoints,
+        tierDistribution: tierCounts,
+      });
+    } catch (error: any) {
+      console.error("Error fetching customer stats:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // ==================== Customer Addresses Routes ====================
   
   app.get("/api/customers/:customerId/addresses", authenticate, async (req, res) => {
@@ -3169,10 +3621,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.get("/api/inventory/transactions", authenticate, authorize("admin", "staff"), async (req, res) => {
     try {
-      const transactions = await storage.getAllInventoryTransactions();
+      const { branchId } = req.query;
+      const { branchId: effectiveBranchId, requiresFilter } = requireBranchAccess(req, branchId as string | undefined);
+      const transactions = requiresFilter && effectiveBranchId
+        ? await storage.getInventoryTransactionsByBranch(effectiveBranchId)
+        : await storage.getAllInventoryTransactions();
       res.json(transactions);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      const statusCode = (error as any).statusCode || 500;
+      res.status(statusCode).json({ error: error.message });
     }
   });
 
@@ -3863,12 +4320,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/shifts", authenticate, authorize("admin", "staff"), async (req, res) => {
     try {
       const { branchId } = req.query;
-      const shifts = branchId 
-        ? await storage.getStaffShiftsByBranch(branchId as string)
+      const { branchId: effectiveBranchId, requiresFilter } = requireBranchAccess(req, branchId as string | undefined);
+      const shifts = requiresFilter && effectiveBranchId 
+        ? await storage.getStaffShiftsByBranch(effectiveBranchId)
         : await storage.getAllStaffShifts();
       res.json(shifts);
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      const statusCode = (error as any).statusCode || 500;
+      res.status(statusCode).json({ error: error.message });
     }
   });
 

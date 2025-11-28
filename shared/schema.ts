@@ -36,10 +36,12 @@ export const users = pgTable("users", {
   language: text("language").default("en"), // User's preferred language (en, ur, ar)
   currency: text("currency").default("PKR"), // User's preferred currency (PKR, USD, AED, SAR)
   isActive: boolean("is_active").notNull().default(true),
+  isDeleted: boolean("is_deleted").notNull().default(false), // Soft delete flag
+  deletedAt: timestamp("deleted_at"), // When the user was soft deleted
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, isDeleted: true, deletedAt: true });
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
@@ -257,15 +259,20 @@ export const DEFAULT_DELIVERY_CONFIG = {
 export const expenses = pgTable("expenses", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   branchId: varchar("branch_id").references(() => branches.id).notNull(),
-  category: text("category").notNull(), // rent, utilities, supplies, salaries, etc.
+  category: text("category").notNull(), // rent, utilities, supplies, salaries, staff, etc.
   description: text("description").notNull(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   date: timestamp("date").notNull(),
+  staffId: varchar("staff_id").references(() => users.id), // Optional: links to staff member when category is 'staff'
+  supplierId: varchar("supplier_id").references(() => suppliers.id), // Optional: links to supplier when category is 'Supplies'
+  receiptUrl: text("receipt_url"), // URL to uploaded receipt/attachment
   addedBy: varchar("added_by").references(() => users.id),
+  isDeleted: boolean("is_deleted").notNull().default(false), // Soft delete flag
+  deletedAt: timestamp("deleted_at"), // When the expense was soft deleted
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-export const insertExpenseSchema = createInsertSchema(expenses).omit({ id: true, createdAt: true });
+export const insertExpenseSchema = createInsertSchema(expenses).omit({ id: true, createdAt: true, isDeleted: true, deletedAt: true });
 export type InsertExpense = z.infer<typeof insertExpenseSchema>;
 export type Expense = typeof expenses.$inferSelect;
 

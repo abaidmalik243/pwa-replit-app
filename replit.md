@@ -54,6 +54,26 @@ The application features a dual interface: a visual-first Customer Interface and
 
 **Multi-Language & Localization System**: Internationalization infrastructure supporting English, Urdu, and Arabic with RTL text, and multiple currencies (PKR, USD, AED, SAR). User preferences are stored in the backend and synchronized with local storage.
 
+**Hierarchical Permissions System**: Granular role-based access control with 12 permission modules (Orders, Menu, Users & Roles, POS, Deliveries & Riders, Inventory & Suppliers, Marketing, Analytics & Reports, Loyalty & Customers, Expense Management, System Settings) containing 60+ individual permissions. Features accordion-based UI with module-level checkboxes, Select All/Clear All functionality, and responsive design for mobile devices. Permissions stored as text arrays using module.action format (e.g., "orders.view", "expenses.approve").
+
+**Branch-Based Access Control**: Comprehensive branch filtering across all modules. Non-admin users (staff, riders) are automatically restricted to viewing only data from their assigned branch. Backend uses `requireBranchAccess()` helper which enforces branch access - throws 403 if non-admin user has no branchId assigned. Routes using branch filtering: orders, expenses, POS tables/sessions, shifts, riders, deliveries, inventory transactions. Admins can access all branches or filter by specific branchId.
+
+**Expense Management System**: Daily expense tracking with 24-hour window filter (5:00 AM today to 4:59 AM tomorrow). Supports multiple categories including Rent, Utilities, Supplies, Salaries, Marketing, Maintenance, Transportation, Staff, and Other. When category is "Staff", a Staff Member dropdown appears populated with active staff from the selected branch. Expenses can link to staff members via optional `staffId` field. Admins bypass all permission checks and can manage expenses across all branches. Staff users are restricted to their assigned branch only.
+
+**Saved Customers Module**: Admin dashboard at `/admin/customers` for comprehensive customer relationship management. Features include customer statistics overview (total customers, active customers, orders, revenue, tier distribution), searchable customer list with tier filtering and sorting options (by name, spent, orders). Detailed customer view dialog with tabs for Overview (stats, member info), Orders (order history), Addresses (saved addresses), Loyalty (points, tier, transactions, admin point adjustments), and Favorites (favorite menu items). Requires `loyalty.view_customers` permission for viewing and `loyalty.manage_points` for adjusting loyalty points. Accessible via Heart icon in sidebar navigation.
+
+## Reusable UI Components
+
+**PasswordInput** (`client/src/components/ui/password-input.tsx`): Input field with show/hide password toggle using Eye/EyeOff icons. Extends standard Input component with visibility toggle functionality.
+
+**PaginationControls** (`client/src/components/ui/pagination-controls.tsx`): Reusable pagination component with page size selector, first/prev/next/last navigation buttons, and "Showing X to Y of Z items" display. Auto-handles edge cases when filtered data shrinks. Props: currentPage, totalPages, totalItems, pageSize, onPageChange, onPageSizeChange, pageSizeOptions, showPageSizeSelector.
+
+**PageLoader** (`client/src/components/ui/page-loader.tsx`): Multiple loading state components:
+- `PageLoader`: Full-page loading with optional message
+- `TableLoader`: Table skeleton with configurable rows/columns
+- `CardLoader`: Card grid skeleton
+- `InlineLoader`: Inline spinner with text
+
 ## External Dependencies
 
 -   **UI Component Libraries**: Radix UI, shadcn/ui

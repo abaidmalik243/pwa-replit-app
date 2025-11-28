@@ -62,6 +62,12 @@ The application features a dual interface: a visual-first Customer Interface and
 
 **Saved Customers Module**: Admin dashboard at `/admin/customers` for comprehensive customer relationship management. Features include customer statistics overview (total customers, active customers, orders, revenue, tier distribution), searchable customer list with tier filtering and sorting options (by name, spent, orders). Detailed customer view dialog with tabs for Overview (stats, member info), Orders (order history), Addresses (saved addresses), Loyalty (points, tier, transactions, admin point adjustments), and Favorites (favorite menu items). Requires `loyalty.view_customers` permission for viewing and `loyalty.manage_points` for adjusting loyalty points. Accessible via Heart icon in sidebar navigation.
 
+**Role-Specific Dashboards**: Three dedicated dashboards tailored for each user role, accessible from the main sidebar:
+- **Admin Dashboard** (`/admin`): Full analytics, revenue charts, order management, KPIs. Admin-only access.
+- **Staff Dashboard** (`/admin/staff-dashboard`): Simplified order workflow with pending/preparing/ready orders, upcoming shift assignments, attendance tracking. Accessible by staff and admin.
+- **Rider Dashboard** (`/rider`): Delivery assignments, availability status, GPS tracking, performance stats. Accessible by rider and admin.
+AdminSidebar uses a `roles` property on menu items to filter visibility. Admins can access all three dashboards; staff and riders see only their respective dashboards.
+
 ## Reusable UI Components
 
 **PasswordInput** (`client/src/components/ui/password-input.tsx`): Input field with show/hide password toggle using Eye/EyeOff icons. Extends standard Input component with visibility toggle functionality.

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
@@ -71,7 +72,7 @@ export default function Login() {
             <img 
               src={logoImage} 
               alt="Kebabish Pizza" 
-              className="h-16 w-auto object-contain" 
+              className="h-20 sm:h-24 md:h-28 w-auto object-contain" 
               data-testid="img-login-logo"
             />
           </div>
@@ -109,9 +110,8 @@ export default function Login() {
                   <FormItem>
                     <FormLabel>Password</FormLabel>
                     <FormControl>
-                      <Input
+                      <PasswordInput
                         placeholder="••••••••"
-                        type="password"
                         autoComplete="current-password"
                         data-testid="input-password"
                         {...field}

@@ -31,7 +31,7 @@ export default function CustomerHeader({
           <img 
             src={logoImage} 
             alt="Kebabish Pizza" 
-            className="h-8 md:h-10 w-auto object-contain" 
+            className="h-10 sm:h-12 md:h-14 w-auto object-contain" 
             data-testid="img-logo"
           />
         </div>

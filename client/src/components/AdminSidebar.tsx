@@ -79,7 +79,7 @@ export default function AdminSidebar({ soundEnabled = true, onToggleSound, onLog
         <img 
           src={logoImage} 
           alt="Kebabish Pizza" 
-          className="h-10 w-auto object-contain" 
+          className="h-12 md:h-14 w-auto object-contain" 
           data-testid="img-admin-logo"
         />
       </div>

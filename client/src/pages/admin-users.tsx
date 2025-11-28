@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import AdminSidebar from "@/components/AdminSidebar";
@@ -22,6 +22,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { PaginationControls } from "@/components/ui/pagination-controls";
+import { PageLoader } from "@/components/ui/page-loader";
 import { ShoppingCart, UtensilsCrossed, Users, BarChart3, Package, Truck, Megaphone, Settings, CreditCard, Heart, Receipt, RefreshCcw, Clock, MapPin, MessageSquare, Smartphone, UserCircle } from "lucide-react";
 import type { User, Branch } from "@shared/schema";
 
@@ -481,6 +483,10 @@ export default function AdminUsers() {
   const [branchFilter, setBranchFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   const { data: dbUsers = [], isLoading } = useQuery<User[]>({
     queryKey: ["/api/users"],
   });
@@ -508,27 +514,54 @@ export default function AdminUsers() {
   }));
 
   // Apply filters
-  const users = allUsers.filter((user) => {
-    // Search filter (name, email, phone)
-    const searchLower = searchQuery.toLowerCase();
-    const matchesSearch = !searchQuery || 
-      user.name.toLowerCase().includes(searchLower) ||
-      user.email.toLowerCase().includes(searchLower) ||
-      (user.phone && user.phone.toLowerCase().includes(searchLower));
+  const filteredUsers = useMemo(() => {
+    return allUsers.filter((user) => {
+      // Search filter (name, email, phone)
+      const searchLower = searchQuery.toLowerCase();
+      const matchesSearch = !searchQuery || 
+        user.name.toLowerCase().includes(searchLower) ||
+        user.email.toLowerCase().includes(searchLower) ||
+        (user.phone && user.phone.toLowerCase().includes(searchLower));
 
-    // Role filter
-    const matchesRole = roleFilter === "all" || user.role === roleFilter;
+      // Role filter
+      const matchesRole = roleFilter === "all" || user.role === roleFilter;
 
-    // Branch filter
-    const matchesBranch = branchFilter === "all" || 
-      (branchFilter === "no-branch" ? !user.branchId : user.branchId === branchFilter);
+      // Branch filter
+      const matchesBranch = branchFilter === "all" || 
+        (branchFilter === "no-branch" ? !user.branchId : user.branchId === branchFilter);
 
-    // Status filter
-    const matchesStatus = statusFilter === "all" || 
-      (statusFilter === "active" ? user.isActive : !user.isActive);
+      // Status filter
+      const matchesStatus = statusFilter === "all" || 
+        (statusFilter === "active" ? user.isActive : !user.isActive);
 
-    return matchesSearch && matchesRole && matchesBranch && matchesStatus;
-  });
+      return matchesSearch && matchesRole && matchesBranch && matchesStatus;
+    });
+  }, [allUsers, searchQuery, roleFilter, branchFilter, statusFilter]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredUsers.length / pageSize);
+
+  // Auto-clamp currentPage when data changes
+  useEffect(() => {
+    if (totalPages > 0 && currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages, currentPage]);
+
+  const paginatedUsers = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredUsers.slice(startIndex, startIndex + pageSize);
+  }, [filteredUsers, currentPage, pageSize]);
+
+  // Reset to first page when filters change
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  };
 
   // Count active filters
   const activeFilterCount = [
@@ -542,6 +575,7 @@ export default function AdminUsers() {
     setRoleFilter("all");
     setBranchFilter("all");
     setStatusFilter("all");
+    setCurrentPage(1);
   };
 
   const form = useForm<UserForm>({
@@ -685,7 +719,7 @@ export default function AdminUsers() {
             <div>
               <h1 className="text-2xl md:text-3xl font-bold mb-2">Users & Roles</h1>
               <p className="text-muted-foreground text-sm md:text-base">
-                Manage user accounts and role assignments ({users.length} of {allUsers.length})
+                Manage user accounts and role assignments ({filteredUsers.length} of {allUsers.length})
               </p>
             </div>
             <Dialog open={isAddDialogOpen || !!editingUser} onOpenChange={(open) => {
@@ -984,11 +1018,21 @@ export default function AdminUsers() {
           </Card>
 
           {isLoading ? (
-            <div className="text-center py-12 text-muted-foreground">
-              Loading users...
-            </div>
+            <PageLoader message="Loading users..." />
           ) : (
-            <UserRoleTable users={users} onEdit={handleEdit} onDelete={handleDelete} />
+            <>
+              <UserRoleTable users={paginatedUsers} onEdit={handleEdit} onDelete={handleDelete} />
+              {filteredUsers.length > 0 && (
+                <PaginationControls
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalItems={filteredUsers.length}
+                  pageSize={pageSize}
+                  onPageChange={handlePageChange}
+                  onPageSizeChange={handlePageSizeChange}
+                />
+              )}
+            </>
           )}
         </main>
       </div>

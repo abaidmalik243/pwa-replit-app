@@ -14,9 +14,12 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Search, Calendar, DollarSign, User, Pencil, Trash2, Package, ExternalLink, Paperclip } from "lucide-react";
+import { Plus, Search, Calendar, DollarSign, User, Pencil, Trash2, Package, ExternalLink, Paperclip, Filter, X } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { ReceiptUploader } from "@/components/ReceiptUploader";
+import { PaginationControls } from "@/components/ui/pagination-controls";
+import { PageLoader, CardLoader } from "@/components/ui/page-loader";
+import { Badge } from "@/components/ui/badge";
 import type { Expense, Branch, User as UserType, Supplier } from "@shared/schema";
 import { format, subDays } from "date-fns";
 
@@ -122,9 +125,12 @@ const EXPENSE_CATEGORIES = [
 export default function AdminExpenses() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedBranch, setSelectedBranch] = useState<string>("all");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -375,15 +381,59 @@ export default function AdminExpenses() {
 
   const expensesArray = Array.isArray(expenses) ? expenses : [];
   
-  const filteredExpenses = expensesArray.filter((expense) =>
-    expense.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    expense.category?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredExpenses = useMemo(() => {
+    return expensesArray.filter((expense) => {
+      const matchesSearch = !searchTerm || 
+        expense.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        expense.category?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesCategory = selectedCategory === "all" || 
+        expense.category?.toLowerCase() === selectedCategory.toLowerCase();
+      
+      return matchesSearch && matchesCategory;
+    });
+  }, [expensesArray, searchTerm, selectedCategory]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredExpenses.length / pageSize);
+  
+  // Auto-clamp currentPage when data changes
+  useEffect(() => {
+    if (totalPages > 0 && currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages, currentPage]);
+
+  const paginatedExpenses = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredExpenses.slice(startIndex, startIndex + pageSize);
+  }, [filteredExpenses, currentPage, pageSize]);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  };
 
   const totalExpenses = filteredExpenses.reduce(
     (sum, exp) => sum + parseFloat(exp.amount),
     0
   );
+  
+  // Count active filters
+  const activeFilterCount = [
+    selectedCategory !== "all",
+    searchTerm.length > 0,
+  ].filter(Boolean).length;
+
+  const clearFilters = () => {
+    setSearchTerm("");
+    setSelectedCategory("all");
+    setCurrentPage(1);
+  };
 
   const getBranchName = (branchId: string) => {
     const branch = allBranches.find((b) => b.id === branchId);
@@ -674,20 +724,26 @@ export default function AdminExpenses() {
             </Card>
           </div>
 
-          <div className="mb-6 flex gap-4 flex-wrap">
+          <div className="mb-6 flex gap-4 flex-wrap items-center">
             <div className="flex-1 min-w-[200px]">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search expenses..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setCurrentPage(1);
+                  }}
                   className="pl-10"
                   data-testid="input-search-expenses"
                 />
               </div>
             </div>
-            <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+            <Select value={selectedBranch} onValueChange={(val) => {
+              setSelectedBranch(val);
+              setCurrentPage(1);
+            }}>
               <SelectTrigger className="w-[200px]" data-testid="filter-branch">
                 <SelectValue placeholder="All Branches" />
               </SelectTrigger>
@@ -700,19 +756,49 @@ export default function AdminExpenses() {
                 ))}
               </SelectContent>
             </Select>
+            <Select value={selectedCategory} onValueChange={(val) => {
+              setSelectedCategory(val);
+              setCurrentPage(1);
+            }}>
+              <SelectTrigger className="w-[150px]" data-testid="filter-category">
+                <Filter className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {EXPENSE_CATEGORIES.map((cat) => (
+                  <SelectItem key={cat} value={cat.toLowerCase()}>
+                    {cat}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {activeFilterCount > 0 && (
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={clearFilters}
+                className="text-muted-foreground"
+                data-testid="button-clear-filters"
+              >
+                <X className="h-4 w-4 mr-1" />
+                Clear
+                <Badge variant="secondary" className="ml-1 h-5 px-1.5">
+                  {activeFilterCount}
+                </Badge>
+              </Button>
+            )}
           </div>
 
           <div className="space-y-4">
             {isLoading ? (
-              <div className="text-center py-12 text-muted-foreground">
-                Loading expenses...
-              </div>
+              <CardLoader count={3} />
             ) : filteredExpenses.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 No expenses found
               </div>
             ) : (
-              filteredExpenses.map((expense) => {
+              paginatedExpenses.map((expense) => {
                 const staffName = getStaffName(expense.staffId);
                 const supplierName = getSupplierName(expense.supplierId);
                 
@@ -810,6 +896,16 @@ export default function AdminExpenses() {
                   </Card>
                 );
               })
+            )}
+            {filteredExpenses.length > 0 && (
+              <PaginationControls
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalItems={filteredExpenses.length}
+                pageSize={pageSize}
+                onPageChange={handlePageChange}
+                onPageSizeChange={handlePageSizeChange}
+              />
             )}
           </div>
         </main>

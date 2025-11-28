@@ -6,6 +6,7 @@ import jwt from "jsonwebtoken";
 import { z } from "zod";
 import crypto from "crypto";
 import { insertUserSchema, insertOrderSchema, insertBranchSchema, insertRiderSchema, insertDeliverySchema, DEFAULT_DELIVERY_CONFIG } from "@shared/schema";
+import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 
 // JWT secret - in production, this should be in environment variables
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
@@ -300,6 +301,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/logout", (req, res) => {
     res.clearCookie('authToken');
     res.json({ message: "Logged out successfully" });
+  });
+
+  // Object Storage Routes
+  // Get upload URL for file uploads (protected - requires authentication)
+  app.post("/api/objects/upload", authenticate, async (req, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      res.json({ uploadURL });
+    } catch (error) {
+      console.error("Error getting upload URL:", error);
+      res.status(500).json({ error: "Failed to get upload URL" });
+    }
+  });
+
+  // Serve uploaded objects (publicly accessible for receipts)
+  app.get("/objects/:objectPath(*)", async (req, res) => {
+    const objectStorageService = new ObjectStorageService();
+    try {
+      const objectFile = await objectStorageService.getObjectEntityFile(req.path);
+      objectStorageService.downloadObject(objectFile, res);
+    } catch (error) {
+      console.error("Error serving object:", error);
+      if (error instanceof ObjectNotFoundError) {
+        return res.sendStatus(404);
+      }
+      return res.sendStatus(500);
+    }
   });
 
   // Forgot password - generate reset token and send email

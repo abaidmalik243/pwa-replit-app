@@ -16,6 +16,7 @@ import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Search, Calendar, DollarSign, User, Pencil, Trash2, Package, ExternalLink, Paperclip } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { ReceiptUploader } from "@/components/ReceiptUploader";
 import type { Expense, Branch, User as UserType, Supplier } from "@shared/schema";
 import { format, subDays } from "date-fns";
 
@@ -631,39 +632,14 @@ export default function AdminExpenses() {
                       name="receiptUrl"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Receipt/Attachment URL (Optional)</FormLabel>
+                          <FormLabel>Receipt/Invoice (Optional)</FormLabel>
                           <FormControl>
-                            <div className="flex items-center gap-2">
-                              <Input
-                                type="url"
-                                placeholder="https://example.com/receipt.pdf"
-                                {...field}
-                                value={field.value || ""}
-                                className="flex-1"
-                                data-testid="input-receipt-url"
-                              />
-                              {field.value && (
-                                <a 
-                                  href={field.value} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="shrink-0"
-                                >
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="icon"
-                                    title="View receipt"
-                                  >
-                                    <ExternalLink className="h-4 w-4" />
-                                  </Button>
-                                </a>
-                              )}
-                            </div>
+                            <ReceiptUploader
+                              value={field.value || ""}
+                              onChange={field.onChange}
+                              disabled={createMutation.isPending || updateMutation.isPending}
+                            />
                           </FormControl>
-                          <p className="text-xs text-muted-foreground">
-                            Paste a URL to a receipt image or PDF
-                          </p>
                           <FormMessage />
                         </FormItem>
                       )}

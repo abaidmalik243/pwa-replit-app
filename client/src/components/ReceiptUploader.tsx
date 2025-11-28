@@ -38,11 +38,11 @@ export function ReceiptUploader({ value, onChange, disabled }: ReceiptUploaderPr
       const response = await apiRequest("/api/objects/upload", "POST");
       const data = await response.json();
       
-      if (!data.uploadURL) {
+      if (!data.uploadURL || !data.storagePath) {
         throw new Error("Failed to get upload URL");
       }
       
-      const uploadURL = data.uploadURL;
+      const { uploadURL, storagePath } = data;
 
       const uploadResponse = await fetch(uploadURL, {
         method: "PUT",
@@ -56,13 +56,9 @@ export function ReceiptUploader({ value, onChange, disabled }: ReceiptUploaderPr
         throw new Error("Upload failed");
       }
 
-      const urlWithoutParams = uploadURL.split('?')[0];
-      const urlPath = new URL(urlWithoutParams).pathname;
-      const pathParts = urlPath.split('/');
-      const objectId = pathParts[pathParts.length - 1];
-      const normalizedPath = `/objects/uploads/${objectId}`;
+      await apiRequest("/api/objects/acl", "POST", { storagePath });
       
-      onChange(normalizedPath);
+      onChange(storagePath);
       setFileName(file.name);
     } catch (err) {
       console.error("Upload error:", err);

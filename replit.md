@@ -54,7 +54,27 @@ The application features a dual interface: a visual-first Customer Interface and
 
 **Multi-Language & Localization System**: Internationalization infrastructure supporting English, Urdu, and Arabic with RTL text, and multiple currencies (PKR, USD, AED, SAR). User preferences are stored in the backend and synchronized with local storage.
 
-**Hierarchical Permissions System**: Granular role-based access control with 12 permission modules (Orders, Menu, Users & Roles, POS, Deliveries & Riders, Inventory & Suppliers, Marketing, Analytics & Reports, Loyalty & Customers, Expense Management, System Settings) containing 60+ individual permissions. Features accordion-based UI with module-level checkboxes, Select All/Clear All functionality, and responsive design for mobile devices. Permissions stored as text arrays using module.action format (e.g., "orders.view", "expenses.approve").
+**Hierarchical Permissions System**: Granular role-based access control with 17 permission modules containing 94 individual permissions. Each module has complete CRUD permissions where applicable:
+- **Orders Management**: view, create, update_status, assign, cancel, refund
+- **Menu Management**: view, create, edit, delete, manage_categories, manage_variants
+- **Users & Roles**: view, create, edit, delete, manage_permissions
+- **Point of Sale**: view, access, manage_tables, apply_discounts, void_items, manage_cash, view_kitchen
+- **Deliveries & Riders**: view_riders, manage_riders, assign_orders, track_riders, view_deliveries
+- **Inventory Management**: view, adjust_stock, receive_stock, view_audit, manage_wastage
+- **Supplier Management** (separate module): view, create, edit, delete
+- **Marketing & Promos**: view_campaigns, manage_campaigns, view_promos, manage_promos, send_notifications
+- **Analytics & Reports**: view_sales, view_analytics, view_customer, view_inventory, export_data
+- **Loyalty & Customers**: view_customers, manage_points, view_rewards, manage_tiers
+- **Expense Management**: view, create, edit, delete (each separately controllable), approve, view_reports
+- **Refund Management**: view, create, approve, process, reject, view_reports
+- **System Settings**: view, general, branches, payments, integrations, backup
+- **Staff & Shifts**: view, create, edit, delete, view_attendance, manage_attendance, view_reports
+- **Delivery Zones & Charges**: view, create, edit, delete, manage_charges
+- **Customer Segments**: view, create, edit, delete
+- **Message Templates**: view, create, edit, delete
+- **JazzCash Monitoring**: view, view_config, manage_config, view_stats
+
+Features accordion-based UI with module-level checkboxes, Select All/Clear All functionality. Permissions stored as text arrays using module.action format. Backend routes use `requirePermission()` middleware for granular access control. Admin users bypass all permission checks by default.
 
 **Branch-Based Access Control**: Comprehensive branch filtering across all modules. Non-admin users (staff, riders) are automatically restricted to viewing only data from their assigned branch. Backend uses `requireBranchAccess()` helper which enforces branch access - throws 403 if non-admin user has no branchId assigned. Routes using branch filtering: orders, expenses, POS tables/sessions, shifts, riders, deliveries, inventory transactions. Admins can access all branches or filter by specific branchId.
 

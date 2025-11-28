@@ -3579,7 +3579,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== Suppliers ====================
   
-  app.get("/api/suppliers", authenticate, authorize("admin", "staff"), async (req, res) => {
+  app.get("/api/suppliers", authenticate, requirePermission("suppliers.view"), async (req, res) => {
     try {
       const suppliers = await storage.getAllSuppliers();
       res.json(suppliers);
@@ -3588,7 +3588,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/suppliers", authenticate, authorize("admin", "staff"), async (req, res) => {
+  app.post("/api/suppliers", authenticate, requirePermission("suppliers.create"), async (req, res) => {
     try {
       const supplier = await storage.createSupplier(req.body);
       res.status(201).json(supplier);
@@ -3597,7 +3597,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/suppliers/:id", authenticate, authorize("admin", "staff"), async (req, res) => {
+  app.patch("/api/suppliers/:id", authenticate, requirePermission("suppliers.edit"), async (req, res) => {
     try {
       const { id } = req.params;
       const supplier = await storage.updateSupplier(id, req.body);
@@ -3607,7 +3607,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/suppliers/:id", authenticate, authorize("admin", "staff"), async (req, res) => {
+  app.delete("/api/suppliers/:id", authenticate, requirePermission("suppliers.delete"), async (req, res) => {
     try {
       const { id } = req.params;
       await storage.deleteSupplier(id);
@@ -3619,7 +3619,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== Inventory ====================
   
-  app.get("/api/inventory/transactions", authenticate, authorize("admin", "staff"), async (req, res) => {
+  app.get("/api/inventory/transactions", authenticate, requirePermission("inventory.view", "inventory.view_audit"), async (req, res) => {
     try {
       const { branchId } = req.query;
       const { branchId: effectiveBranchId, requiresFilter } = requireBranchAccess(req, branchId as string | undefined);
@@ -3633,7 +3633,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/inventory/transactions", authenticate, authorize("admin", "staff"), async (req, res) => {
+  app.post("/api/inventory/transactions", authenticate, requirePermission("inventory.adjust_stock", "inventory.receive_stock"), async (req, res) => {
     try {
       const transaction = await storage.createInventoryTransaction({
         ...req.body,
@@ -3645,7 +3645,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/inventory/wastage/:branchId", authenticate, authorize("admin", "staff"), async (req, res) => {
+  app.get("/api/inventory/wastage/:branchId", authenticate, requirePermission("inventory.view", "inventory.manage_wastage"), async (req, res) => {
     try {
       const { branchId } = req.params;
       const wastage = await storage.getStockWastage(branchId);
@@ -3655,7 +3655,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/inventory/wastage", authenticate, authorize("admin", "staff"), async (req, res) => {
+  app.post("/api/inventory/wastage", authenticate, requirePermission("inventory.manage_wastage"), async (req, res) => {
     try {
       const wastage = await storage.createStockWastage({
         ...req.body,

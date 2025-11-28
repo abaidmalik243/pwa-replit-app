@@ -24,7 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import { PageLoader } from "@/components/ui/page-loader";
-import { ShoppingCart, UtensilsCrossed, Users, BarChart3, Package, Truck, Megaphone, Settings, CreditCard, Heart, Receipt, RefreshCcw, Clock, MapPin, MessageSquare, Smartphone, UserCircle } from "lucide-react";
+import { ShoppingCart, UtensilsCrossed, Users, BarChart3, Package, Truck, Megaphone, Settings, CreditCard, Heart, Receipt, RefreshCcw, Clock, MapPin, MessageSquare, Smartphone, UserCircle, Store } from "lucide-react";
 import type { User, Branch } from "@shared/schema";
 
 // Singleton AudioContext for delete notification sounds
@@ -115,7 +115,8 @@ const PERMISSION_MODULES = [
     label: "Point of Sale",
     icon: CreditCard,
     permissions: [
-      { id: "pos.access", label: "Access POS", description: "Use POS terminal" },
+      { id: "pos.view", label: "View POS", description: "Access POS pages" },
+      { id: "pos.access", label: "Access POS Terminal", description: "Use POS terminal" },
       { id: "pos.manage_tables", label: "Manage Tables", description: "Configure table layout" },
       { id: "pos.apply_discounts", label: "Apply Discounts", description: "Apply order discounts" },
       { id: "pos.void_items", label: "Void Items", description: "Remove items from orders" },
@@ -137,15 +138,25 @@ const PERMISSION_MODULES = [
   },
   {
     id: "inventory",
-    label: "Inventory & Suppliers",
+    label: "Inventory Management",
     icon: Package,
     permissions: [
-      { id: "inventory.view_stock", label: "View Stock", description: "View stock levels" },
+      { id: "inventory.view", label: "View Inventory", description: "View stock levels" },
       { id: "inventory.adjust_stock", label: "Adjust Stock", description: "Modify stock quantities" },
-      { id: "inventory.manage_suppliers", label: "Manage Suppliers", description: "Add/edit suppliers" },
       { id: "inventory.receive_stock", label: "Receive Stock", description: "Record stock receipts" },
       { id: "inventory.view_audit", label: "View Audit Logs", description: "View stock history" },
       { id: "inventory.manage_wastage", label: "Manage Wastage", description: "Record wastage" },
+    ],
+  },
+  {
+    id: "suppliers",
+    label: "Supplier Management",
+    icon: Store,
+    permissions: [
+      { id: "suppliers.view", label: "View Suppliers", description: "View supplier list" },
+      { id: "suppliers.create", label: "Add Suppliers", description: "Add new suppliers" },
+      { id: "suppliers.edit", label: "Edit Suppliers", description: "Modify supplier details" },
+      { id: "suppliers.delete", label: "Delete Suppliers", description: "Remove suppliers" },
     ],
   },
   {
@@ -288,9 +299,10 @@ const ROLE_DEFAULT_PERMISSIONS: Record<string, string[]> = {
   staff: [
     "orders.view", "orders.create", "orders.update_status",
     "menu.view",
-    "pos.access", "pos.apply_discounts", "pos.view_kitchen",
-    "inventory.view_stock",
+    "pos.view", "pos.access", "pos.apply_discounts", "pos.view_kitchen",
+    "inventory.view",
     "reports.view_sales",
+    "shifts.view", "shifts.view_attendance",
   ],
   customer: [],
 };

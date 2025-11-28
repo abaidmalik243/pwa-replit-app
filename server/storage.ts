@@ -329,7 +329,9 @@ export class DbStorage implements IStorage {
   }
 
   async getAllUsers() {
-    return await db.select().from(schema.users).orderBy(desc(schema.users.createdAt));
+    return await db.select().from(schema.users)
+      .where(eq(schema.users.isDeleted, false))
+      .orderBy(desc(schema.users.createdAt));
   }
 
   async createUser(user: schema.InsertUser) {
@@ -343,7 +345,10 @@ export class DbStorage implements IStorage {
   }
 
   async deleteUser(id: string) {
-    await db.delete(schema.users).where(eq(schema.users.id, id));
+    // Soft delete - mark as deleted instead of actually deleting
+    await db.update(schema.users)
+      .set({ isDeleted: true, deletedAt: new Date() })
+      .where(eq(schema.users.id, id));
     return true;
   }
 
@@ -523,7 +528,9 @@ export class DbStorage implements IStorage {
 
   // Expenses
   async getAllExpenses() {
-    return await db.select().from(schema.expenses).orderBy(desc(schema.expenses.date));
+    return await db.select().from(schema.expenses)
+      .where(eq(schema.expenses.isDeleted, false))
+      .orderBy(desc(schema.expenses.date));
   }
 
   async getExpense(id: string) {
@@ -532,7 +539,12 @@ export class DbStorage implements IStorage {
   }
 
   async getExpensesByBranch(branchId: string) {
-    return await db.select().from(schema.expenses).where(eq(schema.expenses.branchId, branchId)).orderBy(desc(schema.expenses.date));
+    return await db.select().from(schema.expenses)
+      .where(and(
+        eq(schema.expenses.branchId, branchId),
+        eq(schema.expenses.isDeleted, false)
+      ))
+      .orderBy(desc(schema.expenses.date));
   }
 
   async getDailyExpenses(branchId?: string) {
@@ -552,7 +564,8 @@ export class DbStorage implements IStorage {
     
     const conditions = [
       gte(schema.expenses.date, today5AM),
-      lte(schema.expenses.date, tomorrow459AM)
+      lte(schema.expenses.date, tomorrow459AM),
+      eq(schema.expenses.isDeleted, false)
     ];
     
     if (branchId) {
@@ -575,7 +588,10 @@ export class DbStorage implements IStorage {
   }
 
   async deleteExpense(id: string) {
-    await db.delete(schema.expenses).where(eq(schema.expenses.id, id));
+    // Soft delete - mark as deleted instead of actually deleting
+    await db.update(schema.expenses)
+      .set({ isDeleted: true, deletedAt: new Date() })
+      .where(eq(schema.expenses.id, id));
     return true;
   }
 

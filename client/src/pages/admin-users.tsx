@@ -24,6 +24,50 @@ import { Badge } from "@/components/ui/badge";
 import { ShoppingCart, UtensilsCrossed, Users, BarChart3, Package, Truck, Megaphone, Settings, CreditCard, Heart, Receipt, RefreshCcw } from "lucide-react";
 import type { User, Branch } from "@shared/schema";
 
+// Singleton AudioContext for delete notification sounds
+let audioContextInstance: AudioContext | null = null;
+
+const getAudioContext = (): AudioContext | null => {
+  try {
+    if (!audioContextInstance || audioContextInstance.state === 'closed') {
+      audioContextInstance = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    return audioContextInstance;
+  } catch (e) {
+    return null;
+  }
+};
+
+// Delete notification sound (short beep)
+const playDeleteSound = async () => {
+  try {
+    const audioContext = getAudioContext();
+    if (!audioContext) return;
+    
+    // Resume context if suspended (required for Safari and Chrome autoplay policy)
+    if (audioContext.state === 'suspended') {
+      await audioContext.resume();
+    }
+    
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.frequency.value = 440; // A4 note
+    oscillator.type = 'sine';
+    
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+    
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.3);
+  } catch (e) {
+    // Silently fail if audio is not supported
+  }
+};
+
 const PERMISSION_MODULES = [
   {
     id: "orders",
@@ -442,7 +486,13 @@ export default function AdminUsers() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-      toast({ title: "User deleted successfully" });
+      // Play delete sound
+      playDeleteSound();
+      toast({ 
+        title: "User Deleted", 
+        description: "The user has been removed from the system.",
+        variant: "destructive"
+      });
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });

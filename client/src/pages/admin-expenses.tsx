@@ -14,10 +14,54 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Search, Calendar, DollarSign, User, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, Calendar, DollarSign, User, Pencil, Trash2, Package, ExternalLink, Paperclip } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import type { Expense, Branch, User as UserType, Supplier } from "@shared/schema";
 import { format, subDays } from "date-fns";
+
+// Singleton AudioContext for delete notification sounds
+let audioContextInstance: AudioContext | null = null;
+
+const getAudioContext = (): AudioContext | null => {
+  try {
+    if (!audioContextInstance || audioContextInstance.state === 'closed') {
+      audioContextInstance = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    return audioContextInstance;
+  } catch (e) {
+    return null;
+  }
+};
+
+// Delete notification sound (short beep)
+const playDeleteSound = async () => {
+  try {
+    const audioContext = getAudioContext();
+    if (!audioContext) return;
+    
+    // Resume context if suspended (required for Safari and Chrome autoplay policy)
+    if (audioContext.state === 'suspended') {
+      await audioContext.resume();
+    }
+    
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.frequency.value = 440; // A4 note
+    oscillator.type = 'sine';
+    
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+    
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.3);
+  } catch (e) {
+    // Silently fail if audio is not supported
+  }
+};
 
 // Calculate the minimum allowed date for expenses based on 24-hour window (5:00 AM cutoff)
 function getMinExpenseDate(): string {
@@ -41,6 +85,7 @@ const expenseSchema = z.object({
     message: "Amount must be a positive number",
   }),
   date: z.string().min(1, "Date is required"),
+  receiptUrl: z.string().optional(),
 }).refine((data) => {
   if (data.category === "staff" && !data.staffId) {
     return false;
@@ -89,6 +134,37 @@ export default function AdminExpenses() {
     queryKey: ["/api/branches"],
   });
 
+  // Fetch all users for displaying staff names on expense cards
+  const { data: allUsers = [] } = useQuery<UserType[]>({
+    queryKey: ["/api/users"],
+    queryFn: async () => {
+      const res = await fetch("/api/users", { credentials: "include" });
+      return res.json();
+    },
+  });
+
+  // Fetch all suppliers for displaying supplier names on expense cards
+  const { data: suppliersList = [] } = useQuery<Supplier[]>({
+    queryKey: ["/api/suppliers"],
+    queryFn: async () => {
+      const res = await fetch("/api/suppliers", { credentials: "include" });
+      return res.json();
+    },
+  });
+
+  // Helper functions to get staff/supplier names
+  const getStaffName = (staffId: string | null) => {
+    if (!staffId) return null;
+    const staff = allUsers.find(u => u.id === staffId);
+    return staff?.fullName || null;
+  };
+
+  const getSupplierName = (supplierId: string | null) => {
+    if (!supplierId) return null;
+    const supplier = suppliersList.find(s => s.id === supplierId);
+    return supplier?.name || null;
+  };
+
   const allowedBranches = useMemo(() => {
     if (isAdmin) {
       return allBranches;
@@ -122,6 +198,7 @@ export default function AdminExpenses() {
       description: "",
       amount: "",
       date: format(new Date(), "yyyy-MM-dd"),
+      receiptUrl: "",
     },
   });
 
@@ -181,6 +258,7 @@ export default function AdminExpenses() {
         description: "",
         amount: "",
         date: format(new Date(), "yyyy-MM-dd"),
+        receiptUrl: "",
       });
     }
   }, [isAddDialogOpen, isAdmin, userBranchId, form]);
@@ -195,9 +273,11 @@ export default function AdminExpenses() {
         branchId: data.branchId,
         category: data.category,
         staffId: data.staffId || null,
+        supplierId: data.supplierId || null,
         description: data.description,
         amount: data.amount,
         date: dateValue,
+        receiptUrl: data.receiptUrl || null,
       });
       return await res.json();
     },
@@ -224,6 +304,7 @@ export default function AdminExpenses() {
         description: data.description,
         amount: data.amount,
         date: dateValue,
+        receiptUrl: data.receiptUrl || null,
       });
       return await res.json();
     },
@@ -247,7 +328,13 @@ export default function AdminExpenses() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/expenses", selectedBranch] });
       queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
-      toast({ title: "Expense deleted successfully" });
+      // Play delete sound
+      playDeleteSound();
+      toast({ 
+        title: "Expense Deleted", 
+        description: "The expense has been removed from the system.",
+        variant: "destructive"
+      });
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -264,6 +351,7 @@ export default function AdminExpenses() {
       description: expense.description,
       amount: expense.amount,
       date: format(new Date(expense.date), "yyyy-MM-dd"),
+      receiptUrl: expense.receiptUrl || "",
     });
   };
 
@@ -538,6 +626,48 @@ export default function AdminExpenses() {
                         </FormItem>
                       )}
                     />
+                    <FormField
+                      control={form.control}
+                      name="receiptUrl"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Receipt/Attachment URL (Optional)</FormLabel>
+                          <FormControl>
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="url"
+                                placeholder="https://example.com/receipt.pdf"
+                                {...field}
+                                value={field.value || ""}
+                                className="flex-1"
+                                data-testid="input-receipt-url"
+                              />
+                              {field.value && (
+                                <a 
+                                  href={field.value} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="shrink-0"
+                                >
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    title="View receipt"
+                                  >
+                                    <ExternalLink className="h-4 w-4" />
+                                  </Button>
+                                </a>
+                              )}
+                            </div>
+                          </FormControl>
+                          <p className="text-xs text-muted-foreground">
+                            Paste a URL to a receipt image or PDF
+                          </p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                     <DialogFooter>
                       <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-save-expense">
                         {(createMutation.isPending || updateMutation.isPending) 
@@ -606,74 +736,104 @@ export default function AdminExpenses() {
                 No expenses found
               </div>
             ) : (
-              filteredExpenses.map((expense) => (
-                <Card key={expense.id} data-testid={`card-expense-${expense.id}`}>
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h3 className="font-semibold">{expense.description}</h3>
-                          <span className="text-xs px-2 py-1 rounded-full bg-muted">
-                            {expense.category}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                          <span>{getBranchName(expense.branchId)}</span>
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            <span>{format(new Date(expense.date), "MMM dd, yyyy")}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <div className="text-2xl font-bold text-primary">
-                            PKR {parseFloat(expense.amount).toLocaleString()}
-                          </div>
-                        </div>
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEdit(expense)}
-                            data-testid={`button-edit-expense-${expense.id}`}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                data-testid={`button-delete-expense-${expense.id}`}
+              filteredExpenses.map((expense) => {
+                const staffName = getStaffName(expense.staffId);
+                const supplierName = getSupplierName(expense.supplierId);
+                
+                return (
+                  <Card key={expense.id} data-testid={`card-expense-${expense.id}`}>
+                    <CardContent className="p-6">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2 flex-wrap">
+                            <h3 className="font-semibold">{expense.description}</h3>
+                            <span className="text-xs px-2 py-1 rounded-full bg-muted">
+                              {expense.category}
+                            </span>
+                            {staffName && (
+                              <span className="text-xs px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 flex items-center gap-1">
+                                <User className="h-3 w-3" />
+                                {staffName}
+                              </span>
+                            )}
+                            {supplierName && (
+                              <span className="text-xs px-2 py-1 rounded-full bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 flex items-center gap-1">
+                                <Package className="h-3 w-3" />
+                                {supplierName}
+                              </span>
+                            )}
+                            {expense.receiptUrl && (
+                              <a 
+                                href={expense.receiptUrl} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-xs px-2 py-1 rounded-full bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 flex items-center gap-1 hover:underline"
+                                data-testid={`link-receipt-${expense.id}`}
                               >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete Expense</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to delete this expense? This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => deleteMutation.mutate(expense.id)}
-                                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                <Paperclip className="h-3 w-3" />
+                                Receipt
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                            <span>{getBranchName(expense.branchId)}</span>
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              <span>{format(new Date(expense.date), "MMM dd, yyyy")}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <div className="text-right">
+                            <div className="text-2xl font-bold text-primary">
+                              PKR {parseFloat(expense.amount).toLocaleString()}
+                            </div>
+                          </div>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleEdit(expense)}
+                              data-testid={`button-edit-expense-${expense.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  data-testid={`button-delete-expense-${expense.id}`}
                                 >
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Expense</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete this expense? This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => deleteMutation.mutate(expense.id)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
+                    </CardContent>
+                  </Card>
+                );
+              })
             )}
           </div>
         </main>
